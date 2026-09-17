@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_myaccounting_account_view,myaccounting.account.view,model_myaccounting_account,group_myaccounting_view,1,0,0,0
+access_myaccounting_account_edit,myaccounting.account.edit,model_myaccounting_account,group_myaccounting_edit,1,1,1,1
+access_myaccounting_move_view,myaccounting.move.view,model_myaccounting_move,group_myaccounting_view,1,0,0,0
+access_myaccounting_move_edit,myaccounting.move.edit,model_myaccounting_move,group_myaccounting_edit,1,1,1,1
+access_myaccounting_move_line_view,myaccounting.move.line.view,model_myaccounting_move_line,group_myaccounting_view,1,0,0,0
+access_myaccounting_move_line_edit,myaccounting.move.line.edit,model_myaccounting_move_line,group_myaccounting_edit,1,1,1,1
+access_myaccounting_backup_edit,myaccounting.backup.edit,model_myaccounting_backup,group_myaccounting_edit,1,1,1,1
+access_myaccounting_user_admin_admin,myaccounting.user_admin.admin,model_myaccounting_user_admin,base.group_system,1,1,1,1

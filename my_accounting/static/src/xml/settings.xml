@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.Settings">
+        <div class="o_myaccounting_settings p-4" style="overflow:auto; height:100%;">
+            <div class="mb-4">
+                <h2 class="m-0">إعدادات أخرى</h2>
+                <div class="text-muted small mt-1">إعدادات ووظائف إضافية للنظام</div>
+            </div>
+
+            <div class="o_settings_section mb-4">
+                <div class="o_settings_section_header">
+                    <i class="fa fa-database me-2"/>
+                    <span>النسخ الاحتياطي والاستعادة</span>
+                </div>
+                <div class="o_settings_section_body">
+                    <div class="o_settings_row">
+                        <div class="o_settings_row_text">
+                            <div class="o_settings_row_title">تحميل نسخة احتياطية</div>
+                            <div class="o_settings_row_desc text-muted small">
+                                يقوم بتحميل ملف يحتوي على جميع القيود المحاسبية وشجرة الحسابات الحالية.
+                            </div>
+                        </div>
+                        <button class="btn btn-primary text-nowrap" t-on-click="() => this.downloadBackup()">
+                            <i class="fa fa-download me-1"/> تحميل نسخة احتياطية
+                        </button>
+                    </div>
+                    <hr/>
+                    <div class="o_settings_row">
+                        <div class="o_settings_row_text">
+                            <div class="o_settings_row_title text-danger">استعادة نسخة احتياطية</div>
+                            <div class="o_settings_row_desc text-muted small">
+                                تحذير: سيتم حذف جميع القيود والحسابات الحالية نهائياً، واستبدالها بمحتوى الملف الذي سيتم رفعه.
+                            </div>
+                        </div>
+                        <div class="text-nowrap">
+                            <input type="file" accept="application/json,.json" class="d-none" t-ref="fileInput"
+                                   t-on-change="(ev) => this.onFileSelected(ev)"/>
+                            <button class="btn btn-outline-danger" t-on-click="() => this.triggerFileSelect()"
+                                    t-att-disabled="state.restoring">
+                                <i class="fa fa-upload me-1"/>
+                                <t t-if="state.restoring">جارِ الاستعادة...</t>
+                                <t t-else="">رفع واستعادة نسخة</t>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>

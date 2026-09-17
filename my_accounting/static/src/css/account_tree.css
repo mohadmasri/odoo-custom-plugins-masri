@@ -1,0 +1,90 @@
+/* الألوان مكتوبة بصيغة var(--متغيّر, قيمة-فاتحة) حتى تعمل الصفحة في الوضعين:
+   الفاتح يأخذ القيمة الاحتياطية، والداكن يأخذ المتغيّر المعرّف في حزمة الوضع
+   الداكن (dark_overrides.scss). */
+
+.o_account_tree_card {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.o_account_tree_header {
+    padding: 10px 16px;
+    background-color: var(--o-surface-2, rgba(0, 0, 0, 0.03));
+    border-bottom: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    color: var(--gray-600, #6c757d);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.o_account_tree_row {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.05));
+    transition: background-color 0.1s ease-in;
+}
+
+.o_account_tree_node:last-child > .o_account_tree_row {
+    border-bottom: none;
+}
+
+.o_account_tree_row:hover {
+    background-color: var(--o-surface-hover, rgba(113, 75, 163, 0.06));
+}
+
+.o_account_tree_row_root {
+    font-weight: 600;
+}
+
+.o_account_tree_caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    color: var(--o-accent, #875a7b);
+    cursor: pointer;
+}
+
+.o_account_tree_code {
+    display: inline-block;
+    min-width: 42px;
+    color: var(--o-accent, #875a7b);
+    font-weight: 600;
+    margin-inline-end: 8px;
+}
+
+.o_account_tree_label {
+    cursor: pointer;
+}
+
+.o_account_tree_label:hover {
+    text-decoration: underline;
+}
+
+.o_account_tree_balance {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+/* الرصيد الصفري يُعرض بصنف text-muted الذي يصبح خافتاً جداً على الخلفية
+   الداكنة، فنرفع تباينه هنا */
+.o_account_tree_balance.text-muted {
+    color: var(--gray-600, #6c757d) !important;
+}
+
+.o_account_tree_add {
+    opacity: 0;
+    transition: opacity 0.1s ease-in;
+}
+
+.o_account_tree_row:hover .o_account_tree_add {
+    opacity: 1;
+}
+
+/* شريط أدوات التحديد الجماعي (يُستخدم أيضاً في القيود move_list.xml) */
+.o_account_bulk_toolbar,
+.o_move_bulk_toolbar {
+    background-color: var(--o-surface-2, #eef3fb);
+}

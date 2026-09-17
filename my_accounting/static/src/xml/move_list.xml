@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.MoveList">
+        <div class="o_move_list p-3" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="m-0">القيود المحاسبية</h2>
+                <button class="btn btn-primary" t-on-click="() => this.createMove()">
+                    <i class="fa fa-plus me-1"/> جديد
+                </button>
+            </div>
+
+            <div class="o_move_filters d-flex flex-wrap align-items-end mb-3" style="gap: 12px;">
+                <div>
+                    <label class="d-block small text-muted mb-1">رقم القيد</label>
+                    <input type="text" class="form-control form-control-sm" style="width:160px;"
+                           placeholder="بحث..." t-att-value="state.name"
+                           t-on-input="(ev) => this.onTextInput('name', ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">من تاريخ</label>
+                    <input type="date" class="form-control form-control-sm" style="width:160px;"
+                           t-att-value="state.dateFrom"
+                           t-on-change="(ev) => this.onDateInput('dateFrom', ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">إلى تاريخ</label>
+                    <input type="date" class="form-control form-control-sm" style="width:160px;"
+                           t-att-value="state.dateTo"
+                           t-on-change="(ev) => this.onDateInput('dateTo', ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">المرجع</label>
+                    <input type="text" class="form-control form-control-sm" style="width:160px;"
+                           placeholder="بحث..." t-att-value="state.ref"
+                           t-on-input="(ev) => this.onTextInput('ref', ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">الحساب</label>
+                    <input type="text" class="form-control form-control-sm" style="width:160px;"
+                           placeholder="بحث..." t-att-value="state.account"
+                           t-on-input="(ev) => this.onTextInput('account', ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">شهر دفتر الأستاذ</label>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onLedgerMonthFilter(ev)">
+                        <option value="">-- الكل --</option>
+                        <t t-foreach="ledgerMonthOptions" t-as="opt" t-key="opt.value">
+                            <option t-att-value="opt.value" t-att-selected="opt.value === state.ledgerMonth">
+                                <t t-esc="opt.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">سنة دفتر الأستاذ</label>
+                    <input type="number" class="form-control form-control-sm" style="width:110px;"
+                           placeholder="مثال: 2026" t-att-value="state.ledgerYear"
+                           t-on-input="(ev) => this.onLedgerYearInput(ev)"/>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">الحالة</label>
+                    <div class="btn-group" role="group">
+                        <button type="button" t-attf-class="btn btn-sm {{ state.stateFilter === 'draft' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.onStateFilter('draft')">مسودة</button>
+                        <button type="button" t-attf-class="btn btn-sm {{ state.stateFilter === 'posted' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.onStateFilter('posted')">مرحّل</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="d-block small text-muted mb-1">التوازن</label>
+                    <div class="btn-group" role="group">
+                        <button type="button" t-attf-class="btn btn-sm {{ state.balanceFilter === 'balanced' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.onBalanceFilter('balanced')">متوازن</button>
+                        <button type="button" t-attf-class="btn btn-sm {{ state.balanceFilter === 'unbalanced' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.onBalanceFilter('unbalanced')">غير متوازن</button>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-link" t-on-click="() => this.clearFilters()">
+                        <i class="fa fa-times me-1"/> مسح الفلاتر
+                    </button>
+                </div>
+            </div>
+
+            <div t-if="selectedIds.length" class="o_move_bulk_toolbar d-flex align-items-center mb-2 p-2"
+                 style="gap: 10px; border-radius: 6px;">
+                <span class="small fw-bold" t-esc="`تم تحديد ${selectedIds.length} قيد`"/>
+                <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.printSelected()">
+                    <i class="fa fa-print me-1"/> طباعة المحدد
+                </button>
+                <button class="btn btn-sm btn-outline-success" t-on-click="() => this.bulkPost()">
+                    <i class="fa fa-check me-1"/> ترحيل المحدد
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.bulkResetToDraft()">
+                    <i class="fa fa-undo me-1"/> إعادة إلى مسودة
+                </button>
+                <button class="btn btn-sm btn-outline-danger" t-on-click="() => this.bulkDelete()">
+                    <i class="fa fa-trash me-1"/> حذف المحدد
+                </button>
+                <button class="btn btn-sm btn-link ms-auto" t-on-click="() => this.clearSelection()">
+                    إلغاء التحديد
+                </button>
+            </div>
+
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th style="width: 32px;">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="allSelected"
+                                   t-on-change="(ev) => this.toggleSelectAll(ev)"/>
+                        </th>
+                        <th>رقم القيد</th>
+                        <th>التاريخ</th>
+                        <th>الشهر المحاسبي</th>
+                        <th>المرجع</th>
+                        <th>اليومية</th>
+                        <th class="text-end">إجمالي المدين</th>
+                        <th class="text-end">إجمالي الدائن</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-if="!state.records.length">
+                        <td colspan="9" class="text-center text-muted py-4">لا توجد قيود مطابقة</td>
+                    </tr>
+                    <tr t-foreach="state.records" t-as="rec" t-key="rec.id"
+                        style="cursor:pointer;" t-on-click="() => this.openMove(rec.id)">
+                        <td t-on-click="(ev) => ev.stopPropagation()">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="state.selected[rec.id] || false"
+                                   t-on-change="(ev) => this.toggleSelect(rec.id, ev)"/>
+                        </td>
+                        <td><strong t-esc="rec.name"/></td>
+                        <td t-esc="rec.date"/>
+                        <td t-esc="rec.ledger_period_label"/>
+                        <td t-esc="rec.ref"/>
+                        <td t-esc="rec.journal"/>
+                        <td class="text-end" t-esc="rec.total_debit.toFixed(3)"/>
+                        <td class="text-end" t-esc="rec.total_credit.toFixed(3)"/>
+                        <td>
+                            <span t-attf-class="badge {{ rec.state === 'posted' ? 'text-bg-success' : 'text-bg-info' }}"
+                                  t-esc="stateLabels[rec.state]"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </t>
+
+</templates>

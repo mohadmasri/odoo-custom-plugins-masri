@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.AccountTree">
+        <div class="o_account_tree_page p-4" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="m-0">شجرة الحسابات</h2>
+                    <div class="text-muted small mt-1">إدارة الحسابات وتنظيمها الهرمي</div>
+                </div>
+                <div class="d-flex" style="gap: 8px;">
+                    <button class="btn btn-outline-secondary" t-on-click="() => this.openReview()">
+                        <i class="fa fa-check-square-o me-1"/> مراجعة الحسابات
+                    </button>
+                    <button class="btn btn-outline-primary" t-on-click="() => this.openBulkCreateDialog(false)">
+                        <i class="fa fa-list-ul me-1"/> إضافة حسابات متعددة
+                    </button>
+                    <button class="btn btn-primary" t-on-click="() => this.createAccount(false)">
+                        <i class="fa fa-plus me-1"/> حساب جديد
+                    </button>
+                </div>
+            </div>
+
+            <div t-if="selectedIds.length" class="o_account_bulk_toolbar d-flex align-items-center mb-2 p-2"
+                 style="gap: 10px; border-radius: 6px;">
+                <span class="small fw-bold" t-esc="`تم تحديد ${selectedIds.length} حساب`"/>
+                <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.printSelected()">
+                    <i class="fa fa-print me-1"/> طباعة المحدد
+                </button>
+                <button class="btn btn-sm btn-link ms-auto" t-on-click="() => this.clearSelection()">
+                    إلغاء التحديد
+                </button>
+            </div>
+
+            <div class="o_account_tree_card">
+                <div class="d-flex fw-bold o_account_tree_header">
+                    <div style="width:30px;" class="text-center">
+                        <input type="checkbox" class="form-check-input"
+                               t-att-checked="allSelected"
+                               t-on-change="(ev) => this.toggleSelectAll(ev)"/>
+                    </div>
+                    <div class="flex-grow-1">الحساب</div>
+                    <div style="width:130px;" class="text-end">الرصيد</div>
+                    <div style="width:40px;"/>
+                </div>
+                <div t-if="!state.roots.length" class="text-muted text-center py-5">
+                    لا توجد حسابات بعد. اضغط "حساب جديد" للبدء.
+                </div>
+                <t t-foreach="state.roots" t-as="root" t-key="root.id">
+                    <AccountTreeNode node="root" depth="0" expanded="state.expanded" selected="state.selected"
+                        onToggle="(id) => this.toggle(id)"
+                        onOpen="(id) => this.openAccount(id)"
+                        onAddChild="(id) => this.createAccount(id)"
+                        onToggleSelect="(id, checked) => this.toggleSelect(id, checked)"/>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="my_accounting.AccountTreeNode">
+        <div class="o_account_tree_node">
+            <div class="d-flex align-items-center o_account_tree_row"
+                 t-attf-class="{{ props.depth === 0 ? 'o_account_tree_row_root' : '' }}"
+                 t-att-style="indentStyle">
+                <div style="width:30px;" class="text-center flex-shrink-0">
+                    <input type="checkbox" class="form-check-input"
+                           t-att-checked="props.selected[node.id] || false"
+                           t-on-change="(ev) => props.onToggleSelect(node.id, ev.target.checked)"/>
+                </div>
+                <span t-if="hasChildren" class="o_account_tree_caret"
+                      t-on-click.stop="() => props.onToggle(node.id)">
+                    <i t-attf-class="fa {{ isExpanded ? 'fa-caret-down' : 'fa-caret-right' }}"/>
+                </span>
+                <span t-else="" class="o_account_tree_caret"/>
+                <span class="flex-grow-1 o_account_tree_label" t-on-click="() => props.onOpen(node.id)">
+                    <span class="o_account_tree_code" t-esc="node.code"/>
+                    <t t-esc="node.name"/>
+                    <span t-if="node.reviewed" class="badge text-bg-success ms-2" style="font-size:10px;">
+                        <i class="fa fa-check me-1"/>تمت المراجعة
+                    </span>
+                </span>
+                <div style="width:130px;" t-attf-class="text-end o_account_tree_balance {{ balanceClass }}"
+                     t-esc="formattedBalance"/>
+                <div style="width:40px;" class="text-center o_account_tree_add">
+                    <a href="#" class="text-muted" title="إضافة حساب فرعي"
+                       t-on-click.stop.prevent="() => props.onAddChild(node.id)">
+                        <i class="fa fa-plus"/>
+                    </a>
+                </div>
+            </div>
+            <t t-if="isExpanded">
+                <t t-foreach="node.children" t-as="child" t-key="child.id">
+                    <AccountTreeNode node="child" depth="props.depth + 1" expanded="props.expanded" selected="props.selected"
+                        onToggle="props.onToggle" onOpen="props.onOpen" onAddChild="props.onAddChild"
+                        onToggleSelect="props.onToggleSelect"/>
+                </t>
+            </t>
+        </div>
+    </t>
+
+</templates>

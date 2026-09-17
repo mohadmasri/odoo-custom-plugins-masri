@@ -1,0 +1,54 @@
+// تصحيحات نهائية للوضع الداكن، تُضاف في نهاية حزمة الأنماط الداكنة.
+//
+// تقتصر على الحالات التي لا تنقلب دلالتها تلقائياً عند عكس لوحة الألوان:
+// أصناف مثل .bg-white و .text-black مكتوبة بلون صريح لا يتغيّر بتغيّر
+// المتغيّرات، فنصححها هنا فقط.
+
+// متغيّرات الأسطح الخاصة بصفحات التطبيق المخصّصة. ملفات CSS الخاصة بنا تقرأها
+// بصيغة var(--o-surface, #fff) فتأخذ اللون الفاتح افتراضياً في الوضع العادي،
+// وهذه القيم الداكنة في الوضع الداكن.
+:root {
+    --o-surface: #1c1f28;
+    --o-surface-2: #232734;
+    --o-surface-hover: #252934;
+    --o-surface-border: #2b3040;
+    --o-accent: #b79ae0;
+}
+
+.bg-white {
+    background-color: #1c1f28 !important;
+}
+
+.text-black,
+.text-body-emphasis {
+    color: #f0f2f7 !important;
+}
+
+.text-light {
+    color: #e8eaf0 !important;
+}
+
+// حدود صريحة بالأبيض تظهر كخط ساطع على الخلفية الداكنة
+.border-white {
+    border-color: #2b3040 !important;
+}
+
+// إطار لوحات البيانات (محرّك الجداول o_spreadsheet له ألوانه الخاصة المرسومة
+// على canvas، لكن نضبط على الأقل الإطار وأشرطة التمرير المحيطة به)
+.o_spreadsheet_dashboard_action,
+.o-dashboard-grid,
+.o-spreadsheet .o-scrollbar {
+    background-color: #1c1f28 !important;
+}
+
+// مكتبة التقويم (FullCalendar) تستخدم ألوان نصوص خاصة بها مكتوبة صراحةً
+.fc {
+    .fc-timegrid-axis-cushion,
+    .fc-timegrid-slot-label-cushion,
+    .fc-col-header-cell-cushion,
+    .fc-daygrid-day-number,
+    .fc-list-day-text,
+    .fc-list-day-side-text {
+        color: #c3c9d6 !important;
+    }
+}

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <template id="report_myaccounting_account_statement_document">
+        <t t-call="web.external_layout">
+            <t t-set="date_from" t-value="o.env.context.get('date_from')"/>
+            <t t-set="date_to" t-value="o.env.context.get('date_to')"/>
+            <t t-set="line_ids_ctx" t-value="o.env.context.get('line_ids')"/>
+            <t t-set="lines" t-value="o._get_statement_lines(date_from, date_to, line_ids_ctx)"/>
+            <div class="page">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h2 class="mb-0">كشف حساب</h2>
+                        <h3 class="text-muted mt-0">
+                            <span t-esc="o.code"/><span> - </span><span t-esc="o.name"/>
+                        </h3>
+                    </div>
+                </div>
+
+                <table class="table table-borderless mb-4" style="width:100%;" t-if="date_from or date_to">
+                    <tr>
+                        <td style="width:25%;"><strong>من تاريخ:</strong></td>
+                        <td style="width:25%;"><span t-esc="date_from or '—'"/></td>
+                        <td style="width:25%;"><strong>إلى تاريخ:</strong></td>
+                        <td style="width:25%;"><span t-esc="date_to or '—'"/></td>
+                    </tr>
+                </table>
+
+                <table class="table table-bordered" style="width:100%;">
+                    <thead style="background-color:#f2f2f2;">
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>القيد</th>
+                            <th>الحساب</th>
+                            <th>البيان</th>
+                            <th class="text-end" style="width:13%;">مدين</th>
+                            <th class="text-end" style="width:13%;">دائن</th>
+                            <th class="text-end" style="width:15%;">الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="lines" t-as="line">
+                            <t t-set="running" t-value="(running or 0) + line.debit - line.credit"/>
+                            <td><span t-field="line.date"/></td>
+                            <td><span t-esc="line.move_id.name"/></td>
+                            <td><span t-esc="line.account_id.code"/><span> - </span><span t-esc="line.account_id.name"/></td>
+                            <td><span t-field="line.name">—</span></td>
+                            <td class="text-end">
+                                <span t-if="line.debit"
+                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-if="line.credit"
+                                      t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="'%.3f' % running"/>
+                            </td>
+                        </tr>
+                        <tr t-if="not lines">
+                            <td colspan="7" class="text-center text-muted">لا توجد حركات ضمن هذا النطاق</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color:#f2f2f2; font-weight:bold;">
+                            <td colspan="4" class="text-end">الإجمالي</td>
+                            <td class="text-end">
+                                <span t-esc="'%.3f' % sum(lines.mapped('debit'))"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="'%.3f' % sum(lines.mapped('credit'))"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="'%.3f' % (running or 0)"/>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_myaccounting_account_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div t-attf-style="{{ 'page-break-after: always;' if not o_last else '' }}">
+                    <t t-call="my_accounting.report_myaccounting_account_statement_document"/>
+                </div>
+            </t>
+            <script>window.addEventListener('load', function () { window.print(); });</script>
+        </t>
+    </template>
+
+    <record id="action_report_myaccounting_account_statement" model="ir.actions.report">
+        <field name="name">طباعة كشف الحساب</field>
+        <field name="model">myaccounting.account</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">my_accounting.report_myaccounting_account_statement</field>
+        <field name="report_file">my_accounting.report_myaccounting_account_statement</field>
+        <field name="print_report_name">'كشف حساب - %s' % (object.name)</field>
+    </record>
+
+    </data>
+</odoo>

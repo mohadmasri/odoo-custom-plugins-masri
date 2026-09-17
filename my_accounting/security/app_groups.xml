@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+    <!-- صلاحيات تطبيق "المحاسبة المخصصة" نفسه: عرض فقط، أو تعديل كامل -->
+    <record id="group_myaccounting_view" model="res.groups">
+        <field name="name">المحاسبة المخصصة: عرض فقط</field>
+    </record>
+    <record id="group_myaccounting_edit" model="res.groups">
+        <field name="name">المحاسبة المخصصة: تعديل</field>
+        <field name="implied_ids" eval="[(4, ref('group_myaccounting_view'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+
+    <!-- مجموعات وصول بسيطة (بدون تدرّج) للتطبيقات التي لا تملك مستويي صلاحية
+         منفصلين أصلاً في أودو، تُستخدم فقط للتحكم بظهور التطبيق للمستخدم -->
+    <record id="group_app_discuss" model="res.groups">
+        <field name="name">الوصول لتطبيق: المناقشة</field>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+    <record id="group_app_calendar" model="res.groups">
+        <field name="name">الوصول لتطبيق: التقويم</field>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+    <record id="group_app_todo" model="res.groups">
+        <field name="name">الوصول لتطبيق: المهام</field>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+    <record id="group_app_contacts" model="res.groups">
+        <field name="name">الوصول لتطبيق: جهات الاتصال</field>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+    <record id="group_app_dashboard_view" model="res.groups">
+        <field name="name">الوصول لتطبيق: لوحات البيانات (عرض)</field>
+        <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+
+    <!-- بوابة ظهور القوائم الرئيسية (التطبيقات) حسب المجموعات أعلاه، بدلاً من
+         إتاحتها لأي مستخدم داخلي دون قيد -->
+    <record id="mail.menu_root_discuss" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_app_discuss')])]"/>
+    </record>
+    <record id="calendar.mail_menu_calendar" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_app_calendar')])]"/>
+    </record>
+    <record id="project_todo.menu_todo_todos" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_app_todo')])]"/>
+    </record>
+    <record id="contacts.menu_contacts" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_app_contacts')])]"/>
+    </record>
+    <record id="spreadsheet_dashboard.spreadsheet_dashboard_menu_root" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_app_dashboard_view'), ref('spreadsheet_dashboard.group_dashboard_manager')])]"/>
+    </record>
+    <record id="my_accounting.menu_myaccounting_root" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('group_myaccounting_view'), ref('group_myaccounting_edit')])]"/>
+    </record>
+
+    <!-- منع المستخدمين العاديين من الوصول لصفحة "التطبيقات" (تثبيت/إزالة
+         تطبيقات أودو)؛ تبقى متاحة فقط للمسؤول (base.group_system) -->
+    <record id="base.menu_management" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('base.group_system')])]"/>
+    </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,43 @@
+.o_myaccounting_home_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    max-width: 900px;
+}
+
+.o_myaccounting_home_card {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    padding: 24px;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    transition: transform 0.12s ease-in, box-shadow 0.12s ease-in;
+}
+
+.o_myaccounting_home_card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.o_myaccounting_home_icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 14px;
+}
+
+.o_myaccounting_home_title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.o_myaccounting_home_desc {
+    font-size: 13px;
+    color: var(--gray-600, #6c757d);
+}

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.AccountMovementsPanel">
+        <div class="o_account_movements_panel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex flex-wrap align-items-end" style="gap: 12px;">
+                    <div>
+                        <label class="d-block small text-muted mb-1">رقم القيد</label>
+                        <input type="text" class="form-control form-control-sm" style="width:140px;"
+                               placeholder="بحث..." t-att-value="state.moveName"
+                               t-on-input="(ev) => this.onTextInput('moveName', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">من تاريخ</label>
+                        <input type="date" class="form-control form-control-sm" style="width:150px;"
+                               t-att-value="state.dateFrom"
+                               t-on-change="(ev) => this.onDateInput('dateFrom', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">إلى تاريخ</label>
+                        <input type="date" class="form-control form-control-sm" style="width:150px;"
+                               t-att-value="state.dateTo"
+                               t-on-change="(ev) => this.onDateInput('dateTo', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">المرجع</label>
+                        <input type="text" class="form-control form-control-sm" style="width:140px;"
+                               placeholder="بحث..." t-att-value="state.ref"
+                               t-on-input="(ev) => this.onTextInput('ref', ev)"/>
+                    </div>
+                    <div t-if="state.childAccounts.length > 1">
+                        <label class="d-block small text-muted mb-1">الحساب</label>
+                        <select class="form-select form-select-sm" style="width:180px;"
+                                t-on-change="(ev) => this.onAccountFilter(ev)">
+                            <option value="" t-att-selected="!state.accountFilter">كل الحسابات (شامل الفرعية)</option>
+                            <t t-foreach="state.childAccounts" t-as="acc" t-key="acc.id">
+                                <option t-att-value="acc.id" t-att-selected="state.accountFilter === acc.id">
+                                    <t t-esc="acc.code"/><t t-esc="' - '"/><t t-esc="acc.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-link" t-on-click="() => this.clearFilters()">
+                            <i class="fa fa-times me-1"/> مسح الفلاتر
+                        </button>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" t-on-click="() => this.printStatement()">
+                    <i class="fa fa-print me-1"/> طباعة
+                </button>
+            </div>
+
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>القيد</th>
+                        <th>الحساب</th>
+                        <th>البيان</th>
+                        <th class="text-end">مدين</th>
+                        <th class="text-end">دائن</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-if="!state.records.length">
+                        <td colspan="7" class="text-center text-muted py-4">لا توجد حركات مطابقة</td>
+                    </tr>
+                    <tr t-foreach="state.records" t-as="rec" t-key="rec.id"
+                        style="cursor:pointer;" t-on-click="() => this.openMove(rec.move_id[0])">
+                        <td t-esc="rec.date"/>
+                        <td><strong t-esc="rec.move_id[1]"/></td>
+                        <td t-esc="rec.account_id[1]"/>
+                        <td t-esc="rec.name"/>
+                        <td class="text-end" t-esc="rec.debit ? rec.debit.toFixed(3) : ''"/>
+                        <td class="text-end" t-esc="rec.credit ? rec.credit.toFixed(3) : ''"/>
+                        <td>
+                            <span t-attf-class="badge {{ rec.move_state === 'posted' ? 'text-bg-success' : 'text-bg-info' }}"
+                                  t-esc="stateLabels[rec.move_state]"/>
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot t-if="state.records.length">
+                    <tr class="fw-bold" style="border-top: 2px solid var(--border-color, #dee2e6);">
+                        <td colspan="4" class="text-end">الإجمالي</td>
+                        <td class="text-end" t-esc="totalDebit.toFixed(3)"/>
+                        <td class="text-end" t-esc="totalCredit.toFixed(3)"/>
+                        <td/>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </t>
+
+</templates>

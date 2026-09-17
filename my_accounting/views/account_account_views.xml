@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <record id="view_myaccounting_account_list" model="ir.ui.view">
+        <field name="name">myaccounting.account.list</field>
+        <field name="model">myaccounting.account</field>
+        <field name="arch" type="xml">
+            <list string="شجرة الحسابات" decoration-muted="not active" js_class="myaccounting_account_review_list">
+                <field name="code"/>
+                <field name="name_tree" string="اسم الحساب"/>
+                <field name="name" column_invisible="1"/>
+                <field name="parent_id" column_invisible="1"/>
+                <field name="balance" sum="الإجمالي" digits="[16,3]"/>
+                <field name="reviewed" widget="boolean_toggle"/>
+                <field name="active" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_account_form" model="ir.ui.view">
+        <field name="name">myaccounting.account.form</field>
+        <field name="model">myaccounting.account</field>
+        <field name="arch" type="xml">
+            <form string="حساب محاسبي">
+                <header>
+                    <button name="action_review" type="object" string="وضع علامة تمت المراجعة"
+                            class="oe_highlight" invisible="reviewed"/>
+                    <button name="action_reset_review" type="object" string="إلغاء المراجعة"
+                            invisible="not reviewed"/>
+                    <button name="action_create_child_account" type="object" string="إنشاء حساب"
+                            invisible="not id"/>
+                    <field name="reviewed" widget="statusbar" statusbar_visible="False,True"
+                           invisible="1"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="تمت المراجعة" bg_color="text-bg-success"
+                            invisible="not reviewed"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="اسم الحساب"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="parent_id"/>
+                            <field name="active"/>
+                            <field name="is_essential"/>
+                        </group>
+                        <group>
+                            <field name="balance"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="reviewed_by" readonly="1"/>
+                            <field name="reviewed_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="حركات القيود">
+                            <widget name="my_accounting.account_movements_panel"/>
+                        </page>
+                        <page string="الحسابات الفرعية">
+                            <field name="child_ids">
+                                <list>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="balance"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="ملاحظات">
+                            <field name="note" placeholder="ملاحظات حول هذا الحساب..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_account_search" model="ir.ui.view">
+        <field name="name">myaccounting.account.search</field>
+        <field name="model">myaccounting.account</field>
+        <field name="arch" type="xml">
+            <search string="بحث في شجرة الحسابات">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="parent_id"/>
+                <filter string="غير مُراجَعة" name="not_reviewed" domain="[('reviewed', '=', False)]"/>
+                <filter string="تمت مراجعتها" name="reviewed" domain="[('reviewed', '=', True)]"/>
+                <separator/>
+                <filter string="غير نشطة" name="inactive" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter string="الحساب الأب" name="group_parent" context="{'group_by': 'parent_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_myaccounting_account" model="ir.actions.act_window">
+        <field name="name">شجرة الحسابات</field>
+        <field name="res_model">myaccounting.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_myaccounting_account_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                أنشئ أول حساب في شجرة الحسابات
+            </p>
+        </field>
+    </record>
+
+    <record id="action_myaccounting_account_review" model="ir.actions.act_window">
+        <field name="name">مراجعة الحسابات</field>
+        <field name="res_model">myaccounting.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_myaccounting_account_search"/>
+        <field name="context">{'search_default_not_reviewed': 1}</field>
+    </record>
+
+    </data>
+</odoo>

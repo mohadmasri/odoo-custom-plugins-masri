@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="my_accounting.DarkModeToggle">
+        <div class="o_dark_mode_toggle d-flex align-items-center justify-content-center px-2"
+             style="cursor:pointer; height:100%;"
+             t-on-click="() => this.toggle()"
+             t-att-title="state.isDark ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'">
+            <i t-attf-class="fa {{ state.isDark ? 'fa-sun-o' : 'fa-moon-o' }}" style="font-size:16px;"/>
+        </div>
+    </t>
+</templates>

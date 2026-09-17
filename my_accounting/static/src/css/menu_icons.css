@@ -1,0 +1,40 @@
+/* أيقونات صغيرة بجانب روابط القائمة الرئيسية لتطبيق المحاسبة المخصصة، لتحسين
+   الرؤية البصرية عند التنقل بين أقسام التطبيق. */
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_move_new"]::before,
+a[data-menu-xmlid="my_accounting.menu_myaccounting_moves"]::before,
+a[data-menu-xmlid="my_accounting.menu_myaccounting_accounts"]::before,
+a[data-menu-xmlid="my_accounting.menu_myaccounting_general_ledger"]::before,
+a[data-menu-xmlid="my_accounting.menu_myaccounting_settings"]::before {
+    font-family: "FontAwesome";
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    margin-inline-end: 8px;
+    font-size: 13px;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_move_new"]::before {
+    content: "\f055"; /* fa-plus-circle */
+    color: #00A09D;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_moves"]::before {
+    content: "\f022"; /* fa-list-alt */
+    color: #714B67;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_accounts"]::before {
+    content: "\f0e8"; /* fa-sitemap */
+    color: #017E84;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_general_ledger"]::before {
+    content: "\f02d"; /* fa-book */
+    color: #F06050;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_settings"]::before {
+    content: "\f013"; /* fa-cog */
+    color: #6c757d;
+}

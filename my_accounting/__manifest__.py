@@ -1,0 +1,81 @@
+{
+    'name': 'محاسبة مخصصة (My Accounting)',
+    'version': '19.0.1.0.0',
+    'summary': 'تطبيق محاسبة مخصص: شجرة حسابات، قيود محاسبية، ومراجعة الحسابات',
+    'description': """
+تطبيق محاسبة بسيط مبني من الصفر يوفر:
+- شجرة حسابات (إنشاء، تعديل، تصنيف حسب النوع)
+- قيود محاسبية بسطور مدين/دائن متوازنة
+- ترحيل القيود (Post) وإعادتها لمسودة
+- مراجعة الحسابات (وضع علامة تمت المراجعة)
+- عرض رصيد كل حساب من واقع القيود المرحّلة
+""",
+    'category': 'Accounting',
+    'author': 'Custom',
+    'license': 'LGPL-3',
+    'depends': [
+        'base', 'mail', 'web', 'project', 'calendar', 'contacts', 'account',
+        'spreadsheet_dashboard', 'project_todo',
+    ],
+    'data': [
+        'security/app_groups.xml',
+        'security/ir.model.access.csv',
+        'data/account_data.xml',
+        'views/report_account_statement.xml',
+        'views/account_account_views.xml',
+        'views/report_account_move.xml',
+        'views/account_move_views.xml',
+        'views/app_launcher_action.xml',
+        'views/menus.xml',
+    ],
+    'application': True,
+    'installable': True,
+    'assets': {
+        'web.assets_backend': [
+            'my_accounting/static/src/js/app_launcher.js',
+            'my_accounting/static/src/xml/app_launcher.xml',
+            'my_accounting/static/src/js/account_bulk_dialog.js',
+            'my_accounting/static/src/xml/account_bulk_dialog.xml',
+            'my_accounting/static/src/js/account_tree.js',
+            'my_accounting/static/src/xml/account_tree.xml',
+            'my_accounting/static/src/js/account_review_list.js',
+            'my_accounting/static/src/css/account_tree.css',
+            'my_accounting/static/src/js/move_list.js',
+            'my_accounting/static/src/xml/move_list.xml',
+            'my_accounting/static/src/js/move_form.js',
+            'my_accounting/static/src/js/account_line_selector.js',
+            'my_accounting/static/src/xml/account_line_selector.xml',
+            'my_accounting/static/src/js/account_movements_widget.js',
+            'my_accounting/static/src/xml/account_movements_widget.xml',
+            'my_accounting/static/src/js/general_ledger.js',
+            'my_accounting/static/src/xml/general_ledger.xml',
+            'my_accounting/static/src/css/general_ledger.css',
+            'my_accounting/static/src/js/home.js',
+            'my_accounting/static/src/xml/home.xml',
+            'my_accounting/static/src/css/home.css',
+            'my_accounting/static/src/js/settings.js',
+            'my_accounting/static/src/xml/settings.xml',
+            'my_accounting/static/src/css/settings.css',
+            'my_accounting/static/src/css/menu_icons.css',
+            'my_accounting/static/src/js/navbar_home_button.js',
+            'my_accounting/static/src/xml/navbar_home_button.xml',
+            'my_accounting/static/src/css/navbar_home_button.css',
+            'my_accounting/static/src/js/user_admin.js',
+            'my_accounting/static/src/xml/user_admin.xml',
+            'my_accounting/static/src/css/user_admin.css',
+            'my_accounting/static/src/js/dark_mode_toggle.js',
+            'my_accounting/static/src/xml/dark_mode_toggle.xml',
+        ],
+        # الوضع الداكن: نحقن متغيّرات الألوان الداكنة في حزمتي الأنماط الداكنة
+        # قبل تجميع بقية الملفات، فتُعاد صياغة كل ألوان الواجهة تلقائياً.
+        'web.assets_web_dark': [
+            ('before', 'web/static/src/scss/primary_variables.scss',
+             'my_accounting/static/src/scss/dark_variables.scss'),
+            'my_accounting/static/src/scss/dark_overrides.scss',
+        ],
+        'web.assets_backend_lazy_dark': [
+            ('before', 'web/static/src/scss/primary_variables.scss',
+             'my_accounting/static/src/scss/dark_variables.scss'),
+        ],
+    },
+}

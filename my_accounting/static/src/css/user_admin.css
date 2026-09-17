@@ -1,0 +1,8 @@
+.o_user_admin_row:hover {
+    background-color: var(--o-surface-hover, #f2f2f2);
+}
+
+.o_user_admin_row_active {
+    background-color: var(--o-surface-2, #eef3fb);
+    font-weight: bold;
+}

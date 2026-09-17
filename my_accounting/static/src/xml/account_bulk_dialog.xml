@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.BulkAccountDialog">
+        <Dialog title="'إضافة حسابات متعددة'" size="'md'">
+            <div class="o_bulk_account_dialog">
+                <div class="mb-3">
+                    <label class="form-label small text-muted d-block">الحساب الأب (لجميع الحسابات)</label>
+                    <select class="form-select" t-on-change="(ev) => this.onParentChange(ev)">
+                        <option value="">-- بدون (حساب رئيسي) --</option>
+                        <t t-foreach="state.accounts" t-as="acc" t-key="acc.id">
+                            <option t-att-value="acc.id" t-att-selected="acc.id === state.parentId">
+                                <t t-esc="acc.display_name"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-muted d-block">أسماء الحسابات (اسم واحد في كل سطر)</label>
+                    <textarea class="form-control" rows="8"
+                              placeholder="مثال:&#10;موفق&#10;رانيا حداد&#10;..."
+                              t-model="state.namesText"/>
+                </div>
+                <div class="small text-muted" t-esc="`سيتم إنشاء ${namesList.length} حساب.`"/>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="() => this.confirm()" t-att-disabled="state.saving">
+                    <i class="fa fa-plus me-1"/> إضافة الحسابات
+                </button>
+                <button class="btn btn-secondary" t-on-click="() => this.props.close()">إلغاء</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

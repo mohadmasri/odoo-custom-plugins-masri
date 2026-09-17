@@ -1,0 +1,202 @@
+// متغيّرات الألوان للوضع الداكن.
+//
+// يُحقن هذا الملف داخل حزمة الأنماط الداكنة (web.assets_web_dark) *قبل* ملف
+// متغيّرات أودو الأساسي primary_variables.scss. وبما أن كل تعريفات ذلك الملف
+// مكتوبة بصيغة "!default" (أي: عيّن القيمة فقط إن لم تكن معرّفة مسبقاً)، فإن
+// تعريفها هنا يجعل أودو يبني كل ما يشتقّ منها — بما فيها خرائط ألوان الأزرار
+// وتدرّجات Bootstrap والحدود والنصوص — بألوان داكنة متناسقة تلقائياً، بدل
+// تصحيح كل مكوّن على حدة.
+//
+// ملاحظة: كل القيم هنا حرفية (بدون الإشارة إلى متغيّرات أودو) لأن هذا الملف
+// يسبق تعريفها.
+
+// ============================================================================
+// تدرّج الرمادي معكوساً: ما كان فاتحاً (خلفيات) صار داكناً، وما كان داكناً
+// (نصوص) صار فاتحاً، فتبقى فروق التباين الأصلية محفوظة في كل الواجهة.
+// ============================================================================
+$o-gray-100: #14161d;   // خلفية الصفحة
+$o-gray-200: #1c1f28;   // أسطح/بطاقات
+$o-gray-300: #2b3040;   // الحدود
+$o-gray-400: #3a4050;
+$o-gray-500: #6b7384;
+$o-gray-600: #98a1b2;   // نص خافت
+$o-gray-700: #c3c9d6;
+$o-gray-800: #dfe3ea;
+$o-gray-900: #f0f2f7;   // النص الأساسي
+
+// الأبيض يبقى أبيض (حتى يظل نص الأزرار الملوّنة والأيقونات فوقها واضحاً)،
+// أما "الأسود" فيصبح فاتحاً لأنه يُستخدم كلون نص في معظم المواضع
+$o-white: #ffffff;
+$o-black: #f0f2f7;
+
+// الأسطح والنصوص الأساسية
+$o-view-background-color: #1c1f28;
+$o-main-text-color: #e8eaf0;
+$o-main-headings-color: #f4f6fa;
+$o-main-color-muted: rgba(#c3c9d6, .72);
+$o-main-link-color: #8fb3ff;
+$o-component-active-color: #f4f6fa;
+$o-component-active-bg: mix(#71639e, #14161d, 25%);
+$o-list-group-active-color: #f4f6fa;
+// لون تمييز العنصر المحدّد يُحسب أصلاً بتفتيح لون info بنسبة 50% فيصبح أزرق
+// فاتحاً جداً؛ نستبدله بلون داكن يحافظ على التباين مع النص الفاتح
+$o-list-group-active-bg: mix(#17a2b8, #14161d, 22%);
+$o-form-lightsecondary: #4a5162;
+
+// عناصر التحكم الأصلية للمتصفح (أشرطة التمرير، منتقي التاريخ، الإكمال...)
+$o-webclient-color-scheme: dark;
+
+// الشريط العلوي
+$o-navbar-background: #1f2330;
+$o-navbar-border-bottom: 1px solid #2b3040;
+
+// ============================================================================
+// خرائط ألوان Bootstrap: تُعاد صياغتها لاحقاً في html_editor انطلاقاً من لوحة
+// ألوان الموقع (وهي فاتحة)، فنعرّفها هنا لتبقى قيم الوضع الداكن هي المعتمدة.
+// ============================================================================
+$theme-colors: (
+    "primary": #71639e,
+    "secondary": #2a2f3d,
+    "success": #28a745,
+    "info": #17a2b8,
+    "warning": #ffac00,
+    "danger": #dc3545,
+    "light": #2a2f3d,
+    "dark": #f0f2f7,
+);
+
+// خريطة أزرار أودو: المدخل "light" فيها مبنيّ على الأبيض الصريح فيظهر الزر
+// أبيض ناصعاً. نعرّفه هنا بلون داكن (بقية المداخل تُبنى تلقائياً من التدرّج
+// الرمادي الجديد أعلاه).
+$o-btns-bs-override: (
+    "light": (
+        background: #2a2f3d,
+        border: #2a2f3d,
+        color: #f0f2f7,
+
+        hover-background: #363c4a,
+        hover-border: #363c4a,
+        hover-color: #ffffff,
+
+        active-background: mix(#71639e, #14161d, 25%),
+        active-border: #71639e,
+        active-color: #f4f6fa,
+    ),
+);
+
+$grays: (
+    "100": #14161d,
+    "200": #1c1f28,
+    "300": #2b3040,
+    "400": #3a4050,
+    "500": #6b7384,
+    "600": #98a1b2,
+    "700": #c3c9d6,
+    "800": #dfe3ea,
+    "900": #f0f2f7,
+);
+
+// ============================================================================
+// أسطح Bootstrap التي تعود افتراضياً إلى الأبيض
+// ============================================================================
+$card-bg: #1c1f28;
+$card-cap-bg: #232734;
+$card-border-color: #2b3040;
+
+$dropdown-bg: #232734;
+$dropdown-border-color: #363c4a;
+$dropdown-divider-bg: #2b3040;
+$dropdown-link-color: #e8eaf0;
+$dropdown-link-hover-color: #ffffff;
+$dropdown-link-hover-bg: #2f3543;
+$dropdown-header-color: #98a1b2;
+
+$modal-content-bg: #1c1f28;
+$modal-content-border-color: #363c4a;
+$modal-header-border-color: #2b3040;
+$modal-footer-border-color: #2b3040;
+$modal-backdrop-bg: #000000;
+
+$input-bg: #232734;
+$input-disabled-bg: #1c1f28;
+$input-color: #e8eaf0;
+$input-border-color: #363c4a;
+$input-placeholder-color: #7a8294;
+$input-group-addon-bg: #2b3040;
+$input-group-addon-color: #e8eaf0;
+$input-group-addon-border-color: #363c4a;
+
+$form-select-bg: #232734;
+$form-select-color: #e8eaf0;
+$form-select-border-color: #363c4a;
+$form-select-indicator-color: #c3c9d6;
+$form-check-input-bg: #232734;
+$form-check-input-border: 1px solid #4a5162;
+$form-file-button-bg: #2b3040;
+$form-file-button-color: #e8eaf0;
+
+$list-group-bg: #1c1f28;
+$list-group-color: #e8eaf0;
+$list-group-border-color: #2b3040;
+$list-group-hover-bg: #252934;
+$list-group-action-color: #e8eaf0;
+$list-group-action-hover-color: #ffffff;
+
+$popover-bg: #232734;
+$popover-border-color: #363c4a;
+$popover-header-bg: #2b3040;
+$popover-header-color: #f0f2f7;
+$popover-body-color: #e8eaf0;
+
+$tooltip-bg: #3a4050;
+$tooltip-color: #f4f6fa;
+
+$accordion-bg: #1c1f28;
+$accordion-border-color: #2b3040;
+$accordion-button-bg: #232734;
+$accordion-button-color: #e8eaf0;
+$accordion-button-active-bg: #2b3040;
+$accordion-button-active-color: #ffffff;
+$accordion-icon-color: #c3c9d6;
+$accordion-icon-active-color: #ffffff;
+
+$pagination-bg: #232734;
+$pagination-color: #e8eaf0;
+$pagination-border-color: #363c4a;
+$pagination-hover-bg: #2f3543;
+$pagination-hover-color: #ffffff;
+$pagination-hover-border-color: #363c4a;
+$pagination-disabled-bg: #1c1f28;
+$pagination-disabled-color: #6b7384;
+$pagination-disabled-border-color: #2b3040;
+
+$nav-link-color: #c3c9d6;
+$nav-link-hover-color: #ffffff;
+$nav-tabs-border-color: #2b3040;
+$nav-tabs-link-hover-border-color: #2b3040 #2b3040 #2b3040;
+$nav-tabs-link-active-bg: #1c1f28;
+$nav-tabs-link-active-color: #f0f2f7;
+$nav-tabs-link-active-border-color: #363c4a #363c4a #1c1f28;
+
+$offcanvas-bg-color: #1c1f28;
+$offcanvas-color: #e8eaf0;
+$offcanvas-border-color: #2b3040;
+
+$progress-bg: #2b3040;
+$table-color: #e8eaf0;
+$table-border-color: #2b3040;
+$hr-color: #363c4a;
+$code-color: #ff9ecb;
+$kbd-bg: #2b3040;
+$kbd-color: #f0f2f7;
+$mark-bg: #4a4520;
+
+// زر الإغلاق (×) في النوافذ المنبثقة يُرسم أسود افتراضياً فلا يُرى على خلفية
+// داكنة، فنقلبه ليصبح فاتحاً
+$btn-close-color: #e8eaf0;
+$btn-close-filter: invert(1) grayscale(100%) brightness(200%);
+
+// مراسي حساب التباين التلقائي: تبقى أبيض/أسود حقيقيين حتى يستمر أودو باختيار
+// لون النص الصحيح فوق الأزرار والشارات الملوّنة
+$color-contrast-dark: #111111;
+$color-contrast-light: #ffffff;

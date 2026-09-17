@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.Home">
+        <div class="o_myaccounting_home p-4" style="overflow:auto; height:100%;">
+            <div class="mb-4">
+                <h2 class="m-0">المحاسبة المخصصة</h2>
+                <div class="text-muted small mt-1">اختر من القائمة أدناه للبدء</div>
+            </div>
+            <div class="o_myaccounting_home_grid">
+                <t t-foreach="cards" t-as="card" t-key="card.title">
+                    <div class="o_myaccounting_home_card" t-on-click="card.action">
+                        <div class="o_myaccounting_home_icon" t-attf-style="background-color: {{ card.color }}1a; color: {{ card.color }};">
+                            <i t-attf-class="fa {{ card.icon }}"/>
+                        </div>
+                        <div class="o_myaccounting_home_title" t-esc="card.title"/>
+                        <div class="o_myaccounting_home_desc" t-esc="card.desc"/>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

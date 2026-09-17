@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <template id="report_myaccounting_move_document">
+        <t t-call="web.external_layout">
+            <div class="page">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h2 class="mb-0">قيد محاسبي</h2>
+                        <h3 class="text-muted mt-0" t-field="o.name"/>
+                    </div>
+                    <div class="text-end">
+                        <span t-if="o.state == 'posted'"
+                              class="badge rounded-pill text-bg-success" style="font-size:14px; padding:8px 16px;">
+                            مرحّل
+                        </span>
+                        <span t-else=""
+                              class="badge rounded-pill text-bg-warning" style="font-size:14px; padding:8px 16px;">
+                            مسودة
+                        </span>
+                    </div>
+                </div>
+
+                <table class="table table-borderless mb-4" style="width:100%;">
+                    <tr>
+                        <td style="width:25%;"><strong>التاريخ:</strong></td>
+                        <td style="width:25%;"><span t-field="o.date"/></td>
+                        <td style="width:25%;"><strong>اليومية:</strong></td>
+                        <td style="width:25%;"><span t-field="o.journal"/></td>
+                    </tr>
+                    <tr>
+                        <td><strong>المرجع:</strong></td>
+                        <td><span t-field="o.ref">—</span></td>
+                        <td><strong>العملة:</strong></td>
+                        <td><span t-field="o.currency_id.name"/></td>
+                    </tr>
+                </table>
+
+                <table class="table table-bordered" style="width:100%;">
+                    <thead style="background-color:#f2f2f2;">
+                        <tr>
+                            <th>الحساب</th>
+                            <th>البيان</th>
+                            <th class="text-end" style="width:15%;">مدين</th>
+                            <th class="text-end" style="width:15%;">دائن</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.line_ids" t-as="line">
+                            <td>
+                                <span t-esc="line.account_id.code"/> - <span t-esc="line.account_label"/>
+                            </td>
+                            <td><span t-field="line.name">—</span></td>
+                            <td class="text-end">
+                                <span t-if="line.debit"
+                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-if="line.credit"
+                                      t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr style="background-color:#f2f2f2; font-weight:bold;">
+                            <td colspan="2" class="text-end">الإجمالي</td>
+                            <td class="text-end">
+                                <span t-field="o.total_debit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="o.total_credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="mt-2">
+                    <span t-if="o.is_balanced" class="text-success">
+                        <i class="fa fa-check-circle"/> <strong>القيد متوازن</strong>
+                    </span>
+                    <span t-else="" class="text-danger">
+                        <i class="fa fa-exclamation-triangle"/> <strong>القيد غير متوازن</strong>
+                    </span>
+                </div>
+
+                <div class="row mt-5" style="page-break-inside: avoid;">
+                    <div class="col-4 text-center">
+                        <p class="mb-5">إعداد</p>
+                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p class="mb-5">مراجعة</p>
+                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p class="mb-5">اعتماد</p>
+                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_myaccounting_move">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div t-attf-style="{{ 'page-break-after: always;' if not o_last else '' }}">
+                    <t t-call="my_accounting.report_myaccounting_move_document"/>
+                </div>
+            </t>
+            <script>window.addEventListener('load', function () { window.print(); });</script>
+        </t>
+    </template>
+
+    <record id="action_report_myaccounting_move" model="ir.actions.report">
+        <field name="name">طباعة القيد المحاسبي</field>
+        <field name="model">myaccounting.move</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">my_accounting.report_myaccounting_move</field>
+        <field name="report_file">my_accounting.report_myaccounting_move</field>
+        <field name="print_report_name">'قيد محاسبي - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_myaccounting_move"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="web.NavBar.AppsMenu" t-inherit="web.NavBar.AppsMenu" t-inherit-mode="extension">
+        <xpath expr="//div[@t-else]" position="after">
+            <a href="#" class="o_myaccounting_home_btn" title="الصفحة الرئيسية"
+               t-on-click.prevent="() => this.onMyAccountingHomeClick()">
+                <i class="fa fa-home"/>
+            </a>
+        </xpath>
+    </t>
+</templates>

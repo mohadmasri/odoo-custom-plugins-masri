@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="my_accounting.AppLauncher">
+        <div class="o_my_app_launcher p-4" style="overflow:auto; height: 100%;">
+            <h2 class="mb-4">التطبيقات الفعالة</h2>
+            <div class="d-flex flex-wrap" style="gap: 16px;">
+                <t t-foreach="apps" t-as="app" t-key="app.id">
+                    <a class="o_my_app_tile text-center text-decoration-none"
+                       t-att-href="app.href"
+                       t-on-click="(ev) => this.openApp(app, ev)"
+                       style="width: 132px; padding: 16px 8px; border-radius: 8px; cursor: pointer;">
+                        <img t-if="app.webIconData" t-att-src="app.webIconData"
+                             style="width:48px; height:48px; border-radius: 8px;"/>
+                        <div t-if="!app.webIconData"
+                             t-attf-style="width:48px; height:48px; border-radius:8px; margin: 0 auto; background-color: {{app.webIcon.backgroundColor}};"/>
+                        <div class="mt-2" style="color: inherit; overflow-wrap: break-word; line-height: 1.2;">
+                            <t t-esc="app.label"/>
+                        </div>
+                    </a>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

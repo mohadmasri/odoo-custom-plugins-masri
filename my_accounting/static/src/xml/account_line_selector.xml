@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.AccountLineSelector">
+        <div class="o_account_line_selector">
+            <span t-if="scopeState.id" class="badge text-bg-light border d-inline-flex align-items-center mb-1"
+                  style="gap: 4px; font-weight: normal;">
+                <t t-esc="scopeState.name"/>
+                <a href="#" class="text-muted" style="text-decoration:none;"
+                   t-on-click.prevent="() => this.clearScope()" title="إزالة الفلتر">×</a>
+            </span>
+            <Many2One t-props="m2oProps"/>
+        </div>
+    </t>
+
+</templates>

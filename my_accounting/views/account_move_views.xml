@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <record id="view_myaccounting_move_list" model="ir.ui.view">
+        <field name="name">myaccounting.move.list</field>
+        <field name="model">myaccounting.move</field>
+        <field name="arch" type="xml">
+            <list string="القيود المحاسبية" decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="ledger_period_label" string="الشهر المحاسبي"/>
+                <field name="ref"/>
+                <field name="journal"/>
+                <field name="total_debit" sum="الإجمالي" digits="[16,3]"/>
+                <field name="total_credit" sum="الإجمالي" digits="[16,3]"/>
+                <field name="state" widget="badge" decoration-success="state == 'posted'"
+                       decoration-info="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_move_form" model="ir.ui.view">
+        <field name="name">myaccounting.move.form</field>
+        <field name="model">myaccounting.move</field>
+        <field name="arch" type="xml">
+            <form string="قيد محاسبي" js_class="myaccounting_move_form">
+                <header>
+                    <button name="action_post" type="object" string="ترحيل" class="oe_highlight"
+                            invisible="state == 'posted'"/>
+                    <button name="action_reset_to_draft" type="object" string="إعادة إلى مسودة"
+                            invisible="state == 'draft'"/>
+                    <button name="%(action_report_myaccounting_move)d" type="action"
+                            string="طباعة" icon="fa-print"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="state == 'posted'" placeholder="رقم القيد"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="ref"/>
+                        </group>
+                        <group>
+                            <field name="journal"/>
+                            <field name="ledger_month" string="شهر دفتر الأستاذ"/>
+                            <field name="ledger_year" string="سنة دفتر الأستاذ"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="بنود القيد">
+                            <field name="line_ids" readonly="state == 'posted'">
+                                <list editable="bottom">
+                                    <field name="account_label" column_invisible="1"/>
+                                    <field name="move_state" column_invisible="1"/>
+                                    <field name="account_id" widget="myaccounting_account_selector"/>
+                                    <field name="name"/>
+                                    <field name="debit" sum="إجمالي المدين" digits="[16,3]"/>
+                                    <field name="credit" sum="إجمالي الدائن" digits="[16,3]"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer oe_right">
+                                <field name="total_debit"/>
+                                <field name="total_credit"/>
+                                <field name="is_balanced" widget="boolean_toggle" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_move_search" model="ir.ui.view">
+        <field name="name">myaccounting.move.search</field>
+        <field name="model">myaccounting.move</field>
+        <field name="arch" type="xml">
+            <search string="بحث في القيود">
+                <field name="name" string="القيد"
+                       filter_domain="['|', ('name', 'ilike', self), ('ref', 'ilike', self)]"/>
+                <field name="ref"/>
+                <field name="journal"/>
+                <field name="date"/>
+                <field name="date" string="من تاريخ" operator="&gt;="/>
+                <field name="date" string="إلى تاريخ" operator="&lt;="/>
+                <field name="line_ids" string="الحساب"
+                       filter_domain="['|', ('line_ids.account_id.code', 'ilike', self), ('line_ids.account_id.name', 'ilike', self)]"/>
+                <filter string="مسودة" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="مرحّل" name="posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
+                <filter string="متوازن" name="balanced" domain="[('is_balanced', '=', True)]"/>
+                <filter string="غير متوازن" name="unbalanced" domain="[('is_balanced', '=', False)]"/>
+                <group>
+                    <filter string="الحالة" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="اليومية" name="group_journal" context="{'group_by': 'journal'}"/>
+                    <filter string="الشهر" name="group_month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_myaccounting_move" model="ir.actions.act_window">
+        <field name="name">القيود المحاسبية</field>
+        <field name="res_model">myaccounting.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_myaccounting_move_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                أنشئ أول قيد محاسبي
+            </p>
+        </field>
+    </record>
+
+    </data>
+</odoo>

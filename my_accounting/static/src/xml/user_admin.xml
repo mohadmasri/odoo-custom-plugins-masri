@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.UserAdmin">
+        <div class="o_user_admin_page p-4" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="m-0">إدارة المستخدمين</h2>
+                    <div class="text-muted small mt-1">إضافة مستخدمين جدد وتحديد صلاحياتهم على التطبيقات</div>
+                </div>
+                <button class="btn btn-primary" t-on-click="() => this.openCreateDialog()">
+                    <i class="fa fa-plus me-1"/> مستخدم جديد
+                </button>
+            </div>
+
+            <div class="d-flex" style="gap: 20px;">
+                <div class="o_user_admin_list" style="width: 280px; flex-shrink: 0;">
+                    <div t-if="!state.users.length" class="text-muted text-center py-4 border rounded">
+                        لا يوجد مستخدمون بعد
+                    </div>
+                    <div t-foreach="state.users" t-as="user" t-key="user.id"
+                         class="d-flex align-items-center justify-content-between p-2 mb-1 rounded o_user_admin_row"
+                         t-attf-class="{{ state.selectedUserId === user.id ? 'o_user_admin_row_active' : '' }}"
+                         t-on-click="() => this.selectUser(user.id)" style="cursor:pointer;">
+                        <div>
+                            <i class="fa fa-user-circle me-2 text-muted"/>
+                            <span t-esc="user.login"/>
+                            <span t-if="user.is_admin" class="badge text-bg-secondary ms-1" style="font-size:10px;">مسؤول</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-grow-1">
+                    <div t-if="!selectedUser" class="text-muted text-center py-5 border rounded">
+                        اختر مستخدماً من القائمة لعرض صلاحياته، أو أضف مستخدماً جديداً
+                    </div>
+                    <t t-else="">
+                        <div class="d-flex align-items-center justify-content-between mb-3 p-2 border rounded">
+                            <div>
+                                <strong t-esc="selectedUser.login"/>
+                                <span t-if="selectedUser.is_self" class="badge text-bg-info ms-2" style="font-size:10px;">أنت</span>
+                            </div>
+                            <div style="gap:6px;" class="d-flex">
+                                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.openRenameDialog(selectedUser)">
+                                    <i class="fa fa-pencil me-1"/> إعادة تسمية
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.openPasswordDialog(selectedUser)">
+                                    <i class="fa fa-key me-1"/> تغيير كلمة المرور
+                                </button>
+                                <button t-if="!selectedUser.is_self and !selectedUser.is_admin"
+                                        class="btn btn-sm btn-outline-danger" t-on-click="() => this.deleteUser(selectedUser)">
+                                    <i class="fa fa-trash me-1"/> حذف
+                                </button>
+                            </div>
+                        </div>
+
+                        <div t-if="selectedUser.is_admin" class="alert alert-info py-2">
+                            هذا المستخدم مسؤول (Administrator) ولديه كل الصلاحيات تلقائياً.
+                        </div>
+                        <t t-else="">
+                            <div class="fw-bold mb-2">صلاحيات التطبيقات</div>
+                            <table class="table table-sm align-middle">
+                                <tbody>
+                                    <tr t-foreach="state.apps" t-as="app" t-key="app.key">
+                                        <td t-esc="appLabel(app.key)"/>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                        t-attf-class="{{ app.level === 'none' ? 'active' : '' }}"
+                                                        t-on-click="() => this.setPermission(app.key, 'none')">بدون</button>
+                                                <button t-if="app.tiered" type="button" class="btn btn-outline-secondary"
+                                                        t-attf-class="{{ app.level === 'view' ? 'active' : '' }}"
+                                                        t-on-click="() => this.setPermission(app.key, 'view')">عرض</button>
+                                                <button type="button" class="btn btn-outline-secondary"
+                                                        t-attf-class="{{ app.level === 'edit' ? 'active' : '' }}"
+                                                        t-on-click="() => this.setPermission(app.key, 'edit')">
+                                                    <t t-esc="app.tiered ? 'تعديل' : 'مسموح'"/>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+                    </t>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="my_accounting.UserCredentialsDialog">
+        <Dialog title="title" size="'sm'">
+            <div>
+                <div t-if="props.mode !== 'password'" class="mb-3">
+                    <label class="form-label">اسم المستخدم</label>
+                    <input type="text" class="form-control" t-model="state.login" autofocus="autofocus"/>
+                </div>
+                <div t-if="props.mode !== 'rename'" class="mb-3">
+                    <label class="form-label">
+                        <t t-esc="props.mode === 'password' ? 'كلمة المرور الجديدة' : 'كلمة المرور'"/>
+                    </label>
+                    <input type="text" class="form-control" t-model="state.password"/>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="() => this.confirm()" t-att-disabled="state.saving">
+                    حفظ
+                </button>
+                <button class="btn btn-secondary" t-on-click="() => this.props.close()">إلغاء</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

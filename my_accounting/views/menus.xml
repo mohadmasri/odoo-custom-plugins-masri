@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <menuitem id="menu_myaccounting_root" name="المحاسبة المخصصة" sequence="15"
+              action="action_myaccounting_home"
+              web_icon="my_accounting,static/description/icon_accounting.svg"/>
+
+    <menuitem id="menu_myaccounting_move_new" name="قيد جديد"
+              parent="menu_myaccounting_root" sequence="10"
+              action="action_myaccounting_move_new_form"/>
+
+    <menuitem id="menu_myaccounting_moves" name="القيود"
+              parent="menu_myaccounting_root" sequence="20"
+              action="action_myaccounting_move_list"/>
+
+    <menuitem id="menu_myaccounting_accounts" name="شجرة الحسابات"
+              parent="menu_myaccounting_root" sequence="30"
+              action="action_myaccounting_account_tree"/>
+
+    <menuitem id="menu_myaccounting_general_ledger" name="دفتر الأستاذ العام"
+              parent="menu_myaccounting_root" sequence="40"
+              action="action_myaccounting_general_ledger"/>
+
+    <menuitem id="menu_myaccounting_settings" name="اعدادات اخرى"
+              parent="menu_myaccounting_root" sequence="50"
+              action="action_myaccounting_settings"/>
+
+    <menuitem id="menu_myaccounting_user_admin_root" name="إدارة المستخدمين" sequence="90"
+              action="action_myaccounting_user_admin" groups="base.group_system"
+              web_icon="my_accounting,static/description/icon_user_admin.svg"/>
+
+    </data>
+</odoo>
