@@ -3,11 +3,39 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { BulkAccountDialog } from "./account_bulk_dialog";
+import {
+    emptyMovementFilter,
+    loadMovementFilter,
+    movementFilterParams,
+    saveMovementFilter,
+} from "./movement_filter_store";
+
+// توحيد النص العربي للبحث الذكي: إزالة التشكيل والتطويل، توحيد أشكال الألف
+// والياء والتاء المربوطة، تحويل الأرقام الهندية، وتجاهل "ال" التعريف في بداية
+// كل كلمة؛ فيجد "صندوق" حساب "الصندوق"، و"مؤسسه" حساب "مؤسسة".
+function normalizeSearchText(value) {
+    return (value || "")
+        .toString()
+        .toLowerCase()
+        .replace(/[ً-ٰٟـ]/g, "")
+        .replace(/[أإآٱ]/g, "ا")
+        .replace(/ى/g, "ي")
+        .replace(/ئ/g, "ي")
+        .replace(/ؤ/g, "و")
+        .replace(/ة/g, "ه")
+        .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+        .split(/[\s\-_/.,،()]+/)
+        .filter(Boolean)
+        .map((word) => (word.length > 3 && word.startsWith("ال") ? word.slice(2) : word))
+        .join(" ");
+}
 
 class AccountTreeNode extends Component {
     static template = "my_accounting.AccountTreeNode";
-    static props = ["node", "depth", "expanded", "selected", "onToggle", "onOpen", "onAddChild", "onToggleSelect"];
+    static props = ["node", "depth", "expanded", "selected", "filterActive",
+                    "onToggle", "onOpen", "onAddChild", "onToggleSelect"];
 
     get node() {
         return this.props.node;
@@ -42,8 +70,27 @@ export class AccountTree extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
         this.dialogService = useService("dialog");
-        this.state = useState({ roots: [], expanded: {}, selected: {}, allIds: [] });
-        onWillStart(() => this.loadData());
+        this.notification = useService("notification");
+        this.state = useState({
+            roots: [],
+            expanded: {},
+            selected: {},
+            search: "",
+            moveNames: [],
+            // قيم حقول الفلتر كما يكتبها المستخدم
+            filterForm: emptyMovementFilter(),
+            // الفلتر المطبَّق فعلاً (بعد الضغط على "تطبيق") + حركة الحسابات ضمنه
+            filter: null,
+        });
+        onWillStart(async () => {
+            await Promise.all([this.loadData(), this.loadMoveNames()]);
+            // استعادة الفلتر المحفوظ (عند الرجوع من داخل حساب، أو إن عُدّل هناك)
+            const stored = loadMovementFilter();
+            if (stored) {
+                this.state.filterForm = stored;
+                await this.applyFilter();
+            }
+        });
     }
 
     async loadData() {
@@ -55,29 +102,177 @@ export class AccountTree extends Component {
         );
         const byId = {};
         records.forEach((r) => {
-            byId[r.id] = { ...r, children: [] };
+            byId[r.id] = { ...r, children: [], searchKey: normalizeSearchText(`${r.code} ${r.name}`) };
         });
         const roots = [];
         records.forEach((r) => {
             const node = byId[r.id];
-            if (r.parent_id) {
-                const parent = byId[r.parent_id[0]];
-                if (parent) {
-                    parent.children.push(node);
-                } else {
-                    roots.push(node);
-                }
+            const parent = r.parent_id && byId[r.parent_id[0]];
+            if (parent) {
+                parent.children.push(node);
             } else {
                 roots.push(node);
             }
         });
         this.state.roots = roots;
-        this.state.allIds = records.map((r) => r.id);
+        if (this.state.filter) {
+            await this.applyFilter();
+        }
+    }
+
+    async loadMoveNames() {
+        this.state.moveNames = await this.orm.call("myaccounting.account", "get_move_names", []);
+    }
+
+    // ---------------------------------------------------------------------
+    // فلتر الحركة (تاريخ / رقم قيد)
+    // ---------------------------------------------------------------------
+
+    get hasFilterInput() {
+        const f = this.state.filterForm;
+        return !!(f.dateFrom || f.dateTo || f.moveFrom.trim() || f.moveTo.trim() || f.ledgerFrom || f.ledgerTo);
+    }
+
+    async applyFilter() {
+        const f = this.state.filterForm;
+        if (!this.hasFilterInput) {
+            this.clearFilter();
+            return;
+        }
+        for (const name of [f.moveFrom.trim(), f.moveTo.trim()]) {
+            if (name && !this.state.moveNames.includes(name)) {
+                this.notification.add(`رقم القيد "${name}" غير موجود.`, { type: "danger" });
+                return;
+            }
+        }
+        const params = movementFilterParams(f);
+        const data = await this.orm.call("myaccounting.account", "get_tree_filter_data", [], params);
+        saveMovementFilter(f);
+        this.state.filter = {
+            dateFrom: params.date_from,
+            // القيم الافتراضية المحسوبة على الخادم: اليوم / آخر قيد
+            dateTo: data.date_to,
+            moveFrom: data.move_from,
+            moveTo: data.move_to,
+            // الشهر الحالي افتراضياً إن لم يُحدَّد "إلى شهر أستاذ"
+            ledgerFrom: params.ledger_from,
+            ledgerTo: data.ledger_to,
+            accounts: data.accounts,
+        };
+        this.expandToVisible();
+    }
+
+    clearFilter() {
+        this.state.filterForm = emptyMovementFilter();
+        this.state.filter = null;
+        saveMovementFilter(null);
+    }
+
+    onFilterKeydown(ev) {
+        if (ev.key === "Enter") {
+            this.applyFilter();
+        }
+    }
+
+    get movementAccountsCount() {
+        return this.state.filter ? Object.keys(this.state.filter.accounts).length : 0;
+    }
+
+    // ---------------------------------------------------------------------
+    // البحث الذكي
+    // ---------------------------------------------------------------------
+
+    get searchTokens() {
+        return normalizeSearchText(this.state.search).split(" ").filter(Boolean);
+    }
+
+    matchesSearch(node) {
+        const tokens = this.searchTokens;
+        return tokens.length > 0 && tokens.every((token) => node.searchKey.includes(token));
+    }
+
+    onSearchInput(ev) {
+        this.state.search = ev.target.value;
+        this.expandToVisible();
+    }
+
+    clearSearch() {
+        this.state.search = "";
+    }
+
+    // ---------------------------------------------------------------------
+    // الشجرة المعروضة بعد تطبيق الفلتر والبحث
+    // ---------------------------------------------------------------------
+
+    /**
+     * يبني نسخة من الشجرة تحتوي فقط على:
+     *  - مع الفلتر: الحسابات التي عليها حركة ضمنه، وآباؤها لإظهار التسلسل.
+     *  - مع البحث: الحسابات المطابقة (مع ما تحتها) وآباؤها.
+     * في وضع الفلتر يعرض عمود الرصيد صافي الحركة (مدين - دائن) ضمن الفلتر.
+     */
+    get displayRoots() {
+        const filter = this.state.filter;
+        const searching = this.searchTokens.length > 0;
+        const build = (node, ancestorMatched) => {
+            const matched = searching && this.matchesSearch(node);
+            const children = node.children
+                .map((child) => build(child, ancestorMatched || matched))
+                .filter(Boolean);
+            const movement = filter ? filter.accounts[node.id] : null;
+            if (filter && !movement && !children.length) {
+                return null;
+            }
+            if (searching && !matched && !ancestorMatched && !children.length) {
+                return null;
+            }
+            return {
+                ...node,
+                children,
+                matched,
+                hasMovement: !!movement,
+                movementCount: movement ? movement.count : 0,
+                balance: filter ? (movement ? movement.debit - movement.credit : 0) : node.balance,
+            };
+        };
+        return this.state.roots.map((root) => build(root, false)).filter(Boolean);
+    }
+
+    get isNarrowed() {
+        return !!this.state.filter || this.searchTokens.length > 0;
+    }
+
+    get visibleIds() {
+        const ids = [];
+        const walk = (nodes) => nodes.forEach((n) => { ids.push(n.id); walk(n.children); });
+        walk(this.displayRoots);
+        return ids;
+    }
+
+    // عند تطبيق فلتر أو بحث نفتح الفروع تلقائياً حتى تظهر النتائج مباشرة
+    expandToVisible() {
+        if (!this.isNarrowed) {
+            return;
+        }
+        const expanded = { ...this.state.expanded };
+        const walk = (nodes) => {
+            for (const node of nodes) {
+                if (node.children.length) {
+                    expanded[node.id] = true;
+                    walk(node.children);
+                }
+            }
+        };
+        walk(this.displayRoots);
+        this.state.expanded = expanded;
     }
 
     toggle(id) {
         this.state.expanded[id] = !this.state.expanded[id];
     }
+
+    // ---------------------------------------------------------------------
+    // التحديد والطباعة
+    // ---------------------------------------------------------------------
 
     get selectedIds() {
         return Object.keys(this.state.selected)
@@ -85,12 +280,19 @@ export class AccountTree extends Component {
             .map((id) => parseInt(id, 10));
     }
 
-    get allSelected() {
-        return this.state.allIds.length > 0 &&
-            this.state.allIds.every((id) => this.state.selected[id]);
+    // الحسابات المحددة والظاهرة حالياً فقط (أي التي عليها حركة ضمن الفلتر إن وُجد)،
+    // فلا يُطبع حساب محدد سابقاً ثم أخفاه الفلتر أو البحث.
+    get printableIds() {
+        const visible = new Set(this.visibleIds);
+        return this.selectedIds.filter((id) => visible.has(id));
     }
 
-    findNode(id, nodes = this.state.roots) {
+    get allSelected() {
+        const ids = this.visibleIds;
+        return ids.length > 0 && ids.every((id) => this.state.selected[id]);
+    }
+
+    findNode(id, nodes = this.displayRoots) {
         for (const node of nodes) {
             if (node.id === id) {
                 return node;
@@ -111,7 +313,7 @@ export class AccountTree extends Component {
         return ids;
     }
 
-    // عند اختيار حساب له حسابات فرعية، تُحدَّد كل الحسابات التي تحته تلقائياً
+    // عند اختيار حساب له حسابات فرعية، تُحدَّد كل الحسابات الظاهرة التي تحته تلقائياً
     // (وكل مستوياتها الفرعية). عند إلغاء التحديد لا يُلغى تحديد ما تحته، حتى
     // يمكن اختيار حساب رئيسي بكل فروعه ثم إلغاء تحديد الرئيسي فقط والإبقاء
     // على الفروع محددة (مثلاً لحذفها كلها دون حذف الحساب الرئيسي نفسه).
@@ -130,10 +332,9 @@ export class AccountTree extends Component {
     }
 
     toggleSelectAll(ev) {
-        const checked = ev.target.checked;
         const selected = {};
-        if (checked) {
-            for (const id of this.state.allIds) {
+        if (ev.target.checked) {
+            for (const id of this.visibleIds) {
                 selected[id] = true;
             }
         }
@@ -145,26 +346,52 @@ export class AccountTree extends Component {
     }
 
     printSelected() {
-        const ids = this.selectedIds;
+        const ids = this.printableIds;
         if (!ids.length) {
             return;
         }
-        this.actionService.doAction({
-            type: "ir.actions.report",
-            report_name: "my_accounting.report_myaccounting_account_statement",
-            report_type: "qweb-html",
-            context: { active_ids: ids },
-        });
+        const filter = this.state.filter;
+        if (!filter) {
+            this.actionService.doAction({
+                type: "ir.actions.report",
+                report_name: "my_accounting.report_myaccounting_account_statement",
+                report_type: "qweb-html",
+                context: { active_ids: ids },
+            });
+            return;
+        }
+        // doAction لا يمرر مفاتيح context المخصصة إلى رابط تقرير qweb-html،
+        // لذا نبني الرابط يدوياً مع نفس قيم الفلتر المطبّق، فتطابق الطباعة الشاشة.
+        const context = {
+            ...user.context,
+            date_from: filter.dateFrom || false,
+            date_to: filter.dateTo || false,
+            move_from: filter.moveFrom || false,
+            move_to: filter.moveTo || false,
+            ledger_from: filter.ledgerFrom || false,
+            ledger_to: filter.ledgerTo || false,
+        };
+        const url = `/report/html/my_accounting.report_myaccounting_account_statement/${ids.join(",")}` +
+            `?context=${encodeURIComponent(JSON.stringify(context))}`;
+        window.open(url, "_blank");
     }
 
+    // ---------------------------------------------------------------------
+
     openAccount(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.account",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+        // نمرّر علامة للوحة حركات الحساب حتى تطبّق نفس فلتر الشجرة المحفوظ،
+        // ونمرّر الحسابات الظاهرة للتنقل بينها بالأسهم داخل الحساب.
+        this.actionService.doAction(
+            {
+                type: "ir.actions.act_window",
+                res_model: "myaccounting.account",
+                res_id: id,
+                views: [[false, "form"]],
+                target: "current",
+                context: { my_accounting_from_tree: true },
+            },
+            { props: { resIds: this.visibleIds } }
+        );
     }
 
     createAccount(parentId) {

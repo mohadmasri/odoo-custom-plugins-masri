@@ -1,3 +1,5 @@
+import re
+
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -124,12 +126,107 @@ class MyAccountingAccount(models.Model):
         if line_ids is not None:
             lines = self.env['myaccounting.move.line'].browse(line_ids).exists()
             return lines.sorted(key=lambda line: (line.date or fields.Date.today(), line.id))
-        domain = [('account_id', 'child_of', self.id)]
-        if date_from:
-            domain.append(('date', '>=', date_from))
-        if date_to:
-            domain.append(('date', '<=', date_to))
+        # نفس شروط فلتر شجرة الحسابات تماماً، حتى تطابق الطباعة ما يظهر على الشاشة
+        ctx = self.env.context
+        domain = [('account_id', 'child_of', self.id)] + self._movement_line_domain(
+            date_from, date_to, ctx.get('move_from'), ctx.get('move_to'),
+            ctx.get('ledger_from'), ctx.get('ledger_to'))
         return self.env['myaccounting.move.line'].search(domain, order='date, id')
+
+    @api.model
+    def _move_natural_key(self, name):
+        """ترتيب طبيعي لأرقام القيود: 'IMP-2' قبل 'IMP-10'، و'9' قبل '10'."""
+        return [(0, int(part), '') if part.isdigit() else (1, 0, part.casefold())
+                for part in re.split(r'(\d+)', name or '') if part]
+
+    @api.model
+    def _ordered_moves(self):
+        moves = self.env['myaccounting.move'].search([])
+        return moves.sorted(key=lambda move: (self._move_natural_key(move.name), move.id))
+
+    @api.model
+    def _parse_ledger_period(self, value):
+        """'2026-07' → 202607 (سنة × 100 + شهر)، للمقارنة بين أشهر دفتر الأستاذ."""
+        match = re.fullmatch(r'\s*(\d{4})-(\d{1,2})\s*', value or '')
+        if not match or not 1 <= int(match.group(2)) <= 12:
+            raise UserError(f'شهر دفتر الأستاذ "{value}" غير صالح.')
+        return int(match.group(1)) * 100 + int(match.group(2))
+
+    @api.model
+    def _current_ledger_period(self):
+        today = fields.Date.context_today(self)
+        return f'{today.year}-{today.month:02d}'
+
+    @api.model
+    def _movement_line_domain(self, date_from=False, date_to=False, move_from=False, move_to=False,
+                              ledger_from=False, ledger_to=False):
+        """شروط بنود القيود ضمن فلتر (من تاريخ - إلى تاريخ) و/أو (من قيد - إلى قيد)
+        و/أو (من شهر دفتر أستاذ - إلى شهر دفتر أستاذ). الفلاتر المتعددة تُجمع معاً (و).
+
+        - إن حُدّد "من تاريخ" دون "إلى تاريخ" يُعتمد تاريخ اليوم.
+        - إن حُدّد "من قيد" دون "إلى قيد" يُعتمد آخر قيد (حسب ترتيب أرقام القيود).
+        - إن حُدّد "من شهر أستاذ" دون "إلى شهر أستاذ" يُعتمد الشهر الحالي.
+        """
+        domain = []
+        if ledger_from or ledger_to:
+            start = self._parse_ledger_period(ledger_from) if ledger_from else 0
+            end = self._parse_ledger_period(ledger_to or self._current_ledger_period())
+            if start > end:
+                start, end = end, start
+            moves = self.env['myaccounting.move'].search([
+                ('ledger_year', '>=', start // 100), ('ledger_year', '<=', end // 100)])
+            moves = moves.filtered(
+                lambda move: start <= move.ledger_year * 100 + int(move.ledger_month or 0) <= end)
+            domain.append(('move_id', 'in', moves.ids))
+        if date_from or date_to:
+            if date_from:
+                domain.append(('date', '>=', date_from))
+            domain.append(('date', '<=', date_to or fields.Date.to_string(fields.Date.context_today(self))))
+        if move_from or move_to:
+            moves = self._ordered_moves()
+            names = moves.mapped('name')
+            for value in (move_from, move_to):
+                if value and value not in names:
+                    raise UserError(f'رقم القيد "{value}" غير موجود.')
+            start = names.index(move_from) if move_from else 0
+            end = names.index(move_to) if move_to else len(names) - 1
+            if start > end:
+                start, end = end, start
+            domain.append(('move_id', 'in', moves[start:end + 1].ids))
+        return domain
+
+    @api.model
+    def get_tree_filter_data(self, date_from=False, date_to=False, move_from=False, move_to=False,
+                             ledger_from=False, ledger_to=False):
+        """حركة كل حساب ضمن الفلتر (بنوده المباشرة فقط، مثل عمود الرصيد في الشجرة)."""
+        result = self.get_movement_filter(date_from, date_to, move_from, move_to, ledger_from, ledger_to)
+        groups = self.env['myaccounting.move.line']._read_group(
+            [('account_id', '!=', False)] + result['domain'],
+            ['account_id'], ['debit:sum', 'credit:sum', '__count'])
+        result['accounts'] = {
+            account.id: {'debit': debit, 'credit': credit, 'count': count}
+            for account, debit, credit, count in groups
+        }
+        return result
+
+    @api.model
+    def get_movement_filter(self, date_from=False, date_to=False, move_from=False, move_to=False,
+                            ledger_from=False, ledger_to=False):
+        """شروط الفلتر + القيم الافتراضية المحسوبة (اليوم / آخر قيد / الشهر الحالي)،
+        تستخدمها شجرة الحسابات ولوحة حركات الحساب معاً حتى تتطابق النتائج."""
+        moves = self._ordered_moves() if (move_from or move_to) else self.env['myaccounting.move']
+        return {
+            'domain': self._movement_line_domain(date_from, date_to, move_from, move_to, ledger_from, ledger_to),
+            'date_to': (date_to or fields.Date.to_string(fields.Date.context_today(self)))
+                       if (date_from or date_to) else False,
+            'move_from': (move_from or (moves[:1].name or False)) if moves else False,
+            'move_to': (move_to or (moves[-1:].name or False)) if moves else False,
+            'ledger_to': (ledger_to or self._current_ledger_period()) if (ledger_from or ledger_to) else False,
+        }
+
+    @api.model
+    def get_move_names(self):
+        return self._ordered_moves().mapped('name')
 
     def action_reset_review(self):
         self.write({

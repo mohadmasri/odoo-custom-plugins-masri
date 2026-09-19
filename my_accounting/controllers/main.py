@@ -3,7 +3,7 @@ import json
 
 import xlsxwriter
 
-from odoo import http
+from odoo import fields, http
 from odoo.http import request
 
 
@@ -19,6 +19,21 @@ class BackupController(http.Controller):
             headers=[
                 ('Content-Type', 'application/json; charset=utf-8'),
                 ('Content-Disposition', f'attachment; filename="{filename}"'),
+            ],
+        )
+
+
+class JournalImportController(http.Controller):
+
+    @http.route('/my_accounting/journal_import/template', type='http', auth='user')
+    def download_import_template(self, **kwargs):
+        """يولّد قالب Excel جاهزاً لتعبئته باستيراد قيود متعدّدة."""
+        content = request.env['myaccounting.move'].build_import_template_xlsx()
+        return request.make_response(
+            content,
+            headers=[
+                ('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                ('Content-Disposition', 'attachment; filename="journal_entries_template.xlsx"'),
             ],
         )
 

@@ -38,10 +38,13 @@ class MyAccountingBackup(models.AbstractModel):
                 'state': move.state,
                 'ledger_month': move.ledger_month,
                 'ledger_year': move.ledger_year,
+                'import_notes': move.import_notes or '',
+                'import_notes_reviewed': move.import_notes_reviewed,
                 'currency_code': move.currency_id.name or None,
                 'company_name': move.company_id.name or None,
                 'lines': [{
                     'account_id': line.account_id.id,
+                    'pending_account_name': line.pending_account_name or '',
                     'name': line.name or '',
                     'debit': line.debit,
                     'credit': line.credit,
@@ -110,10 +113,12 @@ class MyAccountingBackup(models.AbstractModel):
             line_cmds = []
             for line in mv.get('lines', []):
                 new_account_id = account_id_map.get(line.get('account_id'))
-                if not new_account_id:
+                # بنود "غير مكتملة" (مستوردة بلا حساب) تُستعاد باسم الحساب المعلّق
+                if not new_account_id and not line.get('pending_account_name'):
                     continue
                 line_cmds.append((0, 0, {
-                    'account_id': new_account_id,
+                    'account_id': new_account_id or False,
+                    'pending_account_name': line.get('pending_account_name') or False,
                     'name': line.get('name') or False,
                     'debit': line.get('debit') or 0.0,
                     'credit': line.get('credit') or 0.0,
@@ -128,6 +133,9 @@ class MyAccountingBackup(models.AbstractModel):
             }
             # ندعم أيضاً استعادة نسخ احتياطية قديمة لا تحتوي على هذه الحقول،
             # فنترك القيم الافتراضية تُطبَّق تلقائياً عندئذ.
+            if mv.get('import_notes'):
+                move_vals['import_notes'] = mv['import_notes']
+                move_vals['import_notes_reviewed'] = mv.get('import_notes_reviewed', False)
             if mv.get('ledger_month'):
                 move_vals['ledger_month'] = mv['ledger_month']
             if mv.get('ledger_year'):

@@ -1,0 +1,24 @@
+/* زر "ملاحظة" أولاً في محادثة القيد المحاسبي */
+.o-mail-Chatter-topbar[data-thread-model="myaccounting.move"] .o-mail-Chatter-logNote {
+    order: -1;
+}
+.o-mail-Chatter-topbar[data-thread-model="myaccounting.move"] .o-mail-Chatter-sendMessage {
+    order: 0;
+}
+
+/* إبراز ملاحظات الاستيراد داخل القيد */
+.o_myaccounting_import_notes {
+    border-inline-start: 4px solid var(--warning, #f0ad4e);
+}
+.o_myaccounting_import_notes ul {
+    margin-bottom: 0.25rem;
+    padding-inline-start: 1.25rem;
+}
+.o_myaccounting_import_notes p {
+    margin-bottom: 0.25rem;
+}
+
+/* إبراز القيود ذات الملاحظات في قائمة القيود */
+tr.o_move_has_import_notes > td {
+    background-color: rgba(255, 193, 7, 0.12);
+}

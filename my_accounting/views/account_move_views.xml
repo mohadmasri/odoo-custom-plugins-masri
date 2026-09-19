@@ -7,7 +7,8 @@
         <field name="model">myaccounting.move</field>
         <field name="arch" type="xml">
             <list string="القيود المحاسبية" decoration-muted="state == 'draft'">
-                <field name="name"/>
+                <field name="has_import_notes" column_invisible="1"/>
+                <field name="name" decoration-warning="has_import_notes" decoration-bf="has_import_notes"/>
                 <field name="date"/>
                 <field name="ledger_period_label" string="الشهر المحاسبي"/>
                 <field name="ref"/>
@@ -15,7 +16,7 @@
                 <field name="total_debit" sum="الإجمالي" digits="[16,3]"/>
                 <field name="total_credit" sum="الإجمالي" digits="[16,3]"/>
                 <field name="state" widget="badge" decoration-success="state == 'posted'"
-                       decoration-info="state == 'draft'"/>
+                       decoration-info="state == 'draft'" decoration-warning="state == 'incomplete'"/>
             </list>
         </field>
     </record>
@@ -28,6 +29,8 @@
                 <header>
                     <button name="action_post" type="object" string="ترحيل" class="oe_highlight"
                             invisible="state == 'posted'"/>
+                    <button name="action_post_and_next" type="object" string="ترحيل والتالي"
+                            icon="fa-forward" invisible="state == 'posted'"/>
                     <button name="action_reset_to_draft" type="object" string="إعادة إلى مسودة"
                             invisible="state == 'draft'"/>
                     <button name="%(action_report_myaccounting_move)d" type="action"
@@ -35,6 +38,19 @@
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
+                    <field name="has_import_notes" invisible="1"/>
+                    <div class="alert alert-warning o_myaccounting_import_notes" role="alert"
+                         invisible="not has_import_notes">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fa fa-exclamation-triangle fa-lg mt-1" title="ملاحظات الاستيراد"/>
+                            <div class="flex-grow-1">
+                                <field name="import_notes" readonly="1" nolabel="1"/>
+                                <div class="small text-muted">هذه الملاحظات محفوظة أيضاً في تبويب "ملاحظة" في المحادثة أسفل القيد.</div>
+                            </div>
+                            <button name="action_mark_import_notes_reviewed" type="object"
+                                    string="تمت المراجعة" icon="fa-check" class="btn btn-sm btn-secondary"/>
+                        </div>
+                    </div>
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="state == 'posted'" placeholder="رقم القيد"/>
@@ -59,6 +75,8 @@
                                     <field name="account_label" column_invisible="1"/>
                                     <field name="move_state" column_invisible="1"/>
                                     <field name="account_id" widget="myaccounting_account_selector"/>
+                                    <field name="pending_account_name" string="اسم الحساب في الملف"
+                                           readonly="1" optional="show"/>
                                     <field name="name"/>
                                     <field name="debit" sum="إجمالي المدين" digits="[16,3]"/>
                                     <field name="credit" sum="إجمالي الدائن" digits="[16,3]"/>
@@ -90,9 +108,12 @@
                 <field name="date" string="من تاريخ" operator="&gt;="/>
                 <field name="date" string="إلى تاريخ" operator="&lt;="/>
                 <field name="line_ids" string="الحساب"
-                       filter_domain="['|', ('line_ids.account_id.code', 'ilike', self), ('line_ids.account_id.name', 'ilike', self)]"/>
+                       filter_domain="['|', '|', ('line_ids.account_id.code', 'ilike', self), ('line_ids.account_id.name', 'ilike', self), ('line_ids.pending_account_name', 'ilike', self)]"/>
                 <filter string="مسودة" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="غير مكتمل" name="incomplete" domain="[('state', '=', 'incomplete')]"/>
                 <filter string="مرحّل" name="posted" domain="[('state', '=', 'posted')]"/>
+                <separator/>
+                <filter string="بملاحظات استيراد" name="has_import_notes" domain="[('has_import_notes', '=', True)]"/>
                 <separator/>
                 <filter string="متوازن" name="balanced" domain="[('is_balanced', '=', True)]"/>
                 <filter string="غير متوازن" name="unbalanced" domain="[('is_balanced', '=', False)]"/>

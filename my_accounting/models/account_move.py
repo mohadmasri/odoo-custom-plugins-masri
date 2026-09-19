@@ -1,7 +1,43 @@
+import base64
+import io
 import re
+from datetime import date, datetime, timedelta
+
+from markupsafe import Markup, escape
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+
+def normalize_account_key(value):
+    """توحيد شكل اسم/رمز الحساب لمقارنته: إزالة الفراغات الزائدة وتوحيد الحالة."""
+    return ' '.join((value or '').split()).casefold()
+
+
+def normalize_digits(value):
+    """تحويل الأرقام الهندية (٠-٩) والفارسية (۰-۹) إلى أرقام لاتينية."""
+    return (value or '').translate(str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789'))
+
+
+# أسماء الأشهر المقبولة في عمود "شهر دفتر الأستاذ" عند الاستيراد
+ARABIC_MONTHS = {
+    name: number
+    for number, names in enumerate([
+        ('يناير', 'كانون الثاني', 'jan', 'january'),
+        ('فبراير', 'شباط', 'feb', 'february'),
+        ('مارس', 'آذار', 'اذار', 'mar', 'march'),
+        ('أبريل', 'ابريل', 'نيسان', 'apr', 'april'),
+        ('مايو', 'أيار', 'ايار', 'may'),
+        ('يونيو', 'حزيران', 'jun', 'june'),
+        ('يوليو', 'تموز', 'jul', 'july'),
+        ('أغسطس', 'اغسطس', 'آب', 'اب', 'aug', 'august'),
+        ('سبتمبر', 'أيلول', 'ايلول', 'sep', 'september'),
+        ('أكتوبر', 'اكتوبر', 'تشرين الأول', 'تشرين الاول', 'oct', 'october'),
+        ('نوفمبر', 'تشرين الثاني', 'nov', 'november'),
+        ('ديسمبر', 'كانون الأول', 'كانون الاول', 'dec', 'december'),
+    ], start=1)
+    for name in names
+}
 
 LEDGER_MONTH_SELECTION = [
     ('1', '1 - يناير'), ('2', '2 - فبراير'), ('3', '3 - مارس'), ('4', '4 - أبريل'),
@@ -35,8 +71,11 @@ class MyAccountingMove(models.Model):
 
     state = fields.Selection([
         ('draft', 'مسودة'),
+        ('incomplete', 'غير مكتمل'),
         ('posted', 'مرحّل'),
-    ], string='الحالة', default='draft', tracking=True, copy=False)
+    ], string='الحالة', default='draft', tracking=True, copy=False,
+        help='"غير مكتمل" يعني أن القيد يحتوي بنوداً لم يُعرف حسابها عند الاستيراد من ملف Excel، '
+             'ويجب اختيار الحساب يدوياً قبل الترحيل.')
 
     line_ids = fields.One2many('myaccounting.move.line', 'move_id', string='بنود القيد', copy=True)
 
@@ -46,6 +85,24 @@ class MyAccountingMove(models.Model):
     currency_id = fields.Many2one('res.currency', string='العملة',
                                    default=lambda self: self.env.company.currency_id)
     company_id = fields.Many2one('res.company', string='الشركة', default=lambda self: self.env.company)
+
+    # ملاحظات الاستيراد: الأخطاء والتصحيحات التلقائية التي حدثت عند استيراد القيد
+    # من Excel. تُنشر أيضاً كـ"ملاحظة" في المحادثة، وتبقى ظاهرة ومميّزة حتى تُراجَع.
+    import_notes = fields.Html(string='ملاحظات الاستيراد', readonly=True, copy=False, sanitize=True)
+    import_notes_reviewed = fields.Boolean(string='تمت مراجعة ملاحظات الاستيراد', copy=False)
+    has_import_notes = fields.Boolean(string='لديه ملاحظات استيراد', compute='_compute_has_import_notes',
+                                      store=True)
+
+    @api.depends('import_notes', 'import_notes_reviewed')
+    def _compute_has_import_notes(self):
+        for move in self:
+            move.has_import_notes = bool(move.import_notes) and not move.import_notes_reviewed
+
+    def action_mark_import_notes_reviewed(self):
+        self.write({'import_notes_reviewed': True})
+        for move in self:
+            move.message_post(body='تمت مراجعة ملاحظات الاستيراد.', subtype_xmlid='mail.mt_note')
+        return True
 
     _name_company_uniq = models.Constraint(
         'unique(name, company_id)',
@@ -95,10 +152,28 @@ class MyAccountingMove(models.Model):
             move.total_credit = sum(move.line_ids.mapped('credit'))
             move.is_balanced = round(move.total_debit - move.total_credit, 3) == 0.0
 
+    def _sync_state_from_lines(self):
+        """يحدّث حالة القيد بين "مسودة" و"غير مكتمل" حسب وجود بنود بلا حساب.
+        لا يمسّ القيود المرحّلة."""
+        for move in self:
+            if move.state == 'posted':
+                continue
+            new_state = 'incomplete' if any(not line.account_id for line in move.line_ids) else 'draft'
+            if move.state != new_state:
+                move.state = new_state
+
     def action_post(self):
         for move in self:
             if not move.line_ids:
                 raise UserError('لا يمكن ترحيل قيد بدون بنود.')
+            missing = move.line_ids.filtered(lambda line: not line.account_id)
+            if missing:
+                names = '، '.join(sorted({line.pending_account_name or '—' for line in missing}))
+                raise UserError(
+                    f'لا يمكن ترحيل القيد "{move.name}" لأنه يحتوي بنوداً بلا حساب محدّد '
+                    f'(أسماء الحسابات في الملف: {names}).\n'
+                    'اختر الحساب الصحيح لكل بند أولاً.'
+                )
             if not move.is_balanced:
                 raise UserError(
                     f'القيد غير متوازن: إجمالي المدين {move.total_debit} لا يساوي إجمالي الدائن {move.total_credit}.'
@@ -107,8 +182,14 @@ class MyAccountingMove(models.Model):
                 raise UserError('يجب إدخال رقم للقيد قبل الترحيل.')
             move.state = 'posted'
 
+    def action_post_and_next(self):
+        """نفس الترحيل؛ الانتقال للقيد التالي يتم في الواجهة (move_form.js)
+        بعد نجاح الترحيل فقط."""
+        return self.action_post()
+
     def action_reset_to_draft(self):
         self.write({'state': 'draft'})
+        self._sync_state_from_lines()
 
     def unlink(self):
         if not self.env.context.get('force_delete'):
@@ -168,6 +249,491 @@ class MyAccountingMove(models.Model):
             'grand_credit': grand_credit,
         }
 
+    # ========================================================================
+    # الاستيراد من ملف Excel
+    # ========================================================================
+
+    # ترويسات الأعمدة المتوقّعة في الملف، وما يقابلها داخلياً
+    IMPORT_COLUMNS = {
+        'رقم القيد': 'move_key',
+        'التاريخ': 'date',
+        'المرجع': 'ref',
+        'اليومية': 'journal',
+        'شهر دفتر الأستاذ': 'ledger_month',
+        'سنة دفتر الأستاذ': 'ledger_year',
+        'رمز الحساب': 'account_code',
+        'اسم الحساب': 'account_name',
+        'البيان': 'label',
+        'مدين': 'debit',
+        'دائن': 'credit',
+    }
+
+    @api.model
+    def build_import_template_xlsx(self):
+        """يبني قالب Excel لاستيراد القيود: ورقة للقيود، ورقة تعليمات،
+        وورقة بكل الحسابات المتاحة ليتمكّن المستخدم من نسخ الأسماء بدقّة."""
+        import xlsxwriter
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+
+        header_fmt = workbook.add_format({
+            'bold': True, 'bg_color': '#D9E1F2', 'border': 1, 'text_wrap': True, 'align': 'center',
+        })
+        text_fmt = workbook.add_format({'border': 1})
+        num_fmt = workbook.add_format({'border': 1, 'num_format': '#,##0.000'})
+        date_fmt = workbook.add_format({'border': 1, 'num_format': 'yyyy-mm-dd'})
+        note_fmt = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+        title_fmt = workbook.add_format({'bold': True, 'font_size': 13})
+
+        # --- ورقة القيود ---
+        sheet = workbook.add_worksheet('القيود')
+        sheet.right_to_left()
+        headers = [
+            'رقم القيد', 'التاريخ', 'المرجع', 'اليومية',
+            'شهر دفتر الأستاذ', 'سنة دفتر الأستاذ',
+            'رمز الحساب', 'اسم الحساب', 'البيان', 'مدين', 'دائن',
+        ]
+        for col, header in enumerate(headers):
+            sheet.write(0, col, header, header_fmt)
+
+        today = fields.Date.context_today(self)
+        sample_accounts = self.env['myaccounting.account'].search(
+            [('parent_id', '=', False)], order='code', limit=2)
+        first_name = sample_accounts[0].name if sample_accounts else 'اسم حساب من شجرة الحسابات'
+        second_name = sample_accounts[1].name if len(sample_accounts) > 1 else 'اسم حساب آخر'
+
+        examples = [
+            ['1', today, 'مرجع اختياري', 'القيود اليدوية', today.month, today.year,
+             '', first_name, 'شرح الحركة', 500, ''],
+            ['', '', '', '', '', '', '', second_name, 'شرح الحركة', '', 500],
+        ]
+        for row_index, row in enumerate(examples, start=1):
+            for col, value in enumerate(row):
+                if col == 1 and value:
+                    sheet.write_datetime(row_index, col, value, date_fmt)
+                elif col in (9, 10) and value != '':
+                    sheet.write_number(row_index, col, value, num_fmt)
+                else:
+                    sheet.write(row_index, col, value, text_fmt)
+
+        sheet.set_column(0, 0, 10)
+        sheet.set_column(1, 1, 12)
+        sheet.set_column(2, 3, 16)
+        sheet.set_column(4, 5, 16)
+        sheet.set_column(6, 6, 12)
+        sheet.set_column(7, 8, 24)
+        sheet.set_column(9, 10, 13)
+        sheet.freeze_panes(1, 0)
+
+        # --- ورقة التعليمات ---
+        guide = workbook.add_worksheet('تعليمات')
+        guide.right_to_left()
+        guide.set_column(0, 0, 100)
+        guide.write(0, 0, 'طريقة تعبئة الملف', title_fmt)
+        instructions = [
+            '1) كل سطر يمثّل بنداً واحداً داخل القيد (حساب واحد بمبلغ مدين أو دائن).',
+            '2) البنود التي تحمل نفس "رقم القيد" تُجمَّع في قيد واحد.',
+            '   يكفي كتابة رقم القيد في أول سطر، والأسطر التالية التي يكون فيها العمود فارغاً تتبع نفس القيد.',
+            '3) يمكن كتابة مبلغ في "مدين" و"دائن" معاً في نفس السطر عند الحاجة، ولا تُقبل المبالغ السالبة.',
+            '4) "التاريخ" و"المرجع" و"اليومية" و"شهر/سنة دفتر الأستاذ" تُؤخذ من أول سطر في كل قيد.',
+            '   إذا تُرك التاريخ أو شهر/سنة دفتر الأستاذ فارغاً يُؤخذ من القيد السابق في الملف',
+            '   (ولأول قيد: تاريخ اليوم، وشهر/سنة دفتر الأستاذ من التاريخ).',
+            '   التاريخ يُكتب اليوم أولاً بأي شكل: 25/7/2026 أو 25-7-26 أو 25.07.2026 أو 2026-07-25،',
+            '   ويمكن كتابة اليوم والشهر فقط (25/7) فتُؤخذ السنة من "سنة دفتر الأستاذ" أو من القيد السابق.',
+            '   شهر دفتر الأستاذ يُكتب رقماً (7) أو اسماً (يوليو / تموز).',
+            '5) "رمز الحساب" اختياري — إذا كتبته تتم المطابقة به أولاً، وإلّا فبـ"اسم الحساب".',
+            '6) إذا لم يُعثر على الحساب في شجرة الحسابات (أو كان الاسم مكرّراً في أكثر من حساب)،',
+            '   يُستورد القيد بحالة "غير مكتمل" مع حفظ اسم الحساب كما ورد في الملف.',
+            '7) بعد الاستيراد: افتح صفحة القيود، اضغط فلتر الحالة "غير مكتمل"، ثم افتح القيد واختر الحساب الصحيح.',
+            '   بمجرد اختيارك الحساب لبند واحد، تُحدَّث تلقائياً كل البنود غير المكتملة التي تحمل نفس اسم الحساب.',
+            '8) رقم القيد: إذا كان مستخدماً مسبقاً في النظام، يُعطى القيد رقماً جديداً تلقائياً.',
+            '9) احذف سطري المثال قبل رفع الملف.',
+        ]
+        for index, line in enumerate(instructions, start=2):
+            guide.write(index, 0, line, note_fmt)
+
+        # --- ورقة الحسابات المتاحة ---
+        accounts_sheet = workbook.add_worksheet('الحسابات المتاحة')
+        accounts_sheet.right_to_left()
+        for col, header in enumerate(['رمز الحساب', 'اسم الحساب', 'الحساب الأب']):
+            accounts_sheet.write(0, col, header, header_fmt)
+        for index, account in enumerate(
+                self.env['myaccounting.account'].search([], order='code_path'), start=1):
+            accounts_sheet.write(index, 0, account.code or '', text_fmt)
+            accounts_sheet.write(index, 1, account.name or '', text_fmt)
+            accounts_sheet.write(index, 2, account.parent_id.name or '', text_fmt)
+        accounts_sheet.set_column(0, 0, 12)
+        accounts_sheet.set_column(1, 2, 30)
+        accounts_sheet.freeze_panes(1, 0)
+
+        workbook.close()
+        output.seek(0)
+        return output.read()
+
+    @api.model
+    def _import_parse_date(self, value, default_year=None):
+        """يحوّل قيمة خلية إلى تاريخ. يُرجع None إن كانت فارغة، و False إن تعذّر التحويل.
+
+        الأشكال المقبولة (اليوم أولاً دائماً، وأي فاصل من / - . أو مسافة):
+          25/7/2026 ، 25-7-26 ، 25.07.2026 ، 2026-07-25 ، ٢٥/٧/٢٠٢٦
+          25/7 (بدون سنة) ← تُؤخذ السنة من default_year
+          رقم تاريخ Excel التسلسلي (مثل 46228)
+        """
+        if value in (None, ''):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            # خلية رقمية: رقم تاريخ Excel التسلسلي (أيام منذ 1899-12-30)
+            if 20000 <= value <= 80000:
+                return date(1899, 12, 30) + timedelta(days=int(value))
+            return False
+        text = normalize_digits(str(value)).strip()
+        # "2026-07-25 00:00:00" ← نتجاهل الوقت إن وُجد
+        text = re.sub(r'\s+\d{1,2}:\d{2}(:\d{2})?$', '', text)
+        if not text:
+            return None
+        if text.isdigit() and 20000 <= int(text) <= 80000:
+            return date(1899, 12, 30) + timedelta(days=int(text))
+        parts = re.split(r'\s*[/\-.\\\s]\s*', text)
+        if not all(part.isdigit() for part in parts):
+            return False
+        numbers = [int(part) for part in parts]
+        if len(parts) == 3:
+            if len(parts[0]) == 4:
+                year, month, day = numbers
+            else:
+                day, month, year = numbers
+                if len(parts[2]) <= 2:
+                    year += 2000
+        elif len(parts) == 2 and len(parts[0]) <= 2 and len(parts[1]) <= 2:
+            day, month = numbers
+            year = default_year or fields.Date.context_today(self).year
+        else:
+            return False
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return False
+
+    @api.model
+    def _import_parse_ledger_value(self, value, kind):
+        """يحوّل خلية شهر/سنة دفتر الأستاذ إلى رقم صحيح.
+        يُرجع None إن كانت فارغة، و False إن تعذّر التحويل.
+        يقبل: 7 ، 07 ، 7.0 ، ٧ ، أسماء الأشهر (يوليو / تموز)، والسنة بخانتين (26 ← 2026)."""
+        if value in (None, ''):
+            return None
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, float):
+            if not value.is_integer():
+                return False
+            value = int(value)
+        if isinstance(value, int):
+            number = value
+        else:
+            text = normalize_digits(str(value)).strip()
+            if not text:
+                return None
+            if kind == 'month':
+                month = ARABIC_MONTHS.get(normalize_account_key(text))
+                if month:
+                    return month
+            if re.fullmatch(r'\d+(\.0+)?', text):
+                number = int(float(text))
+            else:
+                return False
+        if kind == 'year':
+            if 0 <= number < 100:
+                number += 2000
+            return number if 1900 <= number <= 2200 else False
+        return number if 1 <= number <= 12 else False
+
+    @api.model
+    def _import_parse_float(self, value):
+        """يحوّل قيمة خلية إلى رقم. يُرجع None إن تعذّر التحويل."""
+        if value in (None, ''):
+            return 0.0
+        if isinstance(value, bool):
+            return 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace(',', '')
+        if not text:
+            return 0.0
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    @api.model
+    def _import_build_account_index(self):
+        """يبني فهرسين للحسابات: حسب الرمز وحسب الاسم.
+        الأسماء المتكرّرة تُعلَّم كـ None ليُطلب اختيارها يدوياً لاحقاً."""
+        accounts = self.env['myaccounting.account'].search([])
+        by_code, by_name = {}, {}
+        for account in accounts:
+            code_key = normalize_account_key(account.code)
+            if code_key:
+                by_code[code_key] = account.id
+            name_key = normalize_account_key(account.name)
+            if name_key:
+                by_name[name_key] = None if name_key in by_name else account.id
+        return by_code, by_name
+
+    @api.model
+    def _import_next_names(self, count, used):
+        """يولّد أرقام قيود متسلسلة غير مستخدمة (داخل قاعدة البيانات أو ضمن نفس الاستيراد)."""
+        names = []
+        last_move = self.search([], order='id desc', limit=1)
+        candidate = last_move.name if last_move and last_move.name else '0'
+        for _ in range(count):
+            guard = 0
+            while guard < 10000:
+                candidate = self._increment_name(candidate)
+                if candidate not in used and not self.search_count([('name', '=', candidate)]):
+                    break
+                guard += 1
+            used.add(candidate)
+            names.append(candidate)
+        return names
+
+    def _post_import_notes(self, notes):
+        """يحفظ ملاحظات الاستيراد على القيد وينشرها كـ"ملاحظة" داخلية في المحادثة."""
+        self.ensure_one()
+        items = Markup('').join(Markup('<li>%s</li>') % escape(note) for note in notes)
+        body = Markup('<p><b>ملاحظات الاستيراد من Excel (%s)</b></p><ul>%s</ul>') % (len(notes), items)
+        self.write({'import_notes': body, 'import_notes_reviewed': False})
+        self.message_post(body=body, subtype_xmlid='mail.mt_note')
+
+    @api.model
+    def import_moves_from_xlsx(self, file_b64):
+        """يستورد قيوداً متعدّدة من ملف Excel.
+
+        تُجمَّع الأسطر التي تحمل نفس "رقم القيد" في قيد واحد. أي بند لم يُعثر على
+        حسابه (أو كان اسمه مكرّراً في شجرة الحسابات) يُحفظ باسم الحساب كما ورد في
+        الملف، ويأخذ القيد حالة "غير مكتمل" ليُستكمل يدوياً لاحقاً.
+        """
+        try:
+            import openpyxl
+        except ImportError:
+            raise UserError('مكتبة قراءة ملفات Excel غير متوفرة على الخادم (openpyxl).')
+
+        try:
+            data = base64.b64decode(file_b64)
+            workbook = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+        except Exception:
+            raise UserError('تعذّرت قراءة الملف. تأكد أنه ملف Excel بصيغة .xlsx سليم.')
+
+        sheet = workbook.worksheets[0]
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            raise UserError('الملف فارغ.')
+
+        # ربط ترويسات الأعمدة بمواقعها
+        header_map = {}
+        for index, cell in enumerate(rows[0]):
+            key = self.IMPORT_COLUMNS.get(' '.join(str(cell or '').split()))
+            if key:
+                header_map[key] = index
+        for required in ('move_key', 'account_name', 'debit', 'credit'):
+            if required not in header_map:
+                raise UserError(
+                    'ترويسات الأعمدة غير مطابقة للقالب. الأعمدة المطلوبة على الأقل: '
+                    'رقم القيد، اسم الحساب، مدين، دائن.\n'
+                    'حمّل القالب من الزر المخصّص واستخدمه كما هو.'
+                )
+
+        def cell(row, key):
+            index = header_map.get(key)
+            if index is None or index >= len(row):
+                return None
+            return row[index]
+
+        by_code, by_name = self._import_build_account_index()
+        Account = self.env['myaccounting.account']
+
+        # تجميع الأسطر في قيود: السطر بلا "رقم قيد" يتبع القيد السابق
+        groups, order, current_key = {}, [], None
+        for row_number, row in enumerate(rows[1:], start=2):
+            if row is None or all(value in (None, '') for value in row):
+                continue
+            raw_key = ' '.join(str(cell(row, 'move_key') or '').split())
+            if raw_key:
+                current_key = raw_key
+            if current_key is None:
+                current_key = f'__بلا_رقم_{row_number}'
+            if current_key not in groups:
+                groups[current_key] = []
+                order.append(current_key)
+            groups[current_key].append((row_number, row))
+
+        created, incomplete_count, errors = [], 0, []
+        unmatched_names = {}
+        used_names = set()
+        generated_names = iter(self._import_next_names(len(order), used_names))
+        previous = None  # قيم القيد السابق في الملف (التاريخ وشهر/سنة دفتر الأستاذ)
+
+        for key in order:
+            group = groups[key]
+            first_row = group[0][1]
+            entry_errors = []
+
+            # entry_errors: كل خطأ أو تصحيح تلقائي يخص هذا القيد، يُحفظ معه ويُنشر كملاحظة.
+            # الخلايا الفارغة ليست خطأ: التاريخ وشهر/سنة دفتر الأستاذ يُؤخذان من القيد
+            # السابق في الملف (فالغالب أنها نفس القيم)، دون تسجيل ملاحظة.
+            today = fields.Date.context_today(self)
+            raw_date = cell(first_row, 'date')
+            raw_year = cell(first_row, 'ledger_year')
+            raw_month = cell(first_row, 'ledger_month')
+
+            ledger_year = self._import_parse_ledger_value(raw_year, 'year')
+            ledger_month = self._import_parse_ledger_value(raw_month, 'month')
+
+            # سنة التاريخ المختصر (25/7): سنة دفتر الأستاذ، ثم سنة القيد السابق، ثم السنة الحالية
+            default_year = ledger_year or (previous['date'].year if previous else today.year)
+            move_date = self._import_parse_date(raw_date, default_year=default_year)
+            if not move_date:
+                fallback = previous['date'] if previous else today
+                fallback_label = 'تاريخ القيد السابق' if previous else 'تاريخ اليوم'
+                if move_date is False:
+                    entry_errors.append(f'تاريخ غير صالح: "{raw_date}" ← استُخدم {fallback_label} {fallback}')
+                elif not previous:
+                    entry_errors.append(f'لا يوجد تاريخ في الملف ← استُخدم تاريخ اليوم {today}')
+                move_date = fallback
+
+            if not ledger_year:
+                fallback = previous['ledger_year'] if previous else move_date.year
+                if ledger_year is False:
+                    source = 'سنة القيد السابق' if previous else 'سنة التاريخ'
+                    entry_errors.append(f'سنة دفتر أستاذ غير صالحة: "{raw_year}" ← استُخدمت {source} {fallback}')
+                ledger_year = fallback
+
+            if not ledger_month:
+                fallback = previous['ledger_month'] if previous else move_date.month
+                if ledger_month is False:
+                    source = 'شهر القيد السابق' if previous else 'شهر التاريخ'
+                    entry_errors.append(f'شهر دفتر أستاذ غير صالح: "{raw_month}" ← استُخدم {source} {fallback}')
+                ledger_month = fallback
+
+            previous = {'date': move_date, 'ledger_year': ledger_year, 'ledger_month': ledger_month}
+
+            line_commands, has_pending = [], False
+            for row_number, row in group:
+                account_name = ' '.join(str(cell(row, 'account_name') or '').split())
+                account_code = ' '.join(str(cell(row, 'account_code') or '').split())
+                debit = self._import_parse_float(cell(row, 'debit'))
+                credit = self._import_parse_float(cell(row, 'credit'))
+
+                if debit is None or credit is None:
+                    entry_errors.append(f'سطر {row_number}: قيمة مدين/دائن غير رقمية ← لم يُستورد السطر')
+                    continue
+                if not account_name and not account_code and not debit and not credit:
+                    continue
+                if not account_name and not account_code:
+                    entry_errors.append(f'سطر {row_number}: لا يوجد اسم أو رمز حساب ← لم يُستورد السطر')
+                    continue
+                if debit < 0 or credit < 0:
+                    entry_errors.append(f'سطر {row_number}: لا يمكن أن يكون المبلغ سالباً ← لم يُستورد السطر')
+                    continue
+
+                account_id = by_code.get(normalize_account_key(account_code)) if account_code else None
+                if account_id:
+                    account = Account.browse(account_id)
+                    if account_name and normalize_account_key(account_name) != normalize_account_key(account.name):
+                        entry_errors.append(
+                            f'سطر {row_number}: الرمز "{account_code}" يعود للحساب "{account.name}" '
+                            f'بينما الاسم في الملف "{account_name}" ← اعتُمد الحساب حسب الرمز')
+                elif account_name:
+                    name_key = normalize_account_key(account_name)
+                    account_id = by_name.get(name_key)
+                    if account_id:
+                        if account_code:
+                            account = Account.browse(account_id)
+                            entry_errors.append(
+                                f'سطر {row_number}: الرمز "{account_code}" غير موجود ← تمت المطابقة بالاسم '
+                                f'مع الحساب {account.code} - {account.name}')
+                    elif name_key in by_name:
+                        entry_errors.append(
+                            f'سطر {row_number}: اسم الحساب "{account_name}" مكرّر في شجرة الحسابات '
+                            f'← يجب اختيار الحساب يدوياً')
+                    else:
+                        entry_errors.append(
+                            f'سطر {row_number}: الحساب "{account_name}"'
+                            + (f' (رمز "{account_code}")' if account_code else '')
+                            + ' غير موجود ← يجب اختياره أو إنشاؤه يدوياً')
+                else:
+                    entry_errors.append(
+                        f'سطر {row_number}: الرمز "{account_code}" غير موجود ولا يوجد اسم حساب '
+                        f'← يجب اختيار الحساب يدوياً')
+
+                values = {
+                    'name': (str(cell(row, 'label')).strip() if cell(row, 'label') not in (None, '') else False),
+                    'debit': debit,
+                    'credit': credit,
+                }
+                if account_id:
+                    values['account_id'] = account_id
+                else:
+                    label = account_name or account_code
+                    values['pending_account_name'] = label
+                    has_pending = True
+                    unmatched_names[label] = unmatched_names.get(label, 0) + 1
+                line_commands.append((0, 0, values))
+
+            if not line_commands:
+                if entry_errors:
+                    errors.append(f'القيد "{key}": ' + '؛ '.join(entry_errors))
+                continue
+
+            file_name = key if key and not key.startswith('__بلا_رقم_') else None
+            move_name = file_name
+            if move_name and (move_name in used_names or self.search_count([('name', '=', move_name)])):
+                move_name = None
+            if move_name:
+                used_names.add(move_name)
+            else:
+                move_name = next(generated_names)
+                if file_name:
+                    entry_errors.insert(0, f'رقم القيد "{file_name}" مستخدم مسبقاً ← أُعطي الرقم {move_name}')
+                else:
+                    entry_errors.insert(0, f'لا يوجد رقم قيد في الملف ← أُعطي الرقم {move_name}')
+
+            move = self.create({
+                'name': move_name,
+                'date': move_date,
+                'ref': (str(cell(first_row, 'ref')).strip() if cell(first_row, 'ref') not in (None, '') else False),
+                'journal': (str(cell(first_row, 'journal')).strip()
+                            if cell(first_row, 'journal') not in (None, '') else 'القيود اليدوية'),
+                'ledger_month': str(ledger_month),
+                'ledger_year': ledger_year,
+                'state': 'incomplete' if has_pending else 'draft',
+                'line_ids': line_commands,
+            })
+            created.append(move)
+            if has_pending:
+                incomplete_count += 1
+            if not move.is_balanced:
+                entry_errors.append(
+                    f'القيد غير متوازن: مدين {move.total_debit:,.3f} / دائن {move.total_credit:,.3f} '
+                    f'(الفرق {abs(move.total_debit - move.total_credit):,.3f}) ← يجب تصحيحه قبل الترحيل')
+            if entry_errors:
+                errors.append(f'القيد "{move.name}": ' + '؛ '.join(entry_errors))
+                move._post_import_notes(entry_errors)
+
+        unbalanced = [move.name for move in created if not move.is_balanced]
+
+        return {
+            'created': len(created),
+            'incomplete': incomplete_count,
+            'unbalanced': unbalanced,
+            'unmatched_accounts': sorted(unmatched_names.items(), key=lambda item: -item[1]),
+            'errors': errors,
+        }
+
 
 class MyAccountingMoveLine(models.Model):
     _name = 'myaccounting.move.line'
@@ -176,7 +742,12 @@ class MyAccountingMoveLine(models.Model):
 
     move_id = fields.Many2one('myaccounting.move', string='القيد', required=True, ondelete='cascade')
     move_state = fields.Selection(related='move_id.state', string='حالة القيد', store=True)
-    account_id = fields.Many2one('myaccounting.account', string='الحساب', required=True)
+    account_id = fields.Many2one('myaccounting.account', string='الحساب')
+    pending_account_name = fields.Char(
+        string='اسم الحساب في الملف', copy=False,
+        help='اسم الحساب كما ورد في ملف Excel عندما تعذّر مطابقته مع شجرة الحسابات. '
+             'عند اختيار الحساب الصحيح هنا، تُحدَّث تلقائياً كل البنود غير المكتملة التي تحمل نفس الاسم.',
+    )
     account_label = fields.Char(string='اسم الحساب المعروض في القيد', compute='_compute_account_label')
     name = fields.Char(string='البيان')
     debit = fields.Float(string='مدين', default=0.0, digits=(16, 3))
@@ -184,7 +755,7 @@ class MyAccountingMoveLine(models.Model):
     currency_id = fields.Many2one(related='move_id.currency_id', string='العملة', store=True)
     date = fields.Date(related='move_id.date', string='التاريخ', store=True)
 
-    @api.depends('account_id', 'account_id.name', 'account_id.parent_id.name')
+    @api.depends('account_id', 'account_id.name', 'account_id.parent_id.name', 'pending_account_name')
     def _compute_account_label(self):
         # عند تكرار اسم الحساب في أكثر من مكان في شجرة الحسابات (مثال: "الرواتب"
         # تحت أكثر من حساب أب)، نضيف اسم الحساب الأب لتمييزه، لكن فقط في عرض
@@ -192,7 +763,7 @@ class MyAccountingMoveLine(models.Model):
         for line in self:
             account = line.account_id
             if not account:
-                line.account_label = ''
+                line.account_label = line.pending_account_name or ''
                 continue
             is_duplicate = bool(self.env['myaccounting.account'].search_count([
                 ('name', '=', account.name),
@@ -203,10 +774,54 @@ class MyAccountingMoveLine(models.Model):
             else:
                 line.account_label = account.name
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        lines.move_id._sync_state_from_lines()
+        return lines
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'account_id' in vals and vals.get('account_id'):
+            self._propagate_account_to_matching_lines()
+        if 'account_id' in vals:
+            self.move_id._sync_state_from_lines()
+        return res
+
+    def unlink(self):
+        moves = self.move_id
+        res = super().unlink()
+        moves.exists()._sync_state_from_lines()
+        return res
+
+    def _propagate_account_to_matching_lines(self):
+        """عند اختيار حساب لبند كان اسمه غير معروف، يُطبَّق نفس الحساب تلقائياً على
+        كل البنود الأخرى غير المكتملة التي تحمل نفس اسم الحساب في الملف."""
+        for line in self:
+            pending = (line.pending_account_name or '').strip()
+            if not pending or not line.account_id:
+                continue
+
+            key = normalize_account_key(pending)
+            candidates = self.search([
+                ('id', '!=', line.id),
+                ('account_id', '=', False),
+                ('pending_account_name', '!=', False),
+            ])
+            matching = candidates.filtered(
+                lambda other: normalize_account_key(other.pending_account_name) == key
+            )
+
+            line.pending_account_name = False
+            if matching:
+                matching.write({
+                    'account_id': line.account_id.id,
+                    'pending_account_name': False,
+                })
+                matching.move_id._sync_state_from_lines()
+
     @api.constrains('debit', 'credit')
     def _check_debit_credit(self):
         for line in self:
             if line.debit < 0 or line.credit < 0:
                 raise ValidationError('لا يمكن أن تكون قيمة المدين أو الدائن سالبة.')
-            if line.debit and line.credit:
-                raise ValidationError('لا يمكن أن يحتوي بند واحد على مدين ودائن في نفس الوقت.')

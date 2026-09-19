@@ -88,3 +88,36 @@
 .o_move_bulk_toolbar {
     background-color: var(--o-surface-2, #eef3fb);
 }
+
+/* فلتر الحركة والبحث الذكي */
+.o_account_tree_filters {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+.o_account_tree_search .form-control {
+    padding-inline-start: 34px;
+}
+.o_account_tree_search_icon {
+    position: absolute;
+    inset-inline-start: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500, #adb5bd);
+    pointer-events: none;
+}
+.o_account_tree_filter_sep {
+    align-self: stretch;
+    width: 1px;
+    background-color: var(--o-surface-border, rgba(0, 0, 0, 0.1));
+}
+.o_account_tree_match {
+    background-color: rgba(255, 193, 7, 0.35);
+    border-radius: 3px;
+    padding: 0 2px;
+}
+/* حساب أب ظاهر فقط لأن تحته حسابات عليها حركة */
+.o_account_tree_no_movement {
+    opacity: 0.6;
+}

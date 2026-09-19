@@ -4,8 +4,9 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { JournalImportDialog } from "./journal_import_dialog";
 
-const STATE_LABELS = { draft: "مسودة", posted: "مرحّل" };
+const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
 
 const LEDGER_MONTH_OPTIONS = [
     { value: "1", label: "1 - يناير" }, { value: "2", label: "2 - فبراير" },
@@ -32,11 +33,13 @@ export class MoveList extends Component {
             account: "",
             dateFrom: "",
             dateTo: "",
-            stateFilter: "",
+            stateFilters: [],
             balanceFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
             selected: {},
+            sortField: "",
+            sortDir: "asc",
         });
         this.stateLabels = STATE_LABELS;
         this.ledgerMonthOptions = LEDGER_MONTH_OPTIONS;
@@ -159,8 +162,8 @@ export class MoveList extends Component {
         if (this.state.dateTo) {
             domain.push(["date", "<=", this.state.dateTo]);
         }
-        if (this.state.stateFilter) {
-            domain.push(["state", "=", this.state.stateFilter]);
+        if (this.state.stateFilters.length) {
+            domain.push(["state", "in", this.state.stateFilters]);
         }
         if (this.state.balanceFilter) {
             domain.push(["is_balanced", "=", this.state.balanceFilter === "balanced"]);
@@ -178,7 +181,8 @@ export class MoveList extends Component {
         this.state.records = await this.orm.searchRead(
             "myaccounting.move",
             this.domain,
-            ["name", "date", "ref", "journal", "total_debit", "total_credit", "state", "ledger_period_label"],
+            ["name", "date", "ref", "journal", "total_debit", "total_credit", "state",
+             "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes"],
             { order: "date desc, id desc" }
         );
         this.state.selected = {};
@@ -195,9 +199,72 @@ export class MoveList extends Component {
         this.loadData();
     }
 
+    isStateActive(value) {
+        return this.state.stateFilters.includes(value);
+    }
+
+    // كل حالة زر مستقل: الضغط يفعّلها، والضغط عليها وهي مفعّلة يلغيها،
+    // ويمكن تفعيل أكثر من حالة معاً.
     onStateFilter(value) {
-        this.state.stateFilter = this.state.stateFilter === value ? "" : value;
+        this.state.stateFilters = this.isStateActive(value)
+            ? this.state.stateFilters.filter((v) => v !== value)
+            : [...this.state.stateFilters, value];
         this.loadData();
+    }
+
+    // الضغط على عنوان عمود: أول مرة ترتيب تصاعدي، ثم يتبدّل بين تصاعدي وتنازلي
+    onSort(field) {
+        if (this.state.sortField === field) {
+            this.state.sortDir = this.state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+            this.state.sortField = field;
+            this.state.sortDir = "asc";
+        }
+    }
+
+    clearSort() {
+        this.state.sortField = "";
+        this.state.sortDir = "asc";
+    }
+
+    sortIcon(field) {
+        if (this.state.sortField !== field) {
+            return "fa-sort text-muted opacity-50";
+        }
+        return this.state.sortDir === "asc" ? "fa-sort-asc" : "fa-sort-desc";
+    }
+
+    // الترتيب يتم في المتصفح لأن كل القيود محمّلة أصلاً، وهذا يسمح بترتيب
+    // طبيعي لأرقام القيود ("2" قبل "10") والشهر المحاسبي حسب السنة ثم الشهر.
+    get sortedRecords() {
+        const { sortField, sortDir } = this.state;
+        if (!sortField) {
+            return this.state.records;
+        }
+        const collator = new Intl.Collator("ar", { numeric: true, sensitivity: "base" });
+        const stateOrder = { draft: 0, incomplete: 1, posted: 2 };
+        const keyOf = (rec) => {
+            switch (sortField) {
+                case "ledger_period":
+                    return (rec.ledger_year || 0) * 100 + parseInt(rec.ledger_month || 0, 10);
+                case "state":
+                    return stateOrder[rec.state] ?? 99;
+                case "total_debit":
+                case "total_credit":
+                    return rec[sortField] || 0;
+                default:
+                    return rec[sortField] || "";
+            }
+        };
+        const factor = sortDir === "asc" ? 1 : -1;
+        return [...this.state.records].sort((a, b) => {
+            const ka = keyOf(a);
+            const kb = keyOf(b);
+            const cmp = typeof ka === "number" && typeof kb === "number"
+                ? ka - kb
+                : collator.compare(String(ka), String(kb));
+            return cmp * factor || (b.id - a.id);
+        });
     }
 
     onBalanceFilter(value) {
@@ -223,7 +290,7 @@ export class MoveList extends Component {
             account: "",
             dateFrom: "",
             dateTo: "",
-            stateFilter: "",
+            stateFilters: [],
             balanceFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
@@ -232,13 +299,18 @@ export class MoveList extends Component {
     }
 
     openMove(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.move",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+        // نمرّر قائمة القيود المعروضة (بنفس ترتيبها وفلاترها) حتى تعمل أسهم
+        // التنقل بين القيود داخل نموذج القيد.
+        this.actionService.doAction(
+            {
+                type: "ir.actions.act_window",
+                res_model: "myaccounting.move",
+                res_id: id,
+                views: [[false, "form"]],
+                target: "current",
+            },
+            { props: { resIds: this.sortedRecords.map((rec) => rec.id) } }
+        );
     }
 
     createMove() {
@@ -247,6 +319,12 @@ export class MoveList extends Component {
             res_model: "myaccounting.move",
             views: [[false, "form"]],
             target: "current",
+        });
+    }
+
+    openImportDialog() {
+        this.dialogService.add(JournalImportDialog, {
+            onImported: () => this.loadData(),
         });
     }
 }

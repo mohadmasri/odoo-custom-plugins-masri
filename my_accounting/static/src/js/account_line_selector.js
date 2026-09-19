@@ -38,6 +38,13 @@ export class AccountLineSelectorField extends Many2OneField {
             props.value = { ...props.value, display_name: label };
         }
 
+        // بند مستورد من Excel لم يُعرف حسابه: نعرض الاسم كما ورد في الملف كنص
+        // إرشادي داخل الخانة ليعرف المستخدم أي حساب عليه أن يختار.
+        const pending = this.props.record.data.pending_account_name;
+        if (!props.value && pending) {
+            props.placeholder = `من الملف: ${pending}`;
+        }
+
         // ما دام القيد لا يزال مسودة، نمنع النقر على البند من فتح صفحة الحساب
         // (كان هذا يمنع الصف من الدخول في وضع التعديل عند النقر عليه)، فيصبح
         // بإمكان المستخدم النقر على البند والتعديل عليه مباشرة كالمعتاد. بعد

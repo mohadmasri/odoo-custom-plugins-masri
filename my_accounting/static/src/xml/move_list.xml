@@ -5,9 +5,14 @@
         <div class="o_move_list p-3" style="overflow:auto; height:100%;">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h2 class="m-0">القيود المحاسبية</h2>
-                <button class="btn btn-primary" t-on-click="() => this.createMove()">
-                    <i class="fa fa-plus me-1"/> جديد
-                </button>
+                <div class="d-flex" style="gap: 8px;">
+                    <button class="btn btn-outline-primary" t-on-click="() => this.openImportDialog()">
+                        <i class="fa fa-file-excel-o me-1"/> استيراد من Excel
+                    </button>
+                    <button class="btn btn-primary" t-on-click="() => this.createMove()">
+                        <i class="fa fa-plus me-1"/> جديد
+                    </button>
+                </div>
             </div>
 
             <div class="o_move_filters d-flex flex-wrap align-items-end mb-3" style="gap: 12px;">
@@ -62,9 +67,11 @@
                 <div>
                     <label class="d-block small text-muted mb-1">الحالة</label>
                     <div class="btn-group" role="group">
-                        <button type="button" t-attf-class="btn btn-sm {{ state.stateFilter === 'draft' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                        <button type="button" t-attf-class="btn btn-sm {{ isStateActive('draft') ? 'btn-secondary' : 'btn-outline-secondary' }}"
                                 t-on-click="() => this.onStateFilter('draft')">مسودة</button>
-                        <button type="button" t-attf-class="btn btn-sm {{ state.stateFilter === 'posted' ? 'btn-secondary' : 'btn-outline-secondary' }}"
+                        <button type="button" t-attf-class="btn btn-sm {{ isStateActive('incomplete') ? 'btn-warning' : 'btn-outline-warning' }}"
+                                t-on-click="() => this.onStateFilter('incomplete')">غير مكتمل</button>
+                        <button type="button" t-attf-class="btn btn-sm {{ isStateActive('posted') ? 'btn-secondary' : 'btn-outline-secondary' }}"
                                 t-on-click="() => this.onStateFilter('posted')">مرحّل</button>
                     </div>
                 </div>
@@ -80,6 +87,10 @@
                 <div>
                     <button class="btn btn-sm btn-link" t-on-click="() => this.clearFilters()">
                         <i class="fa fa-times me-1"/> مسح الفلاتر
+                    </button>
+                    <button class="btn btn-sm btn-link" t-att-disabled="!state.sortField"
+                            t-on-click="() => this.clearSort()">
+                        <i class="fa fa-sort me-1"/> إلغاء الترتيب
                     </button>
                 </div>
             </div>
@@ -112,36 +123,49 @@
                                    t-att-checked="allSelected"
                                    t-on-change="(ev) => this.toggleSelectAll(ev)"/>
                         </th>
-                        <th>رقم القيد</th>
-                        <th>التاريخ</th>
-                        <th>الشهر المحاسبي</th>
-                        <th>المرجع</th>
-                        <th>اليومية</th>
-                        <th class="text-end">إجمالي المدين</th>
-                        <th class="text-end">إجمالي الدائن</th>
-                        <th>الحالة</th>
+                        <t t-foreach="[
+                                ['name', 'رقم القيد', ''],
+                                ['date', 'التاريخ', ''],
+                                ['ledger_period', 'الشهر المحاسبي', ''],
+                                ['ref', 'المرجع', ''],
+                                ['journal', 'اليومية', ''],
+                                ['total_debit', 'إجمالي المدين', 'text-end'],
+                                ['total_credit', 'إجمالي الدائن', 'text-end'],
+                                ['state', 'الحالة', ''],
+                            ]" t-as="col" t-key="col[0]">
+                            <th t-att-class="col[2]" style="cursor:pointer; user-select:none; white-space:nowrap;"
+                                t-on-click="() => this.onSort(col[0])">
+                                <t t-esc="col[1]"/>
+                                <i t-attf-class="fa {{ sortIcon(col[0]) }} ms-1"/>
+                            </th>
+                        </t>
                     </tr>
                 </thead>
                 <tbody>
                     <tr t-if="!state.records.length">
                         <td colspan="9" class="text-center text-muted py-4">لا توجد قيود مطابقة</td>
                     </tr>
-                    <tr t-foreach="state.records" t-as="rec" t-key="rec.id"
+                    <tr t-foreach="sortedRecords" t-as="rec" t-key="rec.id"
+                        t-att-class="{ 'o_move_has_import_notes': rec.has_import_notes }"
                         style="cursor:pointer;" t-on-click="() => this.openMove(rec.id)">
                         <td t-on-click="(ev) => ev.stopPropagation()">
                             <input type="checkbox" class="form-check-input"
                                    t-att-checked="state.selected[rec.id] || false"
                                    t-on-change="(ev) => this.toggleSelect(rec.id, ev)"/>
                         </td>
-                        <td><strong t-esc="rec.name"/></td>
+                        <td>
+                            <strong t-esc="rec.name"/>
+                            <i t-if="rec.has_import_notes" class="fa fa-exclamation-triangle text-warning ms-1"
+                               title="لهذا القيد ملاحظات استيراد لم تُراجع بعد"/>
+                        </td>
                         <td t-esc="rec.date"/>
                         <td t-esc="rec.ledger_period_label"/>
-                        <td t-esc="rec.ref"/>
-                        <td t-esc="rec.journal"/>
+                        <td t-esc="rec.ref or ''"/>
+                        <td t-esc="rec.journal or ''"/>
                         <td class="text-end" t-esc="rec.total_debit.toFixed(3)"/>
                         <td class="text-end" t-esc="rec.total_credit.toFixed(3)"/>
                         <td>
-                            <span t-attf-class="badge {{ rec.state === 'posted' ? 'text-bg-success' : 'text-bg-info' }}"
+                            <span t-attf-class="badge {{ rec.state === 'posted' ? 'text-bg-success' : (rec.state === 'incomplete' ? 'text-bg-warning' : 'text-bg-info') }}"
                                   t-esc="stateLabels[rec.state]"/>
                         </td>
                     </tr>

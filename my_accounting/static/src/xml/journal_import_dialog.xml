@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.JournalImportDialog">
+        <Dialog title="'استيراد قيود من ملف Excel'" size="'md'">
+            <div>
+                <div class="mb-3">
+                    <div class="fw-bold mb-1">1. حمّل القالب وعبّئه</div>
+                    <div class="small text-muted mb-2">
+                        القالب يحتوي على الأعمدة المطلوبة، وأمثلة، وصفحة بكل الحسابات المتاحة في النظام.
+                    </div>
+                    <a class="btn btn-outline-primary btn-sm"
+                       href="/my_accounting/journal_import/template">
+                        <i class="fa fa-download me-1"/> تحميل القالب
+                    </a>
+                </div>
+
+                <hr/>
+
+                <div class="mb-3">
+                    <div class="fw-bold mb-1">2. ارفع الملف بعد تعبئته</div>
+                    <input type="file" class="form-control" accept=".xlsx"
+                           t-on-change="(ev) => this.onFileChange(ev)"/>
+                    <div t-if="state.fileName" class="small text-muted mt-1">
+                        الملف المختار: <t t-esc="state.fileName"/>
+                    </div>
+                </div>
+
+                <div t-if="state.result" class="mt-3">
+                    <hr/>
+                    <div class="fw-bold mb-2">نتيجة الاستيراد</div>
+                    <ul class="mb-2">
+                        <li>عدد القيود التي أُنشئت: <strong t-esc="state.result.created"/></li>
+                        <li t-if="state.result.incomplete">
+                            منها غير مكتملة (تحتاج اختيار الحساب يدوياً):
+                            <strong class="text-warning" t-esc="state.result.incomplete"/>
+                        </li>
+                        <li t-if="state.result.unbalanced.length">
+                            قيود غير متوازنة:
+                            <strong class="text-danger" t-esc="state.result.unbalanced.join('، ')"/>
+                        </li>
+                    </ul>
+
+                    <div t-if="state.result.unmatched_accounts.length" class="mb-2">
+                        <div class="small fw-bold mb-1">حسابات لم يُعثر عليها في شجرة الحسابات:</div>
+                        <ul class="small mb-0">
+                            <li t-foreach="state.result.unmatched_accounts" t-as="item" t-key="item[0]">
+                                <t t-esc="item[0]"/>
+                                <span class="text-muted"> (<t t-esc="item[1]"/> بند)</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div t-if="state.result.errors.length" class="alert alert-warning py-2 small mb-0">
+                        <div class="fw-bold mb-1">ملاحظات على بعض الأسطر:</div>
+                        <ul class="mb-0">
+                            <li t-foreach="state.result.errors" t-as="err" t-key="err_index" t-esc="err"/>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-att-disabled="state.importing"
+                        t-on-click="() => this.runImport()">
+                    <i class="fa fa-upload me-1"/>
+                    <t t-esc="state.importing ? 'جارِ الاستيراد...' : 'استيراد'"/>
+                </button>
+                <button class="btn btn-secondary" t-on-click="() => this.props.close()">إغلاق</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

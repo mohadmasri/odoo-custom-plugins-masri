@@ -18,12 +18,29 @@
                     </div>
                 </div>
 
-                <table class="table table-borderless mb-4" style="width:100%;" t-if="date_from or date_to">
-                    <tr>
+                <t t-set="move_from" t-value="o.env.context.get('move_from')"/>
+                <t t-set="move_to" t-value="o.env.context.get('move_to')"/>
+                <t t-set="ledger_from" t-value="o.env.context.get('ledger_from')"/>
+                <t t-set="ledger_to" t-value="o.env.context.get('ledger_to')"/>
+                <table class="table table-borderless mb-4" style="width:100%;"
+                       t-if="date_from or date_to or move_from or move_to or ledger_from or ledger_to">
+                    <tr t-if="date_from or date_to">
                         <td style="width:25%;"><strong>من تاريخ:</strong></td>
                         <td style="width:25%;"><span t-esc="date_from or '—'"/></td>
                         <td style="width:25%;"><strong>إلى تاريخ:</strong></td>
                         <td style="width:25%;"><span t-esc="date_to or '—'"/></td>
+                    </tr>
+                    <tr t-if="move_from or move_to">
+                        <td style="width:25%;"><strong>من قيد:</strong></td>
+                        <td style="width:25%;"><span t-esc="move_from or '—'"/></td>
+                        <td style="width:25%;"><strong>إلى قيد:</strong></td>
+                        <td style="width:25%;"><span t-esc="move_to or '—'"/></td>
+                    </tr>
+                    <tr t-if="ledger_from or ledger_to">
+                        <td style="width:25%;"><strong>من شهر دفتر الأستاذ:</strong></td>
+                        <td style="width:25%;"><span t-esc="ledger_from or '—'"/></td>
+                        <td style="width:25%;"><strong>إلى شهر دفتر الأستاذ:</strong></td>
+                        <td style="width:25%;"><span t-esc="ledger_to or '—'"/></td>
                     </tr>
                 </table>
 

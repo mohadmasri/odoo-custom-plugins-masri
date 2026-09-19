@@ -14,14 +14,43 @@
                     <div>
                         <label class="d-block small text-muted mb-1">من تاريخ</label>
                         <input type="date" class="form-control form-control-sm" style="width:150px;"
-                               t-att-value="state.dateFrom"
-                               t-on-change="(ev) => this.onDateInput('dateFrom', ev)"/>
+                               t-att-value="state.filter.dateFrom"
+                               t-on-change="(ev) => this.onFilterChange('dateFrom', ev)"/>
                     </div>
                     <div>
                         <label class="d-block small text-muted mb-1">إلى تاريخ</label>
                         <input type="date" class="form-control form-control-sm" style="width:150px;"
-                               t-att-value="state.dateTo"
-                               t-on-change="(ev) => this.onDateInput('dateTo', ev)"/>
+                               t-att-value="state.filter.dateTo"
+                               t-on-change="(ev) => this.onFilterChange('dateTo', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">من قيد</label>
+                        <input type="text" class="form-control form-control-sm" style="width:120px;"
+                               list="o_account_movements_move_names" placeholder="رقم القيد"
+                               t-att-value="state.filter.moveFrom"
+                               t-on-change="(ev) => this.onFilterChange('moveFrom', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">إلى قيد</label>
+                        <input type="text" class="form-control form-control-sm" style="width:120px;"
+                               list="o_account_movements_move_names" placeholder="آخر قيد"
+                               t-att-value="state.filter.moveTo"
+                               t-on-change="(ev) => this.onFilterChange('moveTo', ev)"/>
+                    </div>
+                    <datalist id="o_account_movements_move_names">
+                        <option t-foreach="state.moveNames" t-as="moveName" t-key="moveName_index" t-att-value="moveName"/>
+                    </datalist>
+                    <div>
+                        <label class="d-block small text-muted mb-1">من شهر دفتر الأستاذ</label>
+                        <input type="month" class="form-control form-control-sm" style="width:160px;"
+                               t-att-value="state.filter.ledgerFrom"
+                               t-on-change="(ev) => this.onFilterChange('ledgerFrom', ev)"/>
+                    </div>
+                    <div>
+                        <label class="d-block small text-muted mb-1">إلى شهر دفتر الأستاذ</label>
+                        <input type="month" class="form-control form-control-sm" style="width:160px;"
+                               t-att-value="state.filter.ledgerTo"
+                               t-on-change="(ev) => this.onFilterChange('ledgerTo', ev)"/>
                     </div>
                     <div>
                         <label class="d-block small text-muted mb-1">المرجع</label>
@@ -52,6 +81,31 @@
                 </button>
             </div>
 
+            <div t-if="hasFilter and state.resolved" class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center" style="gap: 8px;">
+                <i class="fa fa-filter"/>
+                <div class="flex-grow-1">
+                    <strong t-if="fromTree">فلتر شجرة الحسابات مطبّق:</strong>
+                    <strong t-else="">فلتر الحركة مطبّق:</strong>
+                    <t t-if="state.resolved.date_to">
+                        من تاريخ <strong><bdi t-esc="state.filter.dateFrom or 'البداية'"/></strong>
+                        إلى <strong><bdi t-esc="state.resolved.date_to"/></strong>
+                    </t>
+                    <t t-if="state.resolved.date_to and state.resolved.move_to"> • </t>
+                    <t t-if="state.resolved.move_to">
+                        من قيد <strong><bdi t-esc="state.resolved.move_from"/></strong>
+                        إلى قيد <strong><bdi t-esc="state.resolved.move_to"/></strong>
+                    </t>
+                    <t t-if="state.resolved.ledger_to and (state.resolved.date_to or state.resolved.move_to)"> • </t>
+                    <t t-if="state.resolved.ledger_to">
+                        من شهر أستاذ <strong><bdi t-esc="state.filter.ledgerFrom or 'البداية'"/></strong>
+                        إلى <strong><bdi t-esc="state.resolved.ledger_to"/></strong>
+                    </t>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.clearMovementFilter()">
+                    <i class="fa fa-times me-1"/> إلغاء الفلترة
+                </button>
+            </div>
+
             <table class="table table-hover table-sm">
                 <thead>
                     <tr>
@@ -73,7 +127,7 @@
                         <td t-esc="rec.date"/>
                         <td><strong t-esc="rec.move_id[1]"/></td>
                         <td t-esc="rec.account_id[1]"/>
-                        <td t-esc="rec.name"/>
+                        <td t-esc="rec.name or ''"/>
                         <td class="text-end" t-esc="rec.debit ? rec.debit.toFixed(3) : ''"/>
                         <td class="text-end" t-esc="rec.credit ? rec.credit.toFixed(3) : ''"/>
                         <td>

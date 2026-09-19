@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!-- داخل القيود المحاسبية فقط: نعلّم شريط المحادثة باسم النموذج ليُعرض
+         زر "ملاحظة" (Log note) أولاً قبل "إرسال رسالة" عبر CSS، دون تعديل كود أودو. -->
+    <t t-inherit="mail.Chatter" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o-mail-Chatter-topbar')]" position="attributes">
+            <attribute name="t-att-data-thread-model">state.thread?.model</attribute>
+        </xpath>
+        <!-- في القيود: "ملاحظة" هو الزر الأساسي (أزرق) و"إرسال رسالة" ثانوي -->
+        <xpath expr="//button[hasclass('o-mail-Chatter-sendMessage')]" position="attributes">
+            <attribute name="t-att-class">{
+                'btn-primary': state.thread?.model !== 'myaccounting.move' and state.composerType !== 'note',
+                'btn-secondary': state.thread?.model === 'myaccounting.move' or state.composerType === 'note',
+                'active': state.composerType === 'message',
+                'my-2': !props.compactHeight
+            }</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('o-mail-Chatter-logNote')]" position="attributes">
+            <attribute name="t-att-class">{
+                'btn-primary': state.composerType === 'note' or (state.thread?.model === 'myaccounting.move' and state.composerType !== 'message'),
+                'btn-secondary': !(state.composerType === 'note' or (state.thread?.model === 'myaccounting.move' and state.composerType !== 'message')),
+                'active': state.composerType === 'note',
+                'my-2': !props.compactHeight
+            }</attribute>
+        </xpath>
+    </t>
+</templates>

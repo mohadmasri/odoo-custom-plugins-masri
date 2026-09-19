@@ -57,13 +57,17 @@ export class GeneralLedger extends Component {
     }
 
     openMove(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.move",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+        const rows = (this.state.data && this.state.data.rows) || [];
+        this.actionService.doAction(
+            {
+                type: "ir.actions.act_window",
+                res_model: "myaccounting.move",
+                res_id: id,
+                views: [[false, "form"]],
+                target: "current",
+            },
+            { props: { resIds: rows.map((row) => row.move_id) } }
+        );
     }
 
     printLedger() {

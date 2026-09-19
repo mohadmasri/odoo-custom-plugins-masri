@@ -9,6 +9,31 @@ export class MyAccountingMoveFormController extends FormController {
     setup() {
         super.setup();
         this.moveListActionService = useService("action");
+        this.notificationService = useService("notification");
+    }
+
+    // ملاحظة: أودو يستدعي هذه الدالة حتى لو فشل الإجراء (يلتقط الخطأ ثم يعرضه
+    // بعدها)، لذلك نعيد تحميل القيد من الخادم ونتأكد أنه أصبح "مرحّلاً" فعلاً
+    // قبل الانتقال؛ وإلا يبقى المستخدم على نفس القيد مع رسالة الخطأ.
+    async afterExecuteActionButton(clickParams) {
+        await super.afterExecuteActionButton(clickParams);
+        if (clickParams.name !== "action_post_and_next") {
+            return;
+        }
+        await this.model.root.load();
+        if (this.model.root.data.state === "posted") {
+            await this.goToNextMove();
+        }
+    }
+
+    async goToNextMove() {
+        const { resId, resIds } = this.model.root;
+        const index = resIds.indexOf(resId);
+        if (index === -1 || index >= resIds.length - 1) {
+            this.notificationService.add("تم الترحيل. هذا آخر قيد في القائمة.", { type: "info" });
+            return;
+        }
+        await this.onPagerUpdate({ offset: index + 1, resIds });
     }
 
     async discard() {
