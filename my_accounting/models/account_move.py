@@ -270,8 +270,22 @@ class MyAccountingMove(models.Model):
 
     @api.model
     def build_import_template_xlsx(self):
-        """يبني قالب Excel لاستيراد القيود: ورقة للقيود، ورقة تعليمات،
-        وورقة بكل الحسابات المتاحة ليتمكّن المستخدم من نسخ الأسماء بدقّة."""
+        """قالب Excel فارغ لاستيراد القيود (مع سطري مثال)."""
+        return self._build_moves_xlsx()
+
+    @api.model
+    def export_moves_to_xlsx(self, move_ids):
+        """يصدّر القيود المحددة إلى ملف Excel بنفس قالب الاستيراد وبنفس ترتيب
+        القائمة المعروضة، فيمكن تعديله أو الإضافة عليه وإعادة رفعه."""
+        moves = self.browse(move_ids).exists()
+        position = {move_id: index for index, move_id in enumerate(move_ids)}
+        moves = moves.sorted(key=lambda move: position.get(move.id, 0))
+        return base64.b64encode(self._build_moves_xlsx(moves)).decode()
+
+    @api.model
+    def _build_moves_xlsx(self, moves=None):
+        """يبني ملف Excel بنفس القالب: ورقة القيود (مثال أو قيود فعلية)،
+        ورقة تعليمات، وورقة بكل الحسابات المتاحة."""
         import xlsxwriter
 
         output = io.BytesIO()
@@ -303,12 +317,32 @@ class MyAccountingMove(models.Model):
         first_name = sample_accounts[0].name if sample_accounts else 'اسم حساب من شجرة الحسابات'
         second_name = sample_accounts[1].name if len(sample_accounts) > 1 else 'اسم حساب آخر'
 
-        examples = [
-            ['1', today, 'مرجع اختياري', 'القيود اليدوية', today.month, today.year,
-             '', first_name, 'شرح الحركة', 500, ''],
-            ['', '', '', '', '', '', '', second_name, 'شرح الحركة', '', 500],
-        ]
-        for row_index, row in enumerate(examples, start=1):
+        if moves is None:
+            data_rows = [
+                ['1', today, 'مرجع اختياري', 'القيود اليدوية', today.month, today.year,
+                 '', first_name, 'شرح الحركة', 500, ''],
+                ['', '', '', '', '', '', '', second_name, 'شرح الحركة', '', 500],
+            ]
+        else:
+            # كل قيد: بيانات القيد في سطر بنده الأول، ثم بقية البنود بأعمدة قيد فارغة
+            data_rows = []
+            for move in moves:
+                header = [move.name or '', move.date or '', move.ref or '',
+                          move.journal or '', int(move.ledger_month or 0) or '', move.ledger_year or '']
+                lines = move.line_ids or [None]
+                for index, line in enumerate(lines):
+                    prefix = header if index == 0 else ['', '', '', '', '', '']
+                    if line is None:
+                        data_rows.append(prefix + ['', '', '', '', ''])
+                        continue
+                    data_rows.append(prefix + [
+                        line.account_id.code or '',
+                        line.account_id.name or line.pending_account_name or '',
+                        line.name or '',
+                        line.debit or '',
+                        line.credit or '',
+                    ])
+        for row_index, row in enumerate(data_rows, start=1):
             for col, value in enumerate(row):
                 if col == 1 and value:
                     sheet.write_datetime(row_index, col, value, date_fmt)
@@ -348,8 +382,12 @@ class MyAccountingMove(models.Model):
             '7) بعد الاستيراد: افتح صفحة القيود، اضغط فلتر الحالة "غير مكتمل"، ثم افتح القيد واختر الحساب الصحيح.',
             '   بمجرد اختيارك الحساب لبند واحد، تُحدَّث تلقائياً كل البنود غير المكتملة التي تحمل نفس اسم الحساب.',
             '8) رقم القيد: إذا كان مستخدماً مسبقاً في النظام، يُعطى القيد رقماً جديداً تلقائياً.',
-            '9) احذف سطري المثال قبل رفع الملف.',
         ]
+        if moves is None:
+            instructions.append('9) احذف سطري المثال قبل رفع الملف.')
+        else:
+            instructions.append('9) هذا الملف مُصدَّر من النظام: عدّل عليه أو أضف قيوداً جديدة ثم ارفعه من زر "استيراد من Excel".')
+            instructions.append('   انتبه: إعادة رفع قيد رقمه موجود في النظام تُنشئ قيداً جديداً برقم جديد ولا تُعدّل القيد الأصلي.')
         for index, line in enumerate(instructions, start=2):
             guide.write(index, 0, line, note_fmt)
 

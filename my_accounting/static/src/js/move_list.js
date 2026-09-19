@@ -40,6 +40,7 @@ export class MoveList extends Component {
             selected: {},
             sortField: "",
             sortDir: "asc",
+            exporting: false,
         });
         this.stateLabels = STATE_LABELS;
         this.ledgerMonthOptions = LEDGER_MONTH_OPTIONS;
@@ -326,6 +327,34 @@ export class MoveList extends Component {
         this.dialogService.add(JournalImportDialog, {
             onImported: () => this.loadData(),
         });
+    }
+
+    // تصدير القيود الظاهرة حالياً (بعد الفلاتر) وبنفس ترتيب الجدول، إلى ملف
+    // Excel بنفس قالب الاستيراد ليمكن تعديله وإعادة رفعه.
+    async exportToExcel() {
+        const records = this.sortedRecords;
+        if (!records.length) {
+            this.notification.add("لا توجد قيود للتصدير.", { type: "warning" });
+            return;
+        }
+        this.state.exporting = true;
+        try {
+            const fileBase64 = await this.orm.call(
+                "myaccounting.move", "export_moves_to_xlsx", [records.map((rec) => rec.id)]);
+            const bytes = Uint8Array.from(atob(fileBase64), (char) => char.charCodeAt(0));
+            const url = URL.createObjectURL(new Blob([bytes], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            }));
+            const today = new Date().toISOString().slice(0, 10);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `القيود المحاسبية ${today}.xlsx`;
+            link.click();
+            URL.revokeObjectURL(url);
+            this.notification.add(`تم تصدير ${records.length} قيد.`, { type: "success" });
+        } finally {
+            this.state.exporting = false;
+        }
     }
 }
 
