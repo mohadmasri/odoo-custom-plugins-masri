@@ -4,9 +4,17 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { useSetupAction } from "@web/search/action_hook";
 import { JournalImportDialog } from "./journal_import_dialog";
 
 const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
+
+// الفلاتر والترتيب التي تُحفظ عند فتح قيد وتُستعاد عند الرجوع إلى القائمة
+const KEPT_STATE_FIELDS = [
+    "name", "ref", "account", "dateFrom", "dateTo",
+    "stateFilters", "balanceFilter", "ledgerMonth", "ledgerYear",
+    "sortField", "sortDir",
+];
 
 const LEDGER_MONTH_OPTIONS = [
     { value: "1", label: "1 - يناير" }, { value: "2", label: "2 - فبراير" },
@@ -26,6 +34,8 @@ export class MoveList extends Component {
         this.actionService = useService("action");
         this.dialogService = useService("dialog");
         this.notification = useService("notification");
+        // عند الرجوع من قيد إلى القائمة يعيد أودو الحالة المحفوظة في props.state
+        const restored = (this.props.state && this.props.state.moveListFilters) || {};
         this.state = useState({
             records: [],
             name: "",
@@ -41,6 +51,15 @@ export class MoveList extends Component {
             sortField: "",
             sortDir: "asc",
             exporting: false,
+            ...restored,
+        });
+        // تُستدعى قبل مغادرة القائمة (مثلاً عند فتح قيد) فتُحفظ الفلاتر والترتيب
+        useSetupAction({
+            getLocalState: () => ({
+                moveListFilters: Object.fromEntries(
+                    KEPT_STATE_FIELDS.map((field) => [field, this.state[field]])
+                ),
+            }),
         });
         this.stateLabels = STATE_LABELS;
         this.ledgerMonthOptions = LEDGER_MONTH_OPTIONS;
