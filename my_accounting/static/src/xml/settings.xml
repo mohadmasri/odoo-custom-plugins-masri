@@ -47,6 +47,69 @@
                 </div>
             </div>
 
+            <div class="o_settings_section mb-4" t-if="state.backup">
+                <div class="o_settings_section_header">
+                    <i class="fa fa-clock-o me-2"/>
+                    <span>نسخ احتياطي تلقائي يومي</span>
+                </div>
+                <div class="o_settings_section_body">
+                    <div class="text-muted small mb-3">
+                        نسخة كاملة (قاعدة البيانات وكل المرفقات) تُؤخذ تلقائياً كل ليلة الساعة 2 فجراً،
+                        وتُحذف النسخ الأقدم تلقائياً. يُفضّل اختيار مجلد على قرص خارجي أو مجلد مزامنة سحابية.
+                    </div>
+                    <div class="o_settings_row">
+                        <div class="o_settings_row_text">
+                            <div class="o_settings_row_title">تفعيل النسخ التلقائي</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input" style="transform:scale(1.4);"
+                                   t-att-checked="state.backup.enabled"
+                                   t-on-change="(ev) => { state.backup.enabled = ev.target.checked; }"/>
+                        </div>
+                    </div>
+                    <hr/>
+                    <div class="d-flex flex-wrap align-items-end mb-2" style="gap: 12px;">
+                        <div class="flex-grow-1">
+                            <label class="form-label small mb-1">مجلد الحفظ</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   t-att-value="state.backup.directory"
+                                   t-on-change="(ev) => { state.backup.directory = ev.target.value; }"/>
+                        </div>
+                        <div>
+                            <label class="form-label small mb-1">عدد النسخ المحفوظة</label>
+                            <input type="number" min="1" max="365" class="form-control form-control-sm"
+                                   style="width:120px;" t-att-value="state.backup.keep"
+                                   t-on-change="(ev) => { state.backup.keep = ev.target.value; }"/>
+                        </div>
+                        <button class="btn btn-sm btn-primary" t-att-disabled="state.savingBackup"
+                                t-on-click="() => this.saveBackupConfig()">
+                            <i class="fa fa-save me-1"/> حفظ الإعدادات
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" t-att-disabled="state.runningBackup"
+                                t-on-click="() => this.runBackupNow()">
+                            <i class="fa fa-download me-1"/>
+                            <t t-if="state.runningBackup">جارٍ إنشاء النسخة...</t>
+                            <t t-else="">نسخ الآن</t>
+                        </button>
+                    </div>
+                    <div t-if="state.backup.last_status" class="alert alert-info py-2 px-3 small mb-2"
+                         t-esc="state.backup.last_status"/>
+                    <div t-if="state.backup.files.length" class="small">
+                        <strong>النسخ الموجودة (<t t-esc="state.backup.files.length"/>):</strong>
+                        <table class="table table-sm mt-1 mb-0">
+                            <tbody>
+                                <tr t-foreach="state.backup.files.slice(0, 10)" t-as="f" t-key="f.name">
+                                    <td t-esc="f.name"/>
+                                    <td class="text-muted" t-esc="f.date"/>
+                                    <td class="text-end" t-esc="f.size_mb + ' MB'"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div t-else="" class="text-muted small">لا توجد نسخ محفوظة بعد في هذا المجلد.</div>
+                </div>
+            </div>
+
             <div class="o_settings_section mb-4">
                 <div class="o_settings_section_header">
                     <i class="fa fa-list-ul me-2"/>

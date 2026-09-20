@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.TrialBalance">
+        <div class="o_trial_balance p-3" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <div>
+                    <h2 class="m-0">ميزان المراجعة</h2>
+                    <div class="text-muted small mt-1">
+                        رصيد افتتاحي وحركة الفترة ورصيد ختامي لكل حساب
+                    </div>
+                </div>
+                <div class="d-flex align-items-center" style="gap: 8px;">
+                    <button class="btn btn-secondary" t-on-click="() => this.printReport()">
+                        <i class="fa fa-print me-1"/> طباعة
+                    </button>
+                    <button class="btn btn-success" t-on-click="() => this.exportExcel()">
+                        <i class="fa fa-file-excel-o me-1"/> تحميل Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="o_tb_filters mb-3 no-print">
+                <div class="o_tb_months d-flex flex-wrap align-items-center mb-2">
+                    <span class="text-muted small me-2" t-esc="currentYear"/>
+                    <t t-foreach="monthButtons" t-as="m" t-key="m">
+                        <button type="button"
+                                t-attf-class="btn o_tb_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.selectMonth(m)" t-esc="m"/>
+                    </t>
+                </div>
+                <div class="d-flex flex-wrap align-items-end" style="gap: 10px;">
+                    <div>
+                        <label class="form-label small mb-1">من شهر دفتر الأستاذ</label>
+                        <input type="month" class="form-control form-control-sm"
+                               t-att-value="state.ledgerFrom"
+                               t-on-change="(ev) => this.onFieldChange('ledgerFrom', ev)"/>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-1">إلى شهر دفتر الأستاذ</label>
+                        <input type="month" class="form-control form-control-sm"
+                               t-att-value="state.ledgerTo"
+                               t-on-change="(ev) => this.onFieldChange('ledgerTo', ev)"/>
+                    </div>
+                    <div class="o_tb_sep"/>
+                    <div>
+                        <label class="form-label small mb-1">من تاريخ</label>
+                        <input type="date" class="form-control form-control-sm"
+                               t-att-value="state.dateFrom"
+                               t-on-change="(ev) => this.onFieldChange('dateFrom', ev)"/>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-1">إلى تاريخ</label>
+                        <input type="date" class="form-control form-control-sm"
+                               t-att-value="state.dateTo"
+                               t-on-change="(ev) => this.onFieldChange('dateTo', ev)"/>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-1">الحالة</label>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <t t-foreach="stateFilters" t-as="flt" t-key="flt.value">
+                                <button type="button"
+                                        t-attf-class="btn {{ isStateActive(flt.value) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        t-on-click="() => this.onStateFilter(flt.value)" t-esc="flt.label"/>
+                            </t>
+                        </div>
+                    </div>
+                    <div class="form-check ms-2">
+                        <input type="checkbox" class="form-check-input" id="o_tb_show_empty"
+                               t-att-checked="state.showEmpty"
+                               t-on-change="(ev) => this.toggleShowEmpty(ev)"/>
+                        <label class="form-check-label small" for="o_tb_show_empty">إظهار الحسابات بلا حركة</label>
+                    </div>
+                    <button class="btn btn-sm btn-link" t-on-click="() => this.clearFilters()">
+                        <i class="fa fa-times me-1"/> إعادة ضبط
+                    </button>
+                </div>
+                <div class="text-muted small mt-2">
+                    عند تعبئة التواريخ تُعتمد الفترة حسب تاريخ القيد، وإلا فحسب شهر دفتر الأستاذ.
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
+
+            <t t-if="!state.loading and state.data">
+                <div class="o_tb_printable">
+                    <h4 class="mb-2 o_tb_title">
+                        ميزان المراجعة —
+                        <t t-if="state.dateFrom or state.dateTo">
+                            من <bdi t-esc="state.dateFrom or 'البداية'"/> إلى <bdi t-esc="state.data.date_to"/>
+                        </t>
+                        <t t-else="">
+                            من شهر <bdi t-esc="state.ledgerFrom"/> إلى <bdi t-esc="state.data.ledger_to or state.ledgerTo"/>
+                        </t>
+                    </h4>
+
+                    <div t-if="!state.data.rows.length" class="text-center text-muted py-5">
+                        لا توجد حركات ضمن هذه الفترة
+                    </div>
+
+                    <table t-if="state.data.rows.length" class="table table-bordered table-sm o_tb_table">
+                        <thead>
+                            <tr class="text-center">
+                                <th rowspan="2" style="width:70px;">الرمز</th>
+                                <th rowspan="2">الحساب</th>
+                                <th rowspan="2" style="width:110px;">رصيد افتتاحي</th>
+                                <th colspan="2" style="width:220px;">حركة الفترة</th>
+                                <th rowspan="2" style="width:110px;">رصيد ختامي</th>
+                            </tr>
+                            <tr class="text-center">
+                                <th style="width:110px;">مدين</th>
+                                <th style="width:110px;">دائن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.data.rows" t-as="row" t-key="row.id"
+                                style="cursor:pointer;" t-on-click="() => this.openAccount(row.id)">
+                                <td class="text-muted" t-esc="row.code"/>
+                                <td>
+                                    <t t-esc="row.name"/>
+                                    <span t-if="row.parent" class="text-muted small"> / <t t-esc="row.parent"/></span>
+                                </td>
+                                <td class="text-end" t-esc="fmt(row.opening)"/>
+                                <td class="text-end" t-esc="fmt(row.debit)"/>
+                                <td class="text-end" t-esc="fmt(row.credit)"/>
+                                <td t-attf-class="text-end {{ row.closing &lt; 0 ? 'text-danger' : '' }}"
+                                    t-esc="fmt(row.closing)"/>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="state.data.rows.length">
+                            <tr class="fw-bold">
+                                <td colspan="2" class="text-end">الإجمالي (<t t-esc="state.data.rows.length"/> حساب)</td>
+                                <td class="text-end" t-esc="fmt(state.data.totals.opening)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.debit)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.credit)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.closing)"/>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="small">
+                                    <span t-if="state.data.balanced" class="text-success">
+                                        <i class="fa fa-check-circle me-1"/>الميزان متوازن: إجمالي المدين يساوي إجمالي الدائن.
+                                    </span>
+                                    <span t-else="" class="text-danger">
+                                        <i class="fa fa-exclamation-triangle me-1"/>الميزان غير متوازن — راجع القيود غير المتوازنة.
+                                    </span>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

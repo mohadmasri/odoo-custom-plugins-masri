@@ -245,7 +245,8 @@ export class MoveList extends Component {
             "myaccounting.move",
             this.domain,
             ["name", "date", "ref", "journal", "total_debit", "total_credit", "state",
-             "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes", "move_type"],
+             "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes", "move_type",
+             "attachment_count"],
             { order: "date desc, id desc" }
         );
         this.state.selected = {};

@@ -17,8 +17,47 @@ export class MyAccountingSettings extends Component {
         this.state = useState({
             restoring: false,
             journals: [],
+            backup: null,
+            savingBackup: false,
+            runningBackup: false,
         });
-        onWillStart(() => this.loadJournals());
+        onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig()]));
+    }
+
+    // ------------------------------------------------------------------
+    // النسخ الاحتياطي التلقائي
+    // ------------------------------------------------------------------
+
+    async loadBackupConfig() {
+        this.state.backup = await this.orm.call("myaccounting.backup", "get_auto_backup_config", []);
+    }
+
+    async saveBackupConfig() {
+        const cfg = this.state.backup;
+        this.state.savingBackup = true;
+        try {
+            this.state.backup = await this.orm.call("myaccounting.backup", "set_auto_backup_config",
+                [cfg.enabled, cfg.directory, cfg.keep]);
+            this.notification.add("تم حفظ إعدادات النسخ الاحتياطي التلقائي.", { type: "success" });
+        } finally {
+            this.state.savingBackup = false;
+        }
+    }
+
+    async runBackupNow() {
+        this.state.runningBackup = true;
+        try {
+            const result = await this.orm.call("myaccounting.backup", "run_auto_backup", [true]);
+            if (result.success) {
+                this.notification.add(
+                    `تمت النسخة: ${result.filename} (${result.size_mb} ميغابايت)`, { type: "success" });
+            } else {
+                this.notification.add(result.error || "تعذّر إنشاء النسخة.", { type: "danger", sticky: true });
+            }
+            await this.loadBackupConfig();
+        } finally {
+            this.state.runningBackup = false;
+        }
     }
 
     // ------------------------------------------------------------------

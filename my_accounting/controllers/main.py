@@ -109,3 +109,67 @@ class GeneralLedgerController(http.Controller):
                 ('Content-Disposition', f'attachment; filename="{filename}"'),
             ],
         )
+
+    @http.route('/my_accounting/trial_balance/xlsx', type='http', auth='user')
+    def export_trial_balance_xlsx(self, date_from=None, date_to=None, ledger_from=None,
+                                  ledger_to=None, states=None, show_empty=None, **kwargs):
+        """تصدير ميزان المراجعة بنفس فلاتر الشاشة."""
+        import io
+        import xlsxwriter
+
+        state_list = [state for state in (states or '').split(',') if state]
+        data = request.env['myaccounting.account'].get_trial_balance(
+            date_from or False, date_to or False, ledger_from or False, ledger_to or False,
+            state_list, bool(show_empty))
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        sheet = workbook.add_worksheet('ميزان المراجعة')
+        sheet.right_to_left()
+
+        header_fmt = workbook.add_format({'bold': True, 'bg_color': '#f2f2f2', 'border': 1, 'text_wrap': True})
+        total_fmt = workbook.add_format({'bold': True, 'bg_color': '#f2f2f2', 'border': 1, 'num_format': '#,##0.000'})
+        num_fmt = workbook.add_format({'border': 1, 'num_format': '#,##0.000'})
+        text_fmt = workbook.add_format({'border': 1})
+
+        period = (f"من {date_from or 'البداية'} إلى {data['date_to']}" if (date_from or date_to)
+                  else f"من شهر {ledger_from or ''} إلى {data['ledger_to'] or ledger_to or ''}")
+        sheet.write(0, 0, f'ميزان المراجعة — {period}', header_fmt)
+        headers = ['الرمز', 'الحساب', 'الحساب الأب', 'رصيد افتتاحي', 'مدين', 'دائن', 'رصيد ختامي']
+        for col, title in enumerate(headers):
+            sheet.write(2, col, title, header_fmt)
+
+        row_idx = 3
+        for row in data['rows']:
+            sheet.write(row_idx, 0, row['code'], text_fmt)
+            sheet.write(row_idx, 1, row['name'], text_fmt)
+            sheet.write(row_idx, 2, row['parent'], text_fmt)
+            sheet.write(row_idx, 3, row['opening'], num_fmt)
+            sheet.write(row_idx, 4, row['debit'], num_fmt)
+            sheet.write(row_idx, 5, row['credit'], num_fmt)
+            sheet.write(row_idx, 6, row['closing'], num_fmt)
+            row_idx += 1
+
+        sheet.write(row_idx, 0, 'الإجمالي', header_fmt)
+        sheet.write(row_idx, 1, '', header_fmt)
+        sheet.write(row_idx, 2, '', header_fmt)
+        for offset, key in enumerate(('opening', 'debit', 'credit', 'closing'), start=3):
+            sheet.write(row_idx, offset, data['totals'][key], total_fmt)
+
+        sheet.set_column(0, 0, 10)
+        sheet.set_column(1, 2, 28)
+        sheet.set_column(3, 6, 15)
+        sheet.freeze_panes(3, 0)
+        sheet.set_landscape()
+        sheet.fit_to_pages(1, 0)
+
+        workbook.close()
+        output.seek(0)
+        filename = 'trial_balance.xlsx'
+        return request.make_response(
+            output.read(),
+            headers=[
+                ('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                ('Content-Disposition', f'attachment; filename="{filename}"'),
+            ],
+        )

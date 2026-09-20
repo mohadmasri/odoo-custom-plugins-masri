@@ -41,3 +41,52 @@
     font-size: 13px;
     color: var(--gray-600, #6c757d);
 }
+
+/* لوحة المؤشرات في الصفحة الرئيسية */
+.o_home_kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    max-width: 1100px;
+}
+.o_home_kpi {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    padding: 16px 20px;
+}
+.o_home_kpi_label {
+    font-size: 12px;
+    color: var(--gray-600, #6c757d);
+}
+.o_home_kpi_value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.o_home_kpi_sub {
+    font-size: 12px;
+    color: var(--gray-600, #6c757d);
+}
+.o_home_panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    max-width: 1100px;
+}
+.o_home_panel {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    overflow: hidden;
+}
+.o_home_panel_head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background-color: var(--o-surface-2, rgba(0, 0, 0, 0.03));
+    border-bottom: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    font-weight: 600;
+    font-size: 13px;
+}

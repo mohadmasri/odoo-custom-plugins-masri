@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component } from "@odoo/owl";
+import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -10,6 +10,11 @@ export class MyAccountingHome extends Component {
 
     setup() {
         this.actionService = useService("action");
+        this.orm = useService("orm");
+        this.state = useState({ data: null });
+        onWillStart(async () => {
+            this.state.data = await this.orm.call("myaccounting.move", "get_home_dashboard", []);
+        });
         this.cards = [
             {
                 title: "قيد جديد",
@@ -40,6 +45,34 @@ export class MyAccountingHome extends Component {
                 action: () => this.actionService.doAction("my_accounting.action_myaccounting_general_ledger"),
             },
         ];
+    }
+
+    fmt(value) {
+        return (value || 0).toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    }
+
+    balanceClass(value) {
+        if (value > 0) return "text-success";
+        if (value < 0) return "text-danger";
+        return "text-muted";
+    }
+
+    openMove(id) {
+        this.actionService.doAction({
+            type: "ir.actions.act_window",
+            res_model: "myaccounting.move",
+            res_id: id,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    openMoves() {
+        this.actionService.doAction("my_accounting.action_myaccounting_move_list");
+    }
+
+    openAccountTree() {
+        this.actionService.doAction("my_accounting.action_myaccounting_account_tree");
     }
 }
 

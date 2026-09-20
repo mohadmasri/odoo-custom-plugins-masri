@@ -81,12 +81,16 @@ class MyAccountingAccount(models.Model):
             account.name_tree = f"{prefix}{account.name or ''}"
 
     def _compute_balance(self):
+        """رصيد كل حساب من القيود المرحّلة، باستعلام تجميعي واحد لكل الحسابات
+        بدل استعلام منفصل لكل حساب (أسرع بكثير في شجرة الحسابات)."""
+        balances = {}
+        if self.ids:
+            groups = self.env['myaccounting.move.line']._read_group(
+                [('account_id', 'in', self.ids), ('move_id.state', '=', 'posted')],
+                ['account_id'], ['debit:sum', 'credit:sum'])
+            balances = {account.id: debit - credit for account, debit, credit in groups}
         for account in self:
-            lines = self.env['myaccounting.move.line'].search([
-                ('account_id', '=', account.id),
-                ('move_id.state', '=', 'posted'),
-            ])
-            account.balance = sum(lines.mapped('debit')) - sum(lines.mapped('credit'))
+            account.balance = balances.get(account.id, 0.0)
 
     @api.constrains('parent_id')
     def _check_parent_recursion(self):
@@ -137,6 +141,38 @@ class MyAccountingAccount(models.Model):
             date_from, date_to, ctx.get('move_from'), ctx.get('move_to'),
             ctx.get('ledger_from'), ctx.get('ledger_to'))
         return self.env['myaccounting.move.line'].search(domain, order='date, id')
+
+    def statement_opening_balance(self, date_from=False):
+        """رصيد الحساب قبل بداية الفلتر ("رصيد سابق" في كشف الحساب).
+
+        يُحسب حسب نوع الفلتر المستخدم: التاريخ، أو شهر دفتر الأستاذ، أو رقم القيد.
+        ويُرجع صفراً إن لم يكن هناك فلتر بداية."""
+        self.ensure_one()
+        ctx = self.env.context
+        domain = [('account_id', 'child_of', self.id)]
+        if date_from:
+            domain.append(('date', '<', date_from))
+        elif ctx.get('ledger_from'):
+            start = self._parse_ledger_period(ctx['ledger_from'])
+            moves = self.env['myaccounting.move'].search([]).filtered(
+                lambda move: move.ledger_year * 100 + int(move.ledger_month or 0) < start)
+            if not moves:
+                return 0.0
+            domain.append(('move_id', 'in', moves.ids))
+        elif ctx.get('move_from'):
+            ordered = self._ordered_moves()
+            names = ordered.mapped('name')
+            if ctx['move_from'] not in names:
+                return 0.0
+            before = ordered[:names.index(ctx['move_from'])]
+            if not before:
+                return 0.0
+            domain.append(('move_id', 'in', before.ids))
+        else:
+            return 0.0
+        groups = self.env['myaccounting.move.line']._read_group(domain, [], ['debit:sum', 'credit:sum'])
+        debit, credit = groups[0] if groups else (0.0, 0.0)
+        return (debit or 0.0) - (credit or 0.0)
 
     @api.model
     def _move_natural_key(self, name):
@@ -235,6 +271,73 @@ class MyAccountingAccount(models.Model):
             for account, debit, credit, count in groups
         }
         return result
+
+    @api.model
+    def _trial_balance_opening_domain(self, date_from=False, ledger_from=False):
+        """شروط الحركات السابقة لبداية الفترة (لحساب الرصيد الافتتاحي)."""
+        if date_from:
+            return [('date', '<', date_from)]
+        if ledger_from:
+            start = self._parse_ledger_period(ledger_from)
+            moves = self.env['myaccounting.move'].search([]).filtered(
+                lambda move: move.ledger_year * 100 + int(move.ledger_month or 0) < start)
+            return [('move_id', 'in', moves.ids)] if moves else [('id', '=', 0)]
+        return []
+
+    @api.model
+    def get_trial_balance(self, date_from=False, date_to=False, ledger_from=False, ledger_to=False,
+                          states=None, show_empty=False):
+        """ميزان المراجعة: لكل حساب رصيد افتتاحي وحركة الفترة (مدين/دائن) ورصيد ختامي."""
+        states = [state for state in (states or []) if state in ('draft', 'incomplete', 'posted')] or ['posted']
+        Line = self.env['myaccounting.move.line']
+        base = [('account_id', '!=', False), ('move_id.state', 'in', states)]
+        period = self._movement_line_domain(date_from, date_to, False, False, ledger_from, ledger_to)
+        opening = self._trial_balance_opening_domain(date_from, ledger_from)
+
+        data = {}
+
+        def row(account):
+            return data.setdefault(account.id, {
+                'id': account.id,
+                'code': account.code or '',
+                'name': account.name or '',
+                'parent': account.parent_id.name or '',
+                'opening': 0.0, 'debit': 0.0, 'credit': 0.0,
+            })
+
+        if opening:
+            for account, debit, credit in Line._read_group(
+                    base + opening, ['account_id'], ['debit:sum', 'credit:sum']):
+                row(account)['opening'] = (debit or 0.0) - (credit or 0.0)
+        for account, debit, credit in Line._read_group(
+                base + period, ['account_id'], ['debit:sum', 'credit:sum']):
+            entry = row(account)
+            entry['debit'] = debit or 0.0
+            entry['credit'] = credit or 0.0
+
+        if show_empty:
+            for account in self.search([]):
+                row(account)
+
+        rows = []
+        for entry in data.values():
+            entry['closing'] = entry['opening'] + entry['debit'] - entry['credit']
+            if not show_empty and not any(round(entry[key], 3) for key in ('opening', 'debit', 'credit', 'closing')):
+                continue
+            rows.append(entry)
+        rows.sort(key=lambda item: [
+            (0, int(part), '') if part.isdigit() else (1, 0, part)
+            for part in re.split(r'(\d+)', item['code']) if part] or [(1, 0, '')])
+
+        totals = {key: sum(entry[key] for entry in rows) for key in ('opening', 'debit', 'credit', 'closing')}
+        return {
+            'rows': rows,
+            'totals': totals,
+            'balanced': round(totals['debit'] - totals['credit'], 3) == 0,
+            'date_to': (date_to or fields.Date.to_string(fields.Date.context_today(self)))
+                       if (date_from or date_to) else False,
+            'ledger_to': (ledger_to or self._current_ledger_period()) if (ledger_from or ledger_to) else False,
+        }
 
     @api.model
     def get_movement_filter(self, date_from=False, date_to=False, move_from=False, move_to=False,

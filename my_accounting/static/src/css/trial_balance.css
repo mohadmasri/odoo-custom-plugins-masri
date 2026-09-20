@@ -1,0 +1,67 @@
+/* ميزان المراجعة */
+.o_trial_balance .o_tb_filters {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.o_trial_balance .o_tb_months {
+    gap: 6px;
+}
+
+.o_trial_balance .o_tb_month_btn {
+    min-width: 46px;
+    padding: 6px 10px;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.1;
+}
+
+.o_trial_balance .o_tb_sep {
+    align-self: stretch;
+    width: 1px;
+    background-color: var(--o-surface-border, rgba(0, 0, 0, 0.1));
+}
+
+.o_trial_balance .o_tb_table thead {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.o_trial_balance .o_tb_table thead th,
+.o_trial_balance .o_tb_table tfoot td {
+    background-color: var(--o-surface-2, #f2f2f2);
+}
+
+.o_trial_balance .o_tb_table tbody tr:hover {
+    background-color: var(--o-surface-hover, rgba(113, 75, 163, 0.06));
+}
+
+/* الطباعة: صفحة A4 عمودية، بتصغير محسوب قبل الطباعة (--tb-print-scale) */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+    .o_trial_balance {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        zoom: var(--tb-print-scale, 1);
+    }
+    .o_trial_balance .o_tb_table thead {
+        position: static !important;
+    }
+    .o_trial_balance .o_tb_table td,
+    .o_trial_balance .o_tb_table th {
+        color: #000 !important;
+        background-color: #fff !important;
+        border-color: #999 !important;
+    }
+    .o_trial_balance .o_tb_table thead th,
+    .o_trial_balance .o_tb_table tfoot td {
+        background-color: #f2f2f2 !important;
+    }
+}

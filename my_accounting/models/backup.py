@@ -1,7 +1,13 @@
+import logging
+import os
 from datetime import datetime
 
+import odoo.service.db
 from odoo import api, models
 from odoo.exceptions import UserError
+from odoo.tools import config as odoo_config
+
+_logger = logging.getLogger(__name__)
 
 
 class MyAccountingBackup(models.AbstractModel):
@@ -156,3 +162,109 @@ class MyAccountingBackup(models.AbstractModel):
             'accounts_count': len(data['accounts']),
             'moves_count': len(data['moves']),
         }
+
+    # ========================================================================
+    # النسخ الاحتياطي التلقائي (نسخة كاملة: قاعدة البيانات + الملفات)
+    # ========================================================================
+
+    AUTO_BACKUP_PARAMS = {
+        'enabled': 'my_accounting.auto_backup_enabled',
+        'directory': 'my_accounting.auto_backup_directory',
+        'keep': 'my_accounting.auto_backup_keep',
+        'last_status': 'my_accounting.auto_backup_last_status',
+    }
+
+    @api.model
+    def _auto_backup_default_directory(self):
+        return os.path.join(odoo_config['data_dir'], 'my_accounting_backups')
+
+    @api.model
+    def get_auto_backup_config(self):
+        params = self.env['ir.config_parameter'].sudo()
+        keys = self.AUTO_BACKUP_PARAMS
+        directory = params.get_param(keys['directory']) or self._auto_backup_default_directory()
+        return {
+            'enabled': params.get_param(keys['enabled']) == '1',
+            'directory': directory,
+            'keep': int(params.get_param(keys['keep']) or 14),
+            'last_status': params.get_param(keys['last_status']) or '',
+            'files': self.list_backup_files(directory),
+        }
+
+    @api.model
+    def set_auto_backup_config(self, enabled, directory, keep):
+        params = self.env['ir.config_parameter'].sudo()
+        keys = self.AUTO_BACKUP_PARAMS
+        directory = (directory or '').strip() or self._auto_backup_default_directory()
+        try:
+            keep = max(1, min(int(keep), 365))
+        except (TypeError, ValueError):
+            keep = 14
+        params.set_param(keys['enabled'], '1' if enabled else '0')
+        params.set_param(keys['directory'], directory)
+        params.set_param(keys['keep'], str(keep))
+        return self.get_auto_backup_config()
+
+    @api.model
+    def list_backup_files(self, directory=None):
+        params = self.env['ir.config_parameter'].sudo()
+        directory = directory or params.get_param(
+            self.AUTO_BACKUP_PARAMS['directory']) or self._auto_backup_default_directory()
+        if not os.path.isdir(directory):
+            return []
+        files = []
+        for name in os.listdir(directory):
+            path = os.path.join(directory, name)
+            if name.endswith('.zip') and os.path.isfile(path):
+                stat = os.stat(path)
+                files.append({
+                    'name': name,
+                    'size_mb': round(stat.st_size / (1024 * 1024), 1),
+                    'date': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
+                    'timestamp': stat.st_mtime,
+                })
+        return sorted(files, key=lambda item: -item['timestamp'])
+
+    @api.model
+    def run_auto_backup(self, manual=False):
+        """ينشئ نسخة كاملة (قاعدة البيانات + المرفقات) في المجلد المحدَّد،
+        ثم يحذف النسخ الأقدم مع الإبقاء على العدد المطلوب."""
+        params = self.env['ir.config_parameter'].sudo()
+        keys = self.AUTO_BACKUP_PARAMS
+        if not manual and params.get_param(keys['enabled']) != '1':
+            return {'skipped': True}
+
+        directory = params.get_param(keys['directory']) or self._auto_backup_default_directory()
+        keep = int(params.get_param(keys['keep']) or 14)
+        db_name = self.env.cr.dbname
+        started = datetime.now()
+        try:
+            os.makedirs(directory, exist_ok=True)
+            filename = f"{db_name}_{started.strftime('%Y-%m-%d_%H%M')}.zip"
+            path = os.path.join(directory, filename)
+            # نكتب إلى ملف مؤقت ثم نعيد تسميته، حتى لا تبقى نسخة ناقصة إن انقطعت العملية
+            temp_path = path + '.part'
+            with open(temp_path, 'wb') as stream:
+                odoo.service.db.dump_db(db_name, stream, 'zip')
+            os.replace(temp_path, path)
+            size_mb = round(os.path.getsize(path) / (1024 * 1024), 1)
+
+            removed = 0
+            for old in self.list_backup_files(directory)[keep:]:
+                try:
+                    os.remove(os.path.join(directory, old['name']))
+                    removed += 1
+                except OSError:
+                    pass
+
+            status = (f"آخر نسخة: {started.strftime('%Y-%m-%d %H:%M')} — {filename} "
+                      f"({size_mb} ميغابايت)" + (f"، حُذفت {removed} نسخة قديمة" if removed else ''))
+            params.set_param(keys['last_status'], status)
+            _logger.info('my_accounting: auto backup written to %s (%s MB)', path, size_mb)
+            return {'success': True, 'filename': filename, 'size_mb': size_mb,
+                    'removed': removed, 'status': status, 'directory': directory}
+        except Exception as error:  # noqa: BLE001 - نسجّل السبب ولا نُسقط المهمة المجدولة
+            status = f"فشلت النسخة في {started.strftime('%Y-%m-%d %H:%M')}: {error}"
+            params.set_param(keys['last_status'], status)
+            _logger.exception('my_accounting: auto backup failed')
+            return {'success': False, 'error': str(error), 'status': status}

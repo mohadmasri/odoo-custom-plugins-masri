@@ -169,6 +169,17 @@ class MyAccountingMove(models.Model):
                                    default=lambda self: self.env.company.currency_id)
     company_id = fields.Many2one('res.company', string='الشركة', default=lambda self: self.env.company)
 
+    # المستندات المرفقة بالقيد (صورة الفاتورة أو الشيك أو أي مستند مؤيد)
+    attachment_ids = fields.Many2many(
+        'ir.attachment', 'myaccounting_move_attachment_rel', 'move_id', 'attachment_id',
+        string='المرفقات')
+    attachment_count = fields.Integer(string='عدد المرفقات', compute='_compute_attachment_count')
+
+    @api.depends('attachment_ids')
+    def _compute_attachment_count(self):
+        for move in self:
+            move.attachment_count = len(move.attachment_ids)
+
     # ملاحظات الاستيراد: الأخطاء والتصحيحات التلقائية التي حدثت عند استيراد القيد
     # من Excel. تُنشر أيضاً كـ"ملاحظة" في المحادثة، وتبقى ظاهرة ومميّزة حتى تُراجَع.
     import_notes = fields.Html(string='ملاحظات الاستيراد', readonly=True, copy=False, sanitize=True)
@@ -226,6 +237,60 @@ class MyAccountingMove(models.Model):
             self.env.cr.commit()
         except Exception:  # noqa: BLE001 - لا نمنع إقلاع الخادم بسبب القوائم
             self.env.cr.rollback()
+
+    @api.model
+    def get_home_dashboard(self):
+        """مؤشرات الصفحة الرئيسية: حركة الشهر الحالي، ما يحتاج انتباهاً،
+        أرصدة الحسابات الرئيسية، وآخر القيود."""
+        today = fields.Date.context_today(self)
+        month_domain = [('ledger_year', '=', today.year), ('ledger_month', '=', str(today.month))]
+        month_moves = self.search(month_domain)
+
+        accounts = self.env['myaccounting.account'].search(
+            [('parent_id', '=', False)], order='ledger_sequence, code')
+        balances = {account.id: 0.0 for account in accounts}
+        groups = self.env['myaccounting.move.line']._read_group(
+            [('move_id.state', '=', 'posted'), ('account_id', '!=', False)],
+            ['account_id'], ['debit:sum', 'credit:sum'])
+        for account, debit, credit in groups:
+            root_id = int((account.parent_path or str(account.id)).split('/')[0])
+            if root_id in balances:
+                balances[root_id] += (debit or 0.0) - (credit or 0.0)
+
+        return {
+            'month_label': f'{today.month:02d}/{today.year}',
+            'month': {
+                'moves': len(month_moves.filtered(lambda move: move.move_type == 'entry')),
+                'receipts': len(month_moves.filtered(lambda move: move.move_type == 'receipt')),
+                'debit': sum(month_moves.mapped('total_debit')),
+            },
+            'attention': {
+                'draft': self.search_count([('state', '=', 'draft')]),
+                'incomplete': self.search_count([('state', '=', 'incomplete')]),
+                'unbalanced': self.search_count([('is_balanced', '=', False)]),
+                'notes': self.search_count([('has_import_notes', '=', True)]),
+            },
+            'totals': {
+                'moves': self.search_count([('move_type', '=', 'entry')]),
+                'receipts': self.search_count([('move_type', '=', 'receipt')]),
+                'accounts': self.env['myaccounting.account'].search_count([]),
+            },
+            'accounts': [{
+                'id': account.id,
+                'code': account.code,
+                'name': account.name,
+                'balance': balances.get(account.id, 0.0),
+            } for account in accounts],
+            'recent': [{
+                'id': move.id,
+                'name': move.name,
+                'date': move.date and move.date.isoformat(),
+                'journal': move.journal or '',
+                'total': move.total_debit,
+                'state': move.state,
+                'is_receipt': move.move_type == 'receipt',
+            } for move in self.search([], order='id desc', limit=6)],
+        }
 
     @api.model
     def action_new_from_journal(self, journal):
