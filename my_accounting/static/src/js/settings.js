@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef } from "@odoo/owl";
+import { Component, onWillStart, useState, useRef } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
@@ -16,7 +16,39 @@ export class MyAccountingSettings extends Component {
         this.fileInputRef = useRef("fileInput");
         this.state = useState({
             restoring: false,
+            journals: [],
         });
+        onWillStart(() => this.loadJournals());
+    }
+
+    // ------------------------------------------------------------------
+    // اليوميات: أي يومية تُكتب في قيد تظهر هنا تلقائياً
+    // ------------------------------------------------------------------
+
+    async loadJournals() {
+        this.state.journals = await this.orm.call("myaccounting.journal", "get_journals", []);
+    }
+
+    async toggleJournalMenu(journal) {
+        await this.orm.call("myaccounting.journal", "set_show_in_menu", [journal.id, !journal.show_in_menu]);
+        await this.loadJournals();
+        this.notification.add(
+            "تم تحديث قائمة القوالب. حدّث الصفحة (F5) لتظهر في قائمة \"قيد جديد\".",
+            { type: "success" }
+        );
+    }
+
+    async moveJournal(journal, delta) {
+        await this.orm.call("myaccounting.journal", "move_journal", [journal.id, delta]);
+        await this.loadJournals();
+    }
+
+    isFirstJournal(journal) {
+        return this.state.journals.indexOf(journal) === 0;
+    }
+
+    isLastJournal(journal) {
+        return this.state.journals.indexOf(journal) === this.state.journals.length - 1;
     }
 
     downloadBackup() {

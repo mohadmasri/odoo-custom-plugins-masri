@@ -46,6 +46,53 @@
                     </div>
                 </div>
             </div>
+
+            <div class="o_settings_section mb-4">
+                <div class="o_settings_section_header">
+                    <i class="fa fa-list-ul me-2"/>
+                    <span>اليوميات وقوالب "قيد جديد"</span>
+                </div>
+                <div class="o_settings_section_body">
+                    <div class="text-muted small mb-3">
+                        كل يومية تُكتب في قيد تظهر هنا تلقائياً. فعّل الخانة لتظهر اليومية كقالب
+                        تحت قائمة "قيد جديد"، ورتّب القائمة بالأسهم.
+                    </div>
+                    <div t-if="!state.journals.length" class="text-muted">لا توجد يوميات بعد.</div>
+                    <table t-if="state.journals.length" class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:90px;">الترتيب</th>
+                                <th>اليومية</th>
+                                <th style="width:110px;" class="text-center">عدد القيود</th>
+                                <th style="width:150px;" class="text-center">في قائمة "قيد جديد"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.journals" t-as="journal" t-key="journal.id">
+                                <td>
+                                    <button class="btn btn-sm btn-light px-2 py-0" title="تحريك لأعلى"
+                                            t-att-disabled="isFirstJournal(journal)"
+                                            t-on-click="() => this.moveJournal(journal, -1)">
+                                        <i class="fa fa-caret-up"/>
+                                    </button>
+                                    <button class="btn btn-sm btn-light px-2 py-0 ms-1" title="تحريك لأسفل"
+                                            t-att-disabled="isLastJournal(journal)"
+                                            t-on-click="() => this.moveJournal(journal, 1)">
+                                        <i class="fa fa-caret-down"/>
+                                    </button>
+                                </td>
+                                <td t-esc="journal.name"/>
+                                <td class="text-center" t-esc="journal.move_count"/>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input"
+                                           t-att-checked="journal.show_in_menu"
+                                           t-on-change="() => this.toggleJournalMenu(journal)"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </t>
 

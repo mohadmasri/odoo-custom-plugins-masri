@@ -7,3 +7,5 @@ access_myaccounting_move_line_view,myaccounting.move.line.view,model_myaccountin
 access_myaccounting_move_line_edit,myaccounting.move.line.edit,model_myaccounting_move_line,group_myaccounting_edit,1,1,1,1
 access_myaccounting_backup_edit,myaccounting.backup.edit,model_myaccounting_backup,group_myaccounting_edit,1,1,1,1
 access_myaccounting_user_admin_admin,myaccounting.user_admin.admin,model_myaccounting_user_admin,base.group_system,1,1,1,1
+access_myaccounting_journal_view,myaccounting.journal.view,model_myaccounting_journal,group_myaccounting_view,1,0,0,0
+access_myaccounting_journal_edit,myaccounting.journal.edit,model_myaccounting_journal,group_myaccounting_edit,1,1,1,1

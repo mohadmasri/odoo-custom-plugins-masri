@@ -49,6 +49,8 @@
             'my_accounting/static/src/css/move_list.css',
             'my_accounting/static/src/js/move_form.js',
             'my_accounting/static/src/js/move_line_order.js',
+            'my_accounting/static/src/js/journal_input.js',
+            'my_accounting/static/src/xml/journal_input.xml',
             'my_accounting/static/src/xml/move_line_order.xml',
             'my_accounting/static/src/xml/chatter_note_first.xml',
             'my_accounting/static/src/css/move_import_notes.css',

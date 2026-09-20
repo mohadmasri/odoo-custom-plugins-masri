@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.JournalInput">
+        <span t-if="props.readonly" t-esc="value"/>
+        <t t-else="">
+            <input type="text" class="o_input" t-att-list="datalistId"
+                   placeholder="اختر يومية سابقة أو اكتب اسماً جديداً"
+                   t-att-value="value" t-on-change="(ev) => this.onChange(ev)"/>
+            <datalist t-att-id="datalistId">
+                <option t-foreach="state.names" t-as="journalName" t-key="journalName"
+                        t-att-value="journalName"/>
+            </datalist>
+        </t>
+    </t>
+
+</templates>

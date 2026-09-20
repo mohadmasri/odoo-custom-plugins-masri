@@ -36,6 +36,29 @@ export class MyAccountingMoveFormController extends FormController {
         await this.onPagerUpdate({ offset: index + 1, resIds });
     }
 
+    // القيد المفتوح مباشرة من قائمة "قيد جديد" لا يوجد خلفه مسار تنقل، فبعد
+    // حذفه كان أودو يعود إلى تطبيق عشوائي (المناقشة). نوجّه المستخدم هنا
+    // دائماً إلى صفحة القيود في هذه الحالة.
+    get deleteConfirmationDialogProps() {
+        const props = super.deleteConfirmationDialogProps;
+        return {
+            ...props,
+            confirm: async () => {
+                const hasHistory = (this.env.config.breadcrumbs || []).length > 1;
+                await this.model.root.delete();
+                if (this.model.root.resId) {
+                    return;
+                }
+                if (hasHistory) {
+                    this.env.config.historyBack();
+                } else {
+                    await this.moveListActionService.doAction(
+                        "my_accounting.action_myaccounting_move_list", { clearBreadcrumbs: true });
+                }
+            },
+        };
+    }
+
     async discard() {
         // نعيد تنفيذ نفس منطق discard() الأساسي، لكن بدل الاعتماد على
         // historyBack() (التي قد تُرجع المستخدم إلى تطبيق افتراضي عشوائي

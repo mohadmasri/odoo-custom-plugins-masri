@@ -187,16 +187,12 @@ class MyAccountingMove(models.Model):
         return res
 
     def _ensure_journal_menus(self):
-        """يضيف قائمة قالب لليومية الجديدة فور ظهورها."""
-        parent = self.env.ref('my_accounting.menu_myaccounting_move_new', raise_if_not_found=False)
-        if not parent:
-            return
+        """يسجّل أي يومية جديدة ويحدّث القائمة عند الحاجة."""
         journals = {move.journal.strip() for move in self if move.journal and move.journal.strip()}
         if not journals:
             return
-        known = self.env['ir.ui.menu'].sudo().search([
-            ('parent_id', '=', parent.id), ('name', 'in', list(journals))])
-        if len(known) != len(journals):
+        Journal = self.env['myaccounting.journal']
+        if Journal.search_count([('name', 'in', list(journals))]) != len(journals):
             self._sync_journal_template_menus()
 
     @api.model
@@ -215,7 +211,12 @@ class MyAccountingMove(models.Model):
         model = self.env['ir.model']._get('myaccounting.move')
         empty_menu = self.env.ref('my_accounting.menu_myaccounting_move_new_empty', raise_if_not_found=False)
 
-        journals = sorted({move.journal.strip() for move in self.search([]) if move.journal and move.journal.strip()})
+        Journal = self.env['myaccounting.journal']
+        Journal._sync_journals()
+        journals = [
+            journal.name for journal in Journal.search([('show_in_menu', '=', True)])
+            if journal.move_count
+        ]
         existing = Menu.search([('parent_id', '=', parent.id)])
         by_name = {menu.name: menu for menu in existing if not empty_menu or menu.id != empty_menu.id}
 

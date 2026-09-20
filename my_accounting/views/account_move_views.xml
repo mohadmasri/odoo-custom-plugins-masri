@@ -62,7 +62,7 @@
                             <field name="ref"/>
                         </group>
                         <group>
-                            <field name="journal"/>
+                            <field name="journal" widget="myaccounting_journal"/>
                             <field name="ledger_month" string="شهر دفتر الأستاذ"/>
                             <field name="ledger_year" string="سنة دفتر الأستاذ"/>
                             <field name="currency_id" invisible="1"/>
