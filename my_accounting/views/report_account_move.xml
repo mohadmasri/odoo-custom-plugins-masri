@@ -104,12 +104,48 @@
 
     <template id="report_myaccounting_move">
         <t t-call="web.html_container">
+            <!-- كل قيد في صفحة A4 واحدة مهما كان عدد بنوده: نثبّت عرض الصفحة
+                 على مقاس الطباعة، ثم نصغّر القيد بالنسبة اللازمة قبل الطباعة. -->
+            <style>
+                @page { size: A4 portrait; margin: 8mm; }
+                .o_move_print_page {
+                    width: 194mm;
+                    margin: 0 auto;
+                    transform-origin: top center;
+                }
+                @media print {
+                    .o_move_print_page { break-after: page; page-break-after: always; }
+                    .o_move_print_page:last-child { break-after: auto; page-break-after: auto; }
+                }
+            </style>
             <t t-foreach="docs" t-as="o">
-                <div t-attf-style="{{ 'page-break-after: always;' if not o_last else '' }}">
+                <div class="o_move_print_page">
                     <t t-call="my_accounting.report_myaccounting_move_document"/>
                 </div>
             </t>
-            <script>window.addEventListener('load', function () { window.print(); });</script>
+            <script>
+                window.addEventListener('load', function () {
+                    var MM_TO_PX = 96 / 25.4;
+                    var availableHeight = (297 - 16) * MM_TO_PX; // A4 عمودي ناقص الهوامش
+                    document.querySelectorAll('.o_move_print_page').forEach(function (page) {
+                        page.style.zoom = '';
+                        var zoom = 1;
+                        // التصغير يعيد تنسيق المحتوى قليلاً، فنكرّر القياس حتى يتّسع فعلاً
+                        for (var i = 0; i &lt; 8; i++) {
+                            var height = page.getBoundingClientRect().height;
+                            if (height &lt;= availableHeight) {
+                                break;
+                            }
+                            zoom = Math.max(zoom * (availableHeight / height) * 0.995, 0.02);
+                            page.style.zoom = zoom.toFixed(4);
+                            if (zoom &lt;= 0.02) {
+                                break;
+                            }
+                        }
+                    });
+                    window.print();
+                });
+            </script>
         </t>
     </template>
 
