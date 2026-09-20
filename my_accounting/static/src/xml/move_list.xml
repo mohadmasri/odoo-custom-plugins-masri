@@ -102,15 +102,6 @@
                     </div>
                 </div>
                 <div>
-                    <label class="d-block small text-muted mb-1">التوازن</label>
-                    <div class="btn-group" role="group">
-                        <button type="button" t-attf-class="btn btn-sm {{ state.balanceFilter === 'balanced' ? 'btn-secondary' : 'btn-outline-secondary' }}"
-                                t-on-click="() => this.onBalanceFilter('balanced')">متوازن</button>
-                        <button type="button" t-attf-class="btn btn-sm {{ state.balanceFilter === 'unbalanced' ? 'btn-secondary' : 'btn-outline-secondary' }}"
-                                t-on-click="() => this.onBalanceFilter('unbalanced')">غير متوازن</button>
-                    </div>
-                </div>
-                <div>
                     <button class="btn btn-sm btn-link" t-on-click="() => this.clearFilters()">
                         <i class="fa fa-times me-1"/> مسح الفلاتر
                     </button>

@@ -153,9 +153,23 @@ class MyAccountingAccount(models.Model):
                 for part in re.split(r'(\d+)', text) if part]
 
     @api.model
+    def _move_sort_key(self, move):
+        """السنة ثم الشهر ثم النوع ثم الرقم: سند القبض بعد قيود شهره وقبل الشهر التالي."""
+        name = (move.name or '').strip()
+        year = move.ledger_year or 0
+        ledger_month = int(move.ledger_month or 0)
+        if move.move_type == 'receipt':
+            digits = re.sub(r'\D', '', name)
+            return (year, ledger_month, 1, int(digits or 0), name.casefold())
+        parts = re.fullmatch(r'(\d+)\s*/\s*(\d+)', name)
+        if parts:
+            return (year, int(parts.group(2)), 0, int(parts.group(1)), '')
+        return (year, ledger_month, 2, 0, name.casefold())
+
+    @api.model
     def _ordered_moves(self):
         moves = self.env['myaccounting.move'].search([])
-        return moves.sorted(key=lambda move: (self._move_natural_key(move.name), move.id))
+        return moves.sorted(key=lambda move: (self._move_sort_key(move), move.id))
 
     @api.model
     def _parse_ledger_period(self, value):

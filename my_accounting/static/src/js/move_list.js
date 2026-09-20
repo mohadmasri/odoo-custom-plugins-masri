@@ -9,22 +9,27 @@ import { JournalImportDialog } from "./journal_import_dialog";
 
 const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
 
-// ترتيب أرقام القيود: الرقم المكتوب بصيغة "رقم/شهر" يُرتَّب بالشهر أولاً ثم برقم
-// القيد داخل الشهر، فيأتي 2/7 بعد 1/7 وليس 1/8. وأي صيغة أخرى تُرتَّب ترتيباً
-// طبيعياً (IMP-2 قبل IMP-10، و9 قبل 10).
-function moveNameKey(name) {
-    const text = String(name || "").trim();
-    const parts = text.match(/^(\d+)\s*\/\s*(\d+)$/);
-    if (parts) {
-        return [Number(parts[2]), Number(parts[1])];
+// ترتيب السجلات حسب رقم القيد:
+//  - السنة ثم الشهر أولاً، فالقيد "2/7" يأتي بعد "1/7" وقبل "1/8".
+//  - سندات القبض تأتي بعد قيود شهرها وقبل قيود الشهر التالي (شهرها من دفتر الأستاذ).
+//  - الأسماء بصيغ أخرى تُرتَّب ترتيباً طبيعياً في آخر شهرها.
+function moveSortKey(rec) {
+    const name = String(rec.name || "").trim();
+    const year = rec.ledger_year || 0;
+    const ledgerMonth = parseInt(rec.ledger_month, 10) || 0;
+    if (rec.move_type === "receipt") {
+        return [year, ledgerMonth, 1, parseInt(name.replace(/\D/g, ""), 10) || 0, name.toLowerCase()];
     }
-    return text.split(/(\d+)/).filter(Boolean)
-        .map((part) => (/^\d+$/.test(part) ? Number(part) : part.toLowerCase()));
+    const parts = name.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (parts) {
+        return [year, Number(parts[2]), 0, Number(parts[1]), ""];
+    }
+    return [year, ledgerMonth, 2, 0, name.toLowerCase()];
 }
 
 function compareMoveNames(a, b) {
-    const ka = moveNameKey(a);
-    const kb = moveNameKey(b);
+    const ka = moveSortKey(a);
+    const kb = moveSortKey(b);
     for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
         const x = ka[i];
         const y = kb[i];
@@ -50,7 +55,7 @@ function compareMoveNames(a, b) {
 // الفلاتر والترتيب التي تُحفظ عند فتح قيد وتُستعاد عند الرجوع إلى القائمة
 const KEPT_STATE_FIELDS = [
     "name", "ref", "account", "dateFrom", "dateTo",
-    "stateFilters", "balanceFilter", "typeFilter", "ledgerMonth", "ledgerYear",
+    "stateFilters", "typeFilter", "ledgerMonth", "ledgerYear",
     "sortField", "sortDir",
 ];
 
@@ -82,7 +87,6 @@ export class MoveList extends Component {
             dateFrom: "",
             dateTo: "",
             stateFilters: [],
-            balanceFilter: "",
             typeFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
@@ -224,9 +228,6 @@ export class MoveList extends Component {
         if (this.state.stateFilters.length) {
             domain.push(["state", "in", this.state.stateFilters]);
         }
-        if (this.state.balanceFilter) {
-            domain.push(["is_balanced", "=", this.state.balanceFilter === "balanced"]);
-        }
         if (this.state.typeFilter) {
             domain.push(["move_type", "=", this.state.typeFilter]);
         }
@@ -321,7 +322,7 @@ export class MoveList extends Component {
         const factor = sortDir === "asc" ? 1 : -1;
         return [...this.state.records].sort((a, b) => {
             if (sortField === "name") {
-                return compareMoveNames(a.name, b.name) * factor || (b.id - a.id);
+                return compareMoveNames(a, b) * factor || (b.id - a.id);
             }
             const ka = keyOf(a);
             const kb = keyOf(b);
@@ -330,11 +331,6 @@ export class MoveList extends Component {
                 : collator.compare(String(ka), String(kb));
             return cmp * factor || (b.id - a.id);
         });
-    }
-
-    onBalanceFilter(value) {
-        this.state.balanceFilter = this.state.balanceFilter === value ? "" : value;
-        this.loadData();
     }
 
     // فلتر النوع: قيد محاسبي أو سند قبض (الضغط على الزر المفعّل يلغيه)
@@ -388,7 +384,6 @@ export class MoveList extends Component {
             dateFrom: "",
             dateTo: "",
             stateFilters: [],
-            balanceFilter: "",
             typeFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
