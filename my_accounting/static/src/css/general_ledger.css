@@ -111,3 +111,27 @@
     font-size: 14px;
     line-height: 1.1;
 }
+
+/* تثبيت صفّي الترويسة أثناء التمرير داخل الجدول (بدون أي كود، عبر CSS فقط) */
+.o_general_ledger .o_gl_printable {
+    max-height: calc(100vh - 240px);
+    overflow: auto;
+}
+.o_general_ledger .o_gl_table thead {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+.o_general_ledger .o_gl_table thead th {
+    background-color: var(--o-surface-2, #f2f2f2);
+}
+/* عند الطباعة لا تثبيت ولا تمرير: الجدول كامل في الصفحة */
+@media print {
+    .o_general_ledger .o_gl_printable {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    .o_general_ledger .o_gl_table thead {
+        position: static !important;
+    }
+}

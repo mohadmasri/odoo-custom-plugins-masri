@@ -45,6 +45,7 @@
             'my_accounting/static/src/xml/journal_import_dialog.xml',
             'my_accounting/static/src/js/move_list.js',
             'my_accounting/static/src/xml/move_list.xml',
+            'my_accounting/static/src/css/move_list.css',
             'my_accounting/static/src/js/move_form.js',
             'my_accounting/static/src/xml/chatter_note_first.xml',
             'my_accounting/static/src/css/move_import_notes.css',

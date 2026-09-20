@@ -273,6 +273,32 @@ export class MoveList extends Component {
         this.loadData();
     }
 
+    get currentYear() {
+        return new Date().getFullYear();
+    }
+
+    // أزرار الأشهر 1..12 للسنة الحالية: الوصول لشهر محاسبي بضغطة واحدة
+    get monthButtons() {
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    isMonthActive(month) {
+        return this.state.ledgerMonth === String(month) &&
+            this.state.ledgerYear === String(this.currentYear);
+    }
+
+    // الضغط على الشهر يفعّل الفلتر، والضغط عليه وهو مفعّل يلغيه
+    onMonthButton(month) {
+        if (this.isMonthActive(month)) {
+            this.state.ledgerMonth = "";
+            this.state.ledgerYear = "";
+        } else {
+            this.state.ledgerMonth = String(month);
+            this.state.ledgerYear = String(this.currentYear);
+        }
+        this.loadData();
+    }
+
     onLedgerMonthFilter(ev) {
         this.state.ledgerMonth = ev.target.value;
         this.loadData();
