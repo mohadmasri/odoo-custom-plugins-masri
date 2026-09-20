@@ -9,6 +9,44 @@ import { JournalImportDialog } from "./journal_import_dialog";
 
 const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
 
+// ترتيب أرقام القيود: الرقم المكتوب بصيغة "رقم/شهر" يُرتَّب بالشهر أولاً ثم برقم
+// القيد داخل الشهر، فيأتي 2/7 بعد 1/7 وليس 1/8. وأي صيغة أخرى تُرتَّب ترتيباً
+// طبيعياً (IMP-2 قبل IMP-10، و9 قبل 10).
+function moveNameKey(name) {
+    const text = String(name || "").trim();
+    const parts = text.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (parts) {
+        return [Number(parts[2]), Number(parts[1])];
+    }
+    return text.split(/(\d+)/).filter(Boolean)
+        .map((part) => (/^\d+$/.test(part) ? Number(part) : part.toLowerCase()));
+}
+
+function compareMoveNames(a, b) {
+    const ka = moveNameKey(a);
+    const kb = moveNameKey(b);
+    for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+        const x = ka[i];
+        const y = kb[i];
+        if (x === undefined) {
+            return -1;
+        }
+        if (y === undefined) {
+            return 1;
+        }
+        if (typeof x !== typeof y) {
+            return typeof x === "number" ? -1 : 1;
+        }
+        if (x < y) {
+            return -1;
+        }
+        if (x > y) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // الفلاتر والترتيب التي تُحفظ عند فتح قيد وتُستعاد عند الرجوع إلى القائمة
 const KEPT_STATE_FIELDS = [
     "name", "ref", "account", "dateFrom", "dateTo",
@@ -278,6 +316,9 @@ export class MoveList extends Component {
         };
         const factor = sortDir === "asc" ? 1 : -1;
         return [...this.state.records].sort((a, b) => {
+            if (sortField === "name") {
+                return compareMoveNames(a.name, b.name) * factor || (b.id - a.id);
+            }
             const ka = keyOf(a);
             const kb = keyOf(b);
             const cmp = typeof ka === "number" && typeof kb === "number"

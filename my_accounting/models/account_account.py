@@ -140,9 +140,17 @@ class MyAccountingAccount(models.Model):
 
     @api.model
     def _move_natural_key(self, name):
-        """ترتيب طبيعي لأرقام القيود: 'IMP-2' قبل 'IMP-10'، و'9' قبل '10'."""
+        """ترتيب أرقام القيود.
+
+        الرقم بصيغة "رقم/شهر" يُرتَّب بالشهر أولاً ثم برقم القيد داخل الشهر،
+        فيأتي 2/7 بعد 1/7 وليس 1/8. وأي صيغة أخرى تُرتَّب ترتيباً طبيعياً
+        ('IMP-2' قبل 'IMP-10'، و'9' قبل '10')."""
+        text = (name or '').strip()
+        parts = re.fullmatch(r'(\d+)\s*/\s*(\d+)', text)
+        if parts:
+            return [(0, int(parts.group(2)), ''), (0, int(parts.group(1)), '')]
         return [(0, int(part), '') if part.isdigit() else (1, 0, part.casefold())
-                for part in re.split(r'(\d+)', name or '') if part]
+                for part in re.split(r'(\d+)', text) if part]
 
     @api.model
     def _ordered_moves(self):

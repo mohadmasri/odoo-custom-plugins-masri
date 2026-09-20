@@ -32,6 +32,10 @@ function normalizeSearchText(value) {
         .join(" ");
 }
 
+function pad(n) {
+    return String(n).padStart(2, "0");
+}
+
 class AccountTreeNode extends Component {
     static template = "my_accounting.AccountTreeNode";
     static props = ["node", "depth", "expanded", "selected", "filterActive",
@@ -127,6 +131,31 @@ export class AccountTree extends Component {
     // ---------------------------------------------------------------------
     // فلتر الحركة (تاريخ / رقم قيد)
     // ---------------------------------------------------------------------
+
+    get currentYear() {
+        return new Date().getFullYear();
+    }
+
+    // أزرار الأشهر 1..12 للسنة الحالية: فلترة حركة شهر أستاذ واحد بضغطة
+    get monthButtons() {
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    isMonthActive(month) {
+        const value = `${this.currentYear}-${pad(month)}`;
+        return !!this.state.filter &&
+            this.state.filterForm.ledgerFrom === value &&
+            this.state.filterForm.ledgerTo === value;
+    }
+
+    // الضغط على الشهر يفلتر عليه، والضغط عليه وهو مفعّل يلغيه مع إبقاء باقي الفلاتر
+    async onMonthButton(month) {
+        const value = `${this.currentYear}-${pad(month)}`;
+        const wasActive = this.isMonthActive(month);
+        this.state.filterForm.ledgerFrom = wasActive ? "" : value;
+        this.state.filterForm.ledgerTo = wasActive ? "" : value;
+        await this.applyFilter();
+    }
 
     get hasFilterInput() {
         const f = this.state.filterForm;
