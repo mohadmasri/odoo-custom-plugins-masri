@@ -39,6 +39,84 @@ ARABIC_MONTHS = {
     for name in names
 }
 
+MOVE_TYPES = [
+    ('entry', 'قيد محاسبي'),
+    ('receipt', 'سند قبض'),
+]
+
+# تفقيط المبالغ بالعربية
+ARABIC_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+               'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر',
+               'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر']
+ARABIC_TENS = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون']
+ARABIC_HUNDREDS = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة',
+                   'سبعمائة', 'ثمانمائة', 'تسعمائة']
+ARABIC_SCALES = [('', '', ''), ('ألف', 'ألفان', 'آلاف'), ('مليون', 'مليونان', 'ملايين'),
+                 ('مليار', 'ملياران', 'مليارات')]
+# أسماء العملات ووحداتها الصغرى بالعربية (وإلا استُخدم اسم العملة كما هو)
+ARABIC_CURRENCIES = {
+    # الرمز: (مفرد، جمع، الوحدة الصغرى مفرد، الوحدة الصغرى جمع)
+    'JOD': ('دينار أردني', 'دنانير أردنية', 'فلس', 'فلوس'),
+    'USD': ('دولار أمريكي', 'دولارات أمريكية', 'سنت', 'سنتات'),
+    'EUR': ('يورو', 'يوروهات', 'سنت', 'سنتات'),
+    'SAR': ('ريال سعودي', 'ريالات سعودية', 'هللة', 'هللات'),
+    'AED': ('درهم إماراتي', 'دراهم إماراتية', 'فلس', 'فلوس'),
+    'EGP': ('جنيه مصري', 'جنيهات مصرية', 'قرش', 'قروش'),
+    'ILS': ('شيكل', 'شواكل', 'أغورة', 'أغورات'),
+}
+
+
+def arabic_currency_label(count, singular, plural):
+    """الجمع العربي: من 3 إلى 10 يُجمع، وما عداه يبقى مفرداً."""
+    return plural if 3 <= count % 100 <= 10 else singular
+
+
+def arabic_number_to_words(number):
+    """يحوّل عدداً صحيحاً إلى كلمات عربية."""
+    number = int(number)
+    if number == 0:
+        return 'صفر'
+
+    def three(value):
+        parts = []
+        if value >= 100:
+            parts.append(ARABIC_HUNDREDS[value // 100])
+            value %= 100
+        if value >= 20:
+            unit = value % 10
+            if unit:
+                parts.append(ARABIC_ONES[unit])
+            parts.append(ARABIC_TENS[value // 10])
+        elif value:
+            parts.append(ARABIC_ONES[value])
+        return ' و'.join(parts)
+
+    groups = []
+    scale = 0
+    while number and scale < len(ARABIC_SCALES):
+        groups.append((scale, number % 1000))
+        number //= 1000
+        scale += 1
+
+    words = []
+    for scale, value in reversed(groups):
+        if not value:
+            continue
+        if scale == 0:
+            words.append(three(value))
+            continue
+        singular, dual, plural = ARABIC_SCALES[scale]
+        if value == 1:
+            words.append(singular)
+        elif value == 2:
+            words.append(dual)
+        elif 3 <= value <= 10:
+            words.append(f'{three(value)} {plural}')
+        else:
+            words.append(f'{three(value)} {singular}')
+    return ' و'.join(words)
+
+
 LEDGER_MONTH_SELECTION = [
     ('1', '1 - يناير'), ('2', '2 - فبراير'), ('3', '3 - مارس'), ('4', '4 - أبريل'),
     ('5', '5 - مايو'), ('6', '6 - يونيو'), ('7', '7 - يوليو'), ('8', '8 - أغسطس'),
@@ -69,6 +147,10 @@ class MyAccountingMove(models.Model):
         default=lambda self: self._get_default_ledger_period()[0],
     )
     ledger_period_label = fields.Char(string='الشهر المحاسبي', compute='_compute_ledger_period_label', store=True)
+
+    move_type = fields.Selection(
+        MOVE_TYPES, string='النوع', default='entry', required=True, copy=True,
+        help='سند القبض هو قيد محاسبي بترقيم مستقل وشكل طباعة مختلف.')
 
     state = fields.Selection([
         ('draft', 'مسودة'),
@@ -122,7 +204,9 @@ class MyAccountingMove(models.Model):
 
     @api.model
     def _get_default_name(self):
-        last_move = self.search([], order='id desc', limit=1)
+        # لكل نوع ترقيمه المستقل: يؤخذ رقم آخر سجل من نفس النوع ويُزاد واحداً
+        move_type = self.env.context.get('default_move_type') or 'entry'
+        last_move = self.search([('move_type', '=', move_type)], order='id desc', limit=1)
         candidate = self._increment_name(last_move.name) if last_move and last_move.name else '1'
         guard = 0
         while guard < 1000 and self.search_count([('name', '=', candidate)]):
@@ -241,6 +325,57 @@ class MyAccountingMove(models.Model):
         # يوميات لم تعد موجودة: تُحذف قائمتها
         for menu in by_name.values():
             menu.unlink()
+
+    def receipt_amount_parts(self, amount=None):
+        """يقسم المبلغ إلى (دينار، فلس) لعرضه في عمودين كما في نموذج السند."""
+        self.ensure_one()
+        currency = self.currency_id or self.env.company.currency_id
+        decimals = currency.decimal_places or 2
+        value = round(self.total_debit if amount is None else amount, decimals)
+        units = int(value)
+        return {'units': units, 'subunits': int(round((value - units) * (10 ** decimals)))}
+
+    def receipt_payer(self):
+        """"وصلني من السادة": الجهة الدافعة، وهي حساب الطرف الدائن في السند."""
+        self.ensure_one()
+        credit_lines = self.line_ids.filtered(lambda line: line.credit)
+        if credit_lines:
+            return credit_lines[0].account_label or credit_lines[0].account_id.name or ''
+        return self.ref or ''
+
+    def receipt_detail_lines(self):
+        """بنود التفاصيل في السند: الأسطر المدينة (المبالغ المقبوضة)."""
+        self.ensure_one()
+        debit_lines = self.line_ids.filtered(lambda line: line.debit)
+        return debit_lines or self.line_ids
+
+    def currency_label_ar(self):
+        """اسم العملة بالعربية حسب مبلغ السند (للطباعة)."""
+        self.ensure_one()
+        currency = self.currency_id or self.env.company.currency_id
+        names = ARABIC_CURRENCIES.get(currency.name)
+        if not names:
+            return currency.name or ''
+        total = int(round(self.total_debit or self.total_credit or 0.0))
+        return arabic_currency_label(total, names[0], names[1])
+
+    def amount_in_words(self):
+        """المبلغ الإجمالي للسند مكتوباً بالكلمات بالعربية."""
+        self.ensure_one()
+        currency = self.currency_id or self.env.company.currency_id
+        decimals = currency.decimal_places or 2
+        names = ARABIC_CURRENCIES.get(currency.name)
+        if not names:
+            names = (currency.name or '', currency.name or '', '', '')
+        unit_one, unit_many, sub_one, sub_many = names
+        total = round(self.total_debit or self.total_credit or 0.0, decimals)
+        units = int(total)
+        subunits = int(round((total - units) * (10 ** decimals)))
+        text = f'{arabic_number_to_words(units)} {arabic_currency_label(units, unit_one, unit_many)}'.strip()
+        if subunits and sub_one:
+            text += (f' و{arabic_number_to_words(subunits)} '
+                     f'{arabic_currency_label(subunits, sub_one, sub_many)}')
+        return f'{text} فقط لا غير'
 
     @api.model
     def _get_default_date(self):

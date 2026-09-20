@@ -50,7 +50,7 @@ function compareMoveNames(a, b) {
 // الفلاتر والترتيب التي تُحفظ عند فتح قيد وتُستعاد عند الرجوع إلى القائمة
 const KEPT_STATE_FIELDS = [
     "name", "ref", "account", "dateFrom", "dateTo",
-    "stateFilters", "balanceFilter", "ledgerMonth", "ledgerYear",
+    "stateFilters", "balanceFilter", "typeFilter", "ledgerMonth", "ledgerYear",
     "sortField", "sortDir",
 ];
 
@@ -83,6 +83,7 @@ export class MoveList extends Component {
             dateTo: "",
             stateFilters: [],
             balanceFilter: "",
+            typeFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
             selected: {},
@@ -226,6 +227,9 @@ export class MoveList extends Component {
         if (this.state.balanceFilter) {
             domain.push(["is_balanced", "=", this.state.balanceFilter === "balanced"]);
         }
+        if (this.state.typeFilter) {
+            domain.push(["move_type", "=", this.state.typeFilter]);
+        }
         if (this.state.ledgerMonth) {
             domain.push(["ledger_month", "=", this.state.ledgerMonth]);
         }
@@ -240,7 +244,7 @@ export class MoveList extends Component {
             "myaccounting.move",
             this.domain,
             ["name", "date", "ref", "journal", "total_debit", "total_credit", "state",
-             "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes"],
+             "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes", "move_type"],
             { order: "date desc, id desc" }
         );
         this.state.selected = {};
@@ -333,6 +337,12 @@ export class MoveList extends Component {
         this.loadData();
     }
 
+    // فلتر النوع: قيد محاسبي أو سند قبض (الضغط على الزر المفعّل يلغيه)
+    onTypeFilter(value) {
+        this.state.typeFilter = this.state.typeFilter === value ? "" : value;
+        this.loadData();
+    }
+
     get currentYear() {
         return new Date().getFullYear();
     }
@@ -379,6 +389,7 @@ export class MoveList extends Component {
             dateTo: "",
             stateFilters: [],
             balanceFilter: "",
+            typeFilter: "",
             ledgerMonth: "",
             ledgerYear: "",
         });

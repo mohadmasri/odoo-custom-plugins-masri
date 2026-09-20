@@ -25,6 +25,7 @@
         'views/report_account_statement.xml',
         'views/account_account_views.xml',
         'views/report_account_move.xml',
+        'views/report_receipt.xml',
         'views/account_move_views.xml',
         'views/app_launcher_action.xml',
         'views/menus.xml',

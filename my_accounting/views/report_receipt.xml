@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <!-- تنسيق سند القبض مطابق للنموذج المعتمد: عمودا (فلس/دينار) للمبلغ،
+         عمود التفاصيل، ثم المجموع رقماً وكتابةً. بلا أعمدة مدين/دائن. -->
+    <template id="report_myaccounting_receipt_document">
+        <t t-set="company" t-value="o.company_id or o.env.company"/>
+        <t t-set="total" t-value="o.receipt_amount_parts()"/>
+        <div class="page o_receipt_doc" dir="rtl">
+            <table style="width:100%; border:none;" class="mb-2">
+                <tr>
+                    <td style="text-align:right; font-weight:bold;" t-esc="company.name"/>
+                    <td style="text-align:left; font-weight:bold;" t-esc="company.report_header or ''"/>
+                </tr>
+            </table>
+
+            <h2 class="text-center mb-3" style="letter-spacing:2px;">سند قبض</h2>
+
+            <table style="width:100%;" class="mb-3">
+                <tr>
+                    <td style="width:55%; vertical-align:top;">
+                        <div><strong>التاريخ:</strong>
+                            <span t-esc="o.date and o.date.strftime('%d/%m/%Y') or ''"/>
+                        </div>
+                        <div t-if="company.vat"><strong>الرقم الضريبي:</strong> <span t-esc="company.vat"/></div>
+                        <div><strong>سند قبض رقم:</strong> <span t-field="o.name"/></div>
+                    </td>
+                    <td style="width:45%;">
+                        <table class="table table-bordered mb-0 text-center" style="width:100%;">
+                            <tr style="background-color:#f2f2f2;">
+                                <th style="width:50%;">فلس fils</th>
+                                <th style="width:50%;">دينار JOD</th>
+                            </tr>
+                            <tr style="font-size:18px; font-weight:bold;">
+                                <td t-esc="'%03d' % total['subunits']"/>
+                                <td t-esc="'{:,}'.format(total['units'])"/>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="mb-2" style="border-bottom:1px solid #000; padding-bottom:4px;">
+                <strong>وصلني من السادة:</strong> <span t-esc="o.receipt_payer()"/>
+            </div>
+
+            <table class="table table-bordered" style="width:100%;">
+                <thead style="background-color:#f2f2f2;">
+                    <tr class="text-center">
+                        <th colspan="2" style="width:30%;">المبلغ</th>
+                        <th rowspan="2">التفاصيل</th>
+                    </tr>
+                    <tr class="text-center">
+                        <th style="width:15%;">فلس</th>
+                        <th style="width:15%;">دينار</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.receipt_detail_lines()" t-as="line">
+                        <t t-set="parts" t-value="o.receipt_amount_parts(line.debit or line.credit)"/>
+                        <td class="text-center" t-esc="'%03d' % parts['subunits']"/>
+                        <td class="text-center" t-esc="'{:,}'.format(parts['units'])"/>
+                        <td><span t-field="line.name">—</span></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr style="background-color:#f2f2f2; font-weight:bold;">
+                        <td class="text-center" t-esc="'%03d' % total['subunits']"/>
+                        <td class="text-center" t-esc="'{:,}'.format(total['units'])"/>
+                        <td>
+                            <span>المجموع: </span>
+                            <span t-esc="o.amount_in_words()"/>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <table style="width:100%;" class="mt-5">
+                <tr>
+                    <td style="text-align:right;">مصادقة المدير</td>
+                    <td style="text-align:left;">مصادقة المالية</td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_myaccounting_receipt">
+        <t t-call="web.html_container">
+            <style>
+                @page { size: A4 portrait; margin: 12mm; }
+                .o_receipt_print_page { width: 186mm; margin: 0 auto; }
+                .o_receipt_doc table { border-collapse: collapse; }
+                .o_receipt_doc .table-bordered td,
+                .o_receipt_doc .table-bordered th { border: 1px solid #000; padding: 6px; }
+                @media print {
+                    .o_receipt_print_page { break-after: page; page-break-after: always; }
+                    .o_receipt_print_page:last-child { break-after: auto; page-break-after: auto; }
+                }
+            </style>
+            <t t-foreach="docs" t-as="o">
+                <div class="o_receipt_print_page">
+                    <t t-call="my_accounting.report_myaccounting_receipt_document"/>
+                </div>
+            </t>
+            <script>
+                window.addEventListener('load', function () {
+                    var MM_TO_PX = 96 / 25.4;
+                    var availableHeight = (297 - 24) * MM_TO_PX;
+                    document.querySelectorAll('.o_receipt_print_page').forEach(function (page) {
+                        page.style.zoom = '';
+                        var zoom = 1;
+                        for (var i = 0; i &lt; 8; i++) {
+                            var height = page.getBoundingClientRect().height;
+                            if (height &lt;= availableHeight) {
+                                break;
+                            }
+                            zoom = Math.max(zoom * (availableHeight / height) * 0.995, 0.02);
+                            page.style.zoom = zoom.toFixed(4);
+                            if (zoom &lt;= 0.02) {
+                                break;
+                            }
+                        }
+                    });
+                    window.print();
+                });
+            </script>
+        </t>
+    </template>
+
+    <record id="action_report_myaccounting_receipt" model="ir.actions.report">
+        <field name="name">طباعة سند القبض</field>
+        <field name="model">myaccounting.move</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">my_accounting.report_myaccounting_receipt</field>
+        <field name="report_file">my_accounting.report_myaccounting_receipt</field>
+        <field name="print_report_name">'سند قبض - %s' % (object.name)</field>
+    </record>
+
+    <record id="action_myaccounting_receipt_new_form" model="ir.actions.act_window">
+        <field name="name">سند قبض جديد</field>
+        <field name="res_model">myaccounting.move</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'default_move_type': 'receipt'}</field>
+    </record>
+
+    </data>
+</odoo>

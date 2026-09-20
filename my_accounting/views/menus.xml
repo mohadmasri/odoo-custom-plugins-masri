@@ -14,6 +14,10 @@
               parent="menu_myaccounting_move_new" sequence="1"
               action="action_myaccounting_move_new_form"/>
 
+    <menuitem id="menu_myaccounting_receipt_new" name="سند قبض جديد"
+              parent="menu_myaccounting_root" sequence="15"
+              action="action_myaccounting_receipt_new_form"/>
+
     <menuitem id="menu_myaccounting_moves" name="القيود"
               parent="menu_myaccounting_root" sequence="20"
               action="action_myaccounting_move_list"/>

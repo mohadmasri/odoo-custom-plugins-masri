@@ -34,11 +34,17 @@
                     <button name="action_reset_to_draft" type="object" string="إعادة إلى مسودة"
                             invisible="state == 'draft'"/>
                     <button name="%(action_report_myaccounting_move)d" type="action"
-                            string="طباعة" icon="fa-print"/>
+                            string="طباعة" icon="fa-print" invisible="move_type == 'receipt'"/>
+                    <button name="%(action_report_myaccounting_receipt)d" type="action"
+                            string="طباعة السند" icon="fa-print" invisible="move_type != 'receipt'"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
                     <field name="has_import_notes" invisible="1"/>
+                    <field name="move_type" invisible="1"/>
+                    <div class="oe_title" invisible="move_type != 'receipt'">
+                        <h3 class="text-muted m-0">سند قبض</h3>
+                    </div>
                     <div class="alert alert-warning o_myaccounting_import_notes" role="alert"
                          invisible="not has_import_notes">
                         <div class="d-flex align-items-start gap-2">
