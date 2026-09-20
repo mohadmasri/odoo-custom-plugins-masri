@@ -48,6 +48,7 @@
                             <field name="parent_id"/>
                             <field name="active"/>
                             <field name="is_essential"/>
+                            <field name="ledger_sequence" invisible="parent_id"/>
                         </group>
                         <group>
                             <field name="balance"/>

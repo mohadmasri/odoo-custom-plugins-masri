@@ -15,12 +15,17 @@
     width: auto;
 }
 .o_general_ledger .o_gl_num {
-    width: 90px;
-    min-width: 90px;
-    max-width: 90px;
+    width: var(--gl-num-w, 90px);
+    min-width: var(--gl-num-w, 90px);
+    max-width: var(--gl-num-w, 90px);
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.o_general_ledger .o_gl_table col.o_gl_col_seq { width: 40px; }
+.o_general_ledger .o_gl_table col.o_gl_col_move { width: 110px; }
+.o_general_ledger .o_gl_table col.o_gl_col_date { width: 100px; }
+.o_general_ledger .o_gl_table col.o_gl_col_ref { width: var(--gl-ref-w, 170px); }
+.o_general_ledger .o_gl_table col.o_gl_col_num { width: var(--gl-num-w, 90px); }
 .o_general_ledger .o_gl_seq {
     width: 40px;
     min-width: 40px;
@@ -34,8 +39,9 @@
     min-width: 100px;
 }
 .o_general_ledger .o_gl_ref {
-    width: 170px;
-    min-width: 170px;
+    width: var(--gl-ref-w, 170px);
+    min-width: var(--gl-ref-w, 170px);
+    max-width: var(--gl-ref-w, 170px);
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -70,4 +76,26 @@
     .o_general_ledger tfoot tr td {
         background-color: #f2f2f2 !important;
     }
+}
+
+/* وضع ملء صفحة الطباعة: يُفعَّل لحظة الطباعة فقط.
+   تُضيَّق الأعمدة إلى أقل عرض يكفي الأرقام (مع بقائها متساوية)، ويُسمح
+   بالتفاف الترويسات وعمود المرجع، فيتّسع المجال لتكبير الجدول أكثر. */
+.o_general_ledger.o_gl_print_fit thead th,
+.o_general_ledger.o_gl_print_fit .o_gl_ref {
+    white-space: normal;
+}
+.o_general_ledger.o_gl_print_fit .o_gl_table td,
+.o_general_ledger.o_gl_print_fit .o_gl_table th {
+    padding-top: calc(0.25rem + var(--gl-row-pad, 0px));
+    padding-bottom: calc(0.25rem + var(--gl-row-pad, 0px));
+}
+/* قياس أقل عرض يحتاجه المحتوى */
+.o_general_ledger .o_gl_table.o_gl_measuring,
+.o_general_ledger .o_gl_table.o_gl_measuring col,
+.o_general_ledger .o_gl_table.o_gl_measuring th,
+.o_general_ledger .o_gl_table.o_gl_measuring td {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
 }

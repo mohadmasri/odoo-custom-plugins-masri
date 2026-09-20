@@ -32,6 +32,11 @@ class MyAccountingAccount(models.Model):
     is_essential = fields.Boolean(string='أساسي', default=False, tracking=True,
                                    help='الحسابات الأساسية محمية من الحذف؛ ألغِ تفعيل هذا الخيار أولاً إذا أردت حذف الحساب.')
 
+    ledger_sequence = fields.Integer(
+        string='ترتيب في دفتر الأستاذ', default=100,
+        help='ترتيب ظهور عمود الحساب في دفتر الأستاذ العام (وفي طباعته وتصديره). '
+             'الأصغر يظهر أولاً، والحسابات المتساوية تُرتَّب حسب الرمز.')
+
     reviewed = fields.Boolean(string='تمت المراجعة', default=False, tracking=True)
     reviewed_by = fields.Many2one('res.users', string='راجعه', readonly=True)
     reviewed_date = fields.Datetime(string='تاريخ المراجعة', readonly=True)

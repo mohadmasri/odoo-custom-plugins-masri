@@ -54,7 +54,8 @@ class MyAccountingMove(models.Model):
 
     name = fields.Char(string='رقم القيد', required=True, copy=False, tracking=True,
                         default=lambda self: self._get_default_name())
-    date = fields.Date(string='التاريخ', required=True, default=fields.Date.context_today, tracking=True)
+    date = fields.Date(string='التاريخ', required=True, tracking=True,
+                       default=lambda self: self._get_default_date())
     ref = fields.Char(string='المرجع')
     journal = fields.Char(string='اليومية', default='القيود اليدوية')
 
@@ -128,6 +129,13 @@ class MyAccountingMove(models.Model):
             candidate = self._increment_name(candidate)
             guard += 1
         return candidate
+
+    @api.model
+    def _get_default_date(self):
+        """تاريخ القيد الجديد = تاريخ آخر قيد مُدخَل (وتاريخ اليوم إن لم يوجد أي قيد).
+        يبقى الحقل قابلاً للتعديل يدوياً كالمعتاد."""
+        last_move = self.search([], order='id desc', limit=1)
+        return last_move.date or fields.Date.context_today(self)
 
     @api.model
     def _get_default_ledger_period(self):
@@ -212,7 +220,9 @@ class MyAccountingMove(models.Model):
             ('state', 'in', states),
         ], order='date, id')
 
-        accounts = self.env['myaccounting.account'].search([('parent_id', '=', False)], order='code')
+        # ترتيب الأعمدة حسب "ترتيب في دفتر الأستاذ" المحدَّد في كل حساب رئيسي
+        accounts = self.env['myaccounting.account'].search(
+            [('parent_id', '=', False)], order='ledger_sequence, code')
 
         rows = []
         totals = {acc.id: {'debit': 0.0, 'credit': 0.0} for acc in accounts}

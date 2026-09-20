@@ -92,23 +92,77 @@ export class GeneralLedger extends Component {
         );
     }
 
-    // الطباعة في صفحة واحدة: نحسب نسبة التصغير اللازمة ليتّسع الجدول عرضاً
-    // وطولاً داخل صفحة A4 أفقية، ونطبّقها على الطباعة فقط.
+    // عرض النص داخل خلية (بدون تأثير عرض العمود)
+    _textWidth(cell) {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        const width = range.getBoundingClientRect().width;
+        range.detach();
+        return width;
+    }
+
+    /**
+     * الطباعة في صفحة A4 أفقية واحدة، مملوءة قدر الإمكان:
+     *  1) تُضيَّق أعمدة الأرقام إلى أقل عرض يكفي أطول رقم (وتبقى كلها متساوية)،
+     *     ويُسمح بالتفاف الترويسات وعمود المرجع، فيقلّ عرض الجدول.
+     *  2) يُكبَّر الجدول (أو يُصغَّر) بالنسبة التي تملأ الصفحة دون تجاوزها،
+     *     فتصبح الأرقام أكبر وأوضح.
+     *  3) إن بقي فراغ رأسي، تُزاد المسافات داخل الصفوف لملء الصفحة.
+     * كل ذلك يُطبَّق لحظة الطباعة فقط ثم يُلغى.
+     */
     printLedger() {
         const page = document.querySelector(".o_general_ledger");
         const printable = page && page.querySelector(".o_gl_printable");
-        if (printable) {
-            const MM_TO_PX = 96 / 25.4;
-            const availableWidth = (297 - 16) * MM_TO_PX; // A4 أفقي ناقص الهوامش
-            const availableHeight = (210 - 16) * MM_TO_PX;
-            const scale = Math.min(
-                1,
-                availableWidth / (printable.scrollWidth || 1),
-                availableHeight / (printable.scrollHeight || 1)
-            );
-            page.style.setProperty("--gl-print-scale", scale.toFixed(4));
+        const table = printable && printable.querySelector(".o_gl_table");
+        if (!table) {
+            window.print();
+            return;
         }
-        window.print();
+        const MM_TO_PX = 96 / 25.4;
+        const availableWidth = (297 - 16) * MM_TO_PX; // A4 أفقي ناقص الهوامش
+        const availableHeight = (210 - 16) * MM_TO_PX;
+        const title = page.querySelector(".o_gl_title");
+        const contentHeight = () => printable.scrollHeight + (title ? title.offsetHeight : 0);
+
+        page.classList.add("o_gl_print_fit");
+        try {
+            // 1) أقل عرض يكفي الأرقام = أطول رقم + الحشو الداخلي للخلية
+            const valueCells = [...table.querySelectorAll("tbody .o_gl_num, tfoot .o_gl_num")]
+                .filter((cell) => cell.textContent.trim());
+            if (valueCells.length) {
+                const style = getComputedStyle(valueCells[0]);
+                const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 4;
+                const widest = Math.max(...valueCells.map((cell) => this._textWidth(cell)));
+                page.style.setProperty("--gl-num-w", `${Math.ceil(widest + padding)}px`);
+            }
+            page.style.setProperty("--gl-ref-w", "130px");
+
+            // 2) نسبة ملء الصفحة (تكبير أو تصغير)، بحد أعلى معقول للتكبير
+            let scale = Math.min(
+                availableWidth / (printable.scrollWidth || 1),
+                availableHeight / (contentHeight() || 1),
+                3
+            ) * 0.985;
+
+            // 3) ملء الفراغ الرأسي المتبقي بزيادة تباعد الصفوف
+            const rows = table.querySelectorAll("tr").length;
+            const spare = availableHeight / scale - contentHeight();
+            if (rows && spare > 0) {
+                page.style.setProperty("--gl-row-pad", `${Math.min(spare / (2 * rows), 10).toFixed(2)}px`);
+                scale = Math.min(
+                    availableWidth / (printable.scrollWidth || 1),
+                    availableHeight / (contentHeight() || 1),
+                    3
+                ) * 0.985;
+            }
+            page.style.setProperty("--gl-print-scale", scale.toFixed(4));
+            window.print();
+        } finally {
+            page.classList.remove("o_gl_print_fit");
+            page.style.removeProperty("--gl-num-w");
+            page.style.removeProperty("--gl-ref-w");
+            page.style.removeProperty("--gl-row-pad");
+        }
     }
 
     exportExcel() {

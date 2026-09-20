@@ -34,7 +34,7 @@
             <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
 
             <t t-if="!state.loading and state.data">
-                <h4 class="mb-3" t-esc="state.month"/>
+                <h4 class="mb-3 o_gl_title" t-esc="state.month"/>
 
                 <div t-if="!state.data.rows.length" class="text-center text-muted py-5">
                     لا توجد قيود بالحالات المختارة خلال هذا الشهر
@@ -44,15 +44,15 @@
                     <table class="table table-bordered table-sm o_gl_table" style="white-space:nowrap;">
                         <!-- عرض ثابت لكل عمود: أعمدة الأرقام متساوية دائماً حتى لو كانت فارغة -->
                         <colgroup>
-                            <col style="width:40px;"/>
-                            <col style="width:110px;"/>
-                            <col style="width:100px;"/>
-                            <col style="width:170px;"/>
-                            <col style="width:90px;"/>
-                            <col style="width:90px;"/>
+                            <col class="o_gl_col_seq"/>
+                            <col class="o_gl_col_move"/>
+                            <col class="o_gl_col_date"/>
+                            <col class="o_gl_col_ref"/>
+                            <col class="o_gl_col_num"/>
+                            <col class="o_gl_col_num"/>
                             <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                <col style="width:90px;"/>
-                                <col style="width:90px;"/>
+                                <col class="o_gl_col_num"/>
+                                <col class="o_gl_col_num"/>
                             </t>
                         </colgroup>
                         <thead>
