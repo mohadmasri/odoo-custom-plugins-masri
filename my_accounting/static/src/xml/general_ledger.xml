@@ -31,6 +31,16 @@
                 </div>
             </div>
 
+            <div class="o_gl_months d-flex flex-wrap align-items-center mb-3 no-print">
+                <span class="text-muted small me-2" t-esc="currentYear"/>
+                <t t-foreach="monthButtons" t-as="m" t-key="m">
+                    <button type="button"
+                            t-attf-class="btn o_gl_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.selectMonth(m)"
+                            t-esc="m"/>
+                </t>
+            </div>
+
             <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
 
             <t t-if="!state.loading and state.data">

@@ -99,3 +99,15 @@
     min-width: 0 !important;
     max-width: none !important;
 }
+
+/* أزرار أشهر السنة الحالية: مقاس مريح للضغط بالفأرة واللمس */
+.o_gl_months {
+    gap: 6px;
+}
+.o_gl_month_btn {
+    min-width: 46px;
+    padding: 6px 10px;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.1;
+}

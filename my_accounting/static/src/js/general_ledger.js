@@ -37,6 +37,24 @@ export class GeneralLedger extends Component {
         onWillStart(() => this.loadData());
     }
 
+    get currentYear() {
+        return new Date().getFullYear();
+    }
+
+    // أزرار الأشهر 1..12 للسنة الحالية: الوصول لأي شهر بضغطة واحدة
+    get monthButtons() {
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    isMonthActive(month) {
+        return this.state.month === `${this.currentYear}-${pad(month)}`;
+    }
+
+    selectMonth(month) {
+        this.state.month = `${this.currentYear}-${pad(month)}`;
+        this.loadData();
+    }
+
     get yearMonth() {
         const [y, m] = this.state.month.split("-").map(Number);
         return { y, m };
