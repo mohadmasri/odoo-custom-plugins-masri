@@ -199,15 +199,17 @@ class MyAccountingMove(models.Model):
         return super().unlink()
 
     @api.model
-    def get_general_ledger_matrix(self, year, month):
+    def get_general_ledger_matrix(self, year, month, states=None):
         """دفتر الأستاذ العام: صف لكل قيد، وعمودا مدين/دائن لكل حساب رئيسي (جذري) دائماً،
         مع تجميع حركات أي حساب فرعي تحت حسابه الرئيسي.
         يعتمد التصنيف على شهر/سنة دفتر الأستاذ (ledger_month/ledger_year) للقيد
         وليس على تاريخه الفعلي، لدعم القيود التي تُسجَّل في شهر مختلف عن تاريخها."""
+        # الحالات المطلوبة: مرحّل فقط افتراضياً (كما كان)، أو ما يختاره المستخدم من الفلتر
+        states = [state for state in (states or []) if state in ('draft', 'incomplete', 'posted')] or ['posted']
         moves = self.search([
             ('ledger_year', '=', int(year)),
             ('ledger_month', '=', str(int(month))),
-            ('state', '=', 'posted'),
+            ('state', 'in', states),
         ], order='date, id')
 
         accounts = self.env['myaccounting.account'].search([('parent_id', '=', False)], order='code')
@@ -220,6 +222,10 @@ class MyAccountingMove(models.Model):
         for idx, move in enumerate(moves, start=1):
             amounts = {}
             for line in move.line_ids:
+                if not line.account_id:
+                    # بند في قيد "غير مكتمل" لم يُحدَّد حسابه بعد: لا عمود له،
+                    # لكن مبلغه يظهر ضمن إجمالي مدين/دائن للقيد.
+                    continue
                 root_id = int((line.account_id.parent_path or str(line.account_id.id)).split('/')[0])
                 if root_id not in amounts:
                     amounts[root_id] = {'debit': 0.0, 'credit': 0.0}
@@ -232,6 +238,7 @@ class MyAccountingMove(models.Model):
                 'seq': idx,
                 'move_id': move.id,
                 'move_name': move.name,
+                'state': move.state,
                 'ref': move.ref or '',
                 'date': move.date and move.date.isoformat(),
                 'total_debit': move.total_debit,

@@ -14,6 +14,14 @@
                     <button class="btn btn-outline-secondary btn-sm" t-on-click="() => this.shiftMonth(1)">
                         <i class="fa fa-chevron-left"/>
                     </button>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <t t-foreach="stateFilters" t-as="flt" t-key="flt.value">
+                            <button type="button"
+                                    t-attf-class="btn {{ isStateActive(flt.value) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                    t-on-click="() => this.onStateFilter(flt.value)"
+                                    t-esc="flt.label"/>
+                        </t>
+                    </div>
                     <button class="btn btn-secondary" t-on-click="() => this.printLedger()">
                         <i class="fa fa-print me-1"/> طباعة
                     </button>
@@ -29,19 +37,32 @@
                 <h4 class="mb-3" t-esc="state.month"/>
 
                 <div t-if="!state.data.rows.length" class="text-center text-muted py-5">
-                    لا توجد قيود مرحّلة خلال هذا الشهر
+                    لا توجد قيود بالحالات المختارة خلال هذا الشهر
                 </div>
 
-                <div t-if="state.data.rows.length" style="overflow-x:auto;">
-                    <table class="table table-bordered table-sm" style="white-space:nowrap;">
+                <div t-if="state.data.rows.length" class="o_gl_printable" style="overflow-x:auto;">
+                    <table class="table table-bordered table-sm o_gl_table" style="white-space:nowrap;">
+                        <!-- عرض ثابت لكل عمود: أعمدة الأرقام متساوية دائماً حتى لو كانت فارغة -->
+                        <colgroup>
+                            <col style="width:40px;"/>
+                            <col style="width:110px;"/>
+                            <col style="width:100px;"/>
+                            <col style="width:170px;"/>
+                            <col style="width:90px;"/>
+                            <col style="width:90px;"/>
+                            <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
+                                <col style="width:90px;"/>
+                                <col style="width:90px;"/>
+                            </t>
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th rowspan="2">#</th>
-                                <th rowspan="2">القيد</th>
-                                <th rowspan="2">التاريخ</th>
-                                <th rowspan="2">المرجع</th>
-                                <th rowspan="2" class="text-end">إجمالي مدين</th>
-                                <th rowspan="2" class="text-end">إجمالي دائن</th>
+                                <th rowspan="2" class="o_gl_seq">#</th>
+                                <th rowspan="2" class="o_gl_move">القيد</th>
+                                <th rowspan="2" class="o_gl_date">التاريخ</th>
+                                <th rowspan="2" class="o_gl_ref">المرجع</th>
+                                <th rowspan="2" class="text-end o_gl_num">إجمالي مدين</th>
+                                <th rowspan="2" class="text-end o_gl_num">إجمالي دائن</th>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
                                     <th colspan="2" class="text-center">
                                         <t t-esc="acc.code"/><t t-esc="' - '"/><t t-esc="acc.name"/>
@@ -50,34 +71,40 @@
                             </tr>
                             <tr>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <th class="text-end small">من</th>
-                                    <th class="text-end small">إلى</th>
+                                    <th class="text-end small o_gl_num">من</th>
+                                    <th class="text-end small o_gl_num">إلى</th>
                                 </t>
                             </tr>
                         </thead>
                         <tbody>
                             <tr t-foreach="state.data.rows" t-as="row" t-key="row.move_id"
                                 style="cursor:pointer;" t-on-click="() => this.openMove(row.move_id)">
-                                <td t-esc="row.seq"/>
-                                <td><strong t-esc="row.move_name"/></td>
-                                <td t-esc="row.date"/>
-                                <td t-esc="row.ref"/>
-                                <td class="text-end" t-esc="this.fmt(row.total_debit)"/>
-                                <td class="text-end" t-esc="this.fmt(row.total_credit)"/>
+                                <td class="o_gl_seq" t-esc="row.seq"/>
+                                <td class="o_gl_move">
+                                    <strong t-esc="row.move_name"/>
+                                    <span t-if="row.state !== 'posted'"
+                                          t-attf-class="badge ms-1 {{ row.state === 'draft' ? 'text-bg-secondary' : 'text-bg-warning' }}"
+                                          style="font-size:9px;"
+                                          t-esc="row.state === 'draft' ? 'مسودة' : 'غير مكتمل'"/>
+                                </td>
+                                <td class="o_gl_date" t-esc="row.date"/>
+                                <td class="o_gl_ref" t-esc="row.ref"/>
+                                <td class="text-end o_gl_num" t-esc="this.fmt(row.total_debit)"/>
+                                <td class="text-end o_gl_num" t-esc="this.fmt(row.total_credit)"/>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <td class="text-end" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].debit) : ''"/>
-                                    <td class="text-end" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].credit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].debit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].credit) : ''"/>
                                 </t>
                             </tr>
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold">
                                 <td colspan="4" class="text-end">الإجمالي</td>
-                                <td class="text-end" t-esc="this.fmt(state.data.grand_debit)"/>
-                                <td class="text-end" t-esc="this.fmt(state.data.grand_credit)"/>
+                                <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_debit)"/>
+                                <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_credit)"/>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <td class="text-end" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].debit) : ''"/>
-                                    <td class="text-end" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].credit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].debit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].credit) : ''"/>
                                 </t>
                             </tr>
                         </tfoot>

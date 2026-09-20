@@ -41,8 +41,10 @@ class JournalImportController(http.Controller):
 class GeneralLedgerController(http.Controller):
 
     @http.route('/my_accounting/general_ledger/xlsx', type='http', auth='user')
-    def export_general_ledger_xlsx(self, year=None, month=None, **kwargs):
-        data = request.env['myaccounting.move'].get_general_ledger_matrix(year, month)
+    def export_general_ledger_xlsx(self, year=None, month=None, states=None, **kwargs):
+        # نفس فلتر الحالة المطبَّق على الشاشة، ليطابق ملف Excel ما يراه المستخدم
+        state_list = [state for state in (states or '').split(',') if state]
+        data = request.env['myaccounting.move'].get_general_ledger_matrix(year, month, state_list)
         accounts = data['accounts']
 
         output = io.BytesIO()
@@ -54,6 +56,10 @@ class GeneralLedgerController(http.Controller):
         total_fmt = workbook.add_format({'bold': True, 'bg_color': '#f2f2f2', 'border': 1, 'num_format': '#,##0.000'})
         num_fmt = workbook.add_format({'border': 1, 'num_format': '#,##0.000'})
         text_fmt = workbook.add_format({'border': 1})
+
+        # طباعة ملف Excel أيضاً في صفحة واحدة أفقية
+        sheet.set_landscape()
+        sheet.fit_to_pages(1, 1)
 
         headers = ['#', 'القيد', 'التاريخ', 'المرجع', 'إجمالي مدين', 'إجمالي دائن']
         for acc in accounts:

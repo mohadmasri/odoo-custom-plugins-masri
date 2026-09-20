@@ -8,3 +8,66 @@
 .o_general_ledger tfoot tr {
     background-color: var(--o-surface-2, #f2f2f2);
 }
+
+/* أعمدة الأرقام متساوية العرض دائماً، حتى الفارغة منها */
+.o_general_ledger .o_gl_table {
+    table-layout: fixed;
+    width: auto;
+}
+.o_general_ledger .o_gl_num {
+    width: 90px;
+    min-width: 90px;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.o_general_ledger .o_gl_seq {
+    width: 40px;
+    min-width: 40px;
+}
+.o_general_ledger .o_gl_move {
+    width: 110px;
+    min-width: 110px;
+}
+.o_general_ledger .o_gl_date {
+    width: 100px;
+    min-width: 100px;
+}
+.o_general_ledger .o_gl_ref {
+    width: 170px;
+    min-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* الطباعة: صفحة A4 أفقية واحدة، بتصغير محسوب قبل الطباعة (--gl-print-scale) */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 8mm;
+    }
+    .o_general_ledger {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        zoom: var(--gl-print-scale, 1);
+    }
+    .o_general_ledger .o_gl_printable {
+        overflow: visible !important;
+    }
+    .o_general_ledger .o_gl_table {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .o_general_ledger .o_gl_table td,
+    .o_general_ledger .o_gl_table th {
+        /* ألوان واضحة على الورق حتى في الوضع الداكن */
+        color: #000 !important;
+        background-color: #fff !important;
+        border-color: #999 !important;
+    }
+    .o_general_ledger thead tr th,
+    .o_general_ledger tfoot tr td {
+        background-color: #f2f2f2 !important;
+    }
+}

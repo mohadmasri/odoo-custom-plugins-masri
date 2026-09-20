@@ -50,6 +50,13 @@ $o-webclient-color-scheme: dark;
 $o-navbar-background: #1f2330;
 $o-navbar-border-bottom: 1px solid #2b3040;
 
+// القائمة الجانبية على الجوال (Burger menu): خلفيتها تشتقّ من $o-white الذي
+// أبقيناه أبيض، فنحدّدها هنا صراحةً وإلا ظهرت بيضاء بنص فاتح غير مقروء.
+$o-burger-base-bg: #1f2330;
+$o-burger-base-color: #e8eaf0;
+$o-burger-topbar-bg: #14161d;
+$o-burger-topbar-color: #f0f2f7;
+
 // ============================================================================
 // خرائط ألوان Bootstrap: تُعاد صياغتها لاحقاً في html_editor انطلاقاً من لوحة
 // ألوان الموقع (وهي فاتحة)، فنعرّفها هنا لتبقى قيم الوضع الداكن هي المعتمدة.
