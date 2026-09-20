@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.MoveLineOrder">
+        <div class="o_myaccounting_line_order d-inline-flex flex-column">
+            <button type="button" class="btn p-0 o_line_order_btn" title="تحريك البند لأعلى"
+                    t-att-disabled="isFirst"
+                    t-on-click.stop.prevent="() => this.move(-1)">
+                <i class="fa fa-caret-up"/>
+            </button>
+            <button type="button" class="btn p-0 o_line_order_btn" title="تحريك البند لأسفل"
+                    t-att-disabled="isLast"
+                    t-on-click.stop.prevent="() => this.move(1)">
+                <i class="fa fa-caret-down"/>
+            </button>
+        </div>
+    </t>
+
+</templates>

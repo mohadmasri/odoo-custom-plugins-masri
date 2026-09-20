@@ -44,6 +44,7 @@ class MyAccountingBackup(models.AbstractModel):
                 'currency_code': move.currency_id.name or None,
                 'company_name': move.company_id.name or None,
                 'lines': [{
+                    'sequence': line.sequence,
                     'account_id': line.account_id.id,
                     'pending_account_name': line.pending_account_name or '',
                     'name': line.name or '',
@@ -119,6 +120,7 @@ class MyAccountingBackup(models.AbstractModel):
                 if not new_account_id and not line.get('pending_account_name'):
                     continue
                 line_cmds.append((0, 0, {
+                    'sequence': line.get('sequence', 10),
                     'account_id': new_account_id or False,
                     'pending_account_name': line.get('pending_account_name') or False,
                     'name': line.get('name') or False,

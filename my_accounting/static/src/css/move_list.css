@@ -9,3 +9,18 @@
     font-size: 14px;
     line-height: 1.1;
 }
+
+/* أسهم ترتيب بنود القيد */
+.o_myaccounting_line_order .o_line_order_btn {
+    line-height: 0.8;
+    color: var(--gray-600, #6c757d);
+    border: 0;
+    background: none;
+    font-size: 15px;
+}
+.o_myaccounting_line_order .o_line_order_btn:hover:not(:disabled) {
+    color: var(--o-accent, #714b9c);
+}
+.o_myaccounting_line_order .o_line_order_btn:disabled {
+    opacity: 0.25;
+}

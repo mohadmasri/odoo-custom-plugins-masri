@@ -130,6 +130,117 @@ class MyAccountingMove(models.Model):
             guard += 1
         return candidate
 
+    # ========================================================================
+    # قوالب القيود: قائمة اليوميات تحت "قيد جديد"
+    # ========================================================================
+
+    def _register_hook(self):
+        """يبني/يحدّث قوائم قوالب اليوميات عند كل إقلاع للخادم (وبعد كل تحديث)."""
+        super()._register_hook()
+        try:
+            self.env['myaccounting.move']._sync_journal_template_menus()
+            self.env.cr.commit()
+        except Exception:  # noqa: BLE001 - لا نمنع إقلاع الخادم بسبب القوائم
+            self.env.cr.rollback()
+
+    @api.model
+    def action_new_from_journal(self, journal):
+        """ينشئ قيداً جديداً مطابقاً لبنود آخر قيد في نفس اليومية،
+        برقم وتاريخ وشهر أستاذ يتبع آخر ما وصلت إليه القيود، ويفتحه للتعديل."""
+        template = self.search([('journal', '=', journal)], order='id desc', limit=1)
+        if not template:
+            raise UserError(f'لا يوجد قيد سابق في اليومية "{journal}" لاستخدامه كقالب.')
+        ledger_year, ledger_month = self._get_default_ledger_period()
+        new_move = template.copy({
+            'date': self._get_default_date(),
+            'ledger_year': ledger_year,
+            'ledger_month': ledger_month,
+        })
+        new_move.message_post(
+            body=f'أُنشئ هذا القيد من قالب اليومية "{journal}" نسخاً عن القيد {template.name}.',
+            subtype_xmlid='mail.mt_note')
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'myaccounting.move',
+            'res_id': new_move.id,
+            'views': [[False, 'form']],
+            'target': 'current',
+        }
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        moves = super().create(vals_list)
+        moves._ensure_journal_menus()
+        return moves
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'journal' in vals:
+            self._ensure_journal_menus()
+        return res
+
+    def unlink(self):
+        journals = {move.journal for move in self if move.journal}
+        res = super().unlink()
+        if journals:
+            self._sync_journal_template_menus()
+        return res
+
+    def _ensure_journal_menus(self):
+        """يضيف قائمة قالب لليومية الجديدة فور ظهورها."""
+        parent = self.env.ref('my_accounting.menu_myaccounting_move_new', raise_if_not_found=False)
+        if not parent:
+            return
+        journals = {move.journal.strip() for move in self if move.journal and move.journal.strip()}
+        if not journals:
+            return
+        known = self.env['ir.ui.menu'].sudo().search([
+            ('parent_id', '=', parent.id), ('name', 'in', list(journals))])
+        if len(known) != len(journals):
+            self._sync_journal_template_menus()
+
+    @api.model
+    def _journal_menu_xmlid(self, journal):
+        digest = re.sub(r'[^a-z0-9]+', '_', journal.strip().casefold())
+        return f'journal_tpl_{abs(hash(journal)) % (10 ** 8)}_{digest[:20]}'
+
+    @api.model
+    def _sync_journal_template_menus(self):
+        """يحدّث قائمة القوالب تحت "قيد جديد" لتطابق اليوميات الموجودة فعلاً."""
+        parent = self.env.ref('my_accounting.menu_myaccounting_move_new', raise_if_not_found=False)
+        if not parent:
+            return
+        Menu = self.env['ir.ui.menu'].sudo()
+        Server = self.env['ir.actions.server'].sudo()
+        model = self.env['ir.model']._get('myaccounting.move')
+        empty_menu = self.env.ref('my_accounting.menu_myaccounting_move_new_empty', raise_if_not_found=False)
+
+        journals = sorted({move.journal.strip() for move in self.search([]) if move.journal and move.journal.strip()})
+        existing = Menu.search([('parent_id', '=', parent.id)])
+        by_name = {menu.name: menu for menu in existing if not empty_menu or menu.id != empty_menu.id}
+
+        for index, journal in enumerate(journals, start=10):
+            menu = by_name.pop(journal, None)
+            if menu:
+                menu.sequence = index
+                continue
+            action = Server.create({
+                'name': journal,
+                'model_id': model.id,
+                'state': 'code',
+                'code': f'action = env["myaccounting.move"].action_new_from_journal({journal!r})',
+            })
+            Menu.create({
+                'name': journal,
+                'parent_id': parent.id,
+                'sequence': index,
+                'action': f'ir.actions.server,{action.id}',
+                'group_ids': [(6, 0, parent.group_ids.ids)],
+            })
+        # يوميات لم تعد موجودة: تُحذف قائمتها
+        for menu in by_name.values():
+            menu.unlink()
+
     @api.model
     def _get_default_date(self):
         """تاريخ القيد الجديد = تاريخ آخر قيد مُدخَل (وتاريخ اليوم إن لم يوجد أي قيد).
@@ -793,7 +904,10 @@ class MyAccountingMove(models.Model):
 class MyAccountingMoveLine(models.Model):
     _name = 'myaccounting.move.line'
     _description = 'بند قيد محاسبي'
-    _order = 'id'
+    # الترتيب اليدوي للبنود (سحب وإفلات) ثم ترتيب الإدخال للبنود المتساوية
+    _order = 'sequence, id'
+
+    sequence = fields.Integer(string='الترتيب', default=10)
 
     move_id = fields.Many2one('myaccounting.move', string='القيد', required=True, ondelete='cascade')
     move_state = fields.Selection(related='move_id.state', string='حالة القيد', store=True)
@@ -880,3 +994,19 @@ class MyAccountingMoveLine(models.Model):
         for line in self:
             if line.debit < 0 or line.credit < 0:
                 raise ValidationError('لا يمكن أن تكون قيمة المدين أو الدائن سالبة.')
+
+    def action_reorder(self, delta):
+        """يحرّك البند خطوة واحدة (delta = -1 لأعلى، 1 لأسفل) داخل قيده.
+
+        يعمل حتى على القيد المرحّل لأن الترتيب عرضي فقط ولا يغيّر المبالغ."""
+        self.ensure_one()
+        lines = list(self.move_id.line_ids)
+        index = lines.index(self)
+        target = index + delta
+        if target < 0 or target >= len(lines):
+            return False
+        lines.insert(target, lines.pop(index))
+        for position, line in enumerate(lines, start=1):
+            if line.sequence != position:
+                line.sequence = position
+        return True

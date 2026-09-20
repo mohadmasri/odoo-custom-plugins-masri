@@ -17,6 +17,7 @@
         'base', 'mail', 'web', 'project', 'calendar', 'contacts', 'account',
         'spreadsheet_dashboard', 'project_todo',
     ],
+    'post_init_hook': 'post_init_hook',
     'data': [
         'security/app_groups.xml',
         'security/ir.model.access.csv',
@@ -47,6 +48,8 @@
             'my_accounting/static/src/xml/move_list.xml',
             'my_accounting/static/src/css/move_list.css',
             'my_accounting/static/src/js/move_form.js',
+            'my_accounting/static/src/js/move_line_order.js',
+            'my_accounting/static/src/xml/move_line_order.xml',
             'my_accounting/static/src/xml/chatter_note_first.xml',
             'my_accounting/static/src/css/move_import_notes.css',
             'my_accounting/static/src/js/account_line_selector.js',

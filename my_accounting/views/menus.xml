@@ -7,7 +7,11 @@
               web_icon="my_accounting,static/description/icon_accounting.svg"/>
 
     <menuitem id="menu_myaccounting_move_new" name="قيد جديد"
-              parent="menu_myaccounting_root" sequence="10"
+              parent="menu_myaccounting_root" sequence="10"/>
+
+    <!-- قيد فارغ، وتحته تُضاف قوالب اليوميات تلقائياً (انظر _sync_journal_template_menus) -->
+    <menuitem id="menu_myaccounting_move_new_empty" name="قيد فارغ"
+              parent="menu_myaccounting_move_new" sequence="1"
               action="action_myaccounting_move_new_form"/>
 
     <menuitem id="menu_myaccounting_moves" name="القيود"
