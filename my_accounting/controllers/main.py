@@ -40,6 +40,13 @@ class JournalImportController(http.Controller):
 
 class GeneralLedgerController(http.Controller):
 
+    @staticmethod
+    def _ledger_cell(amount, side):
+        """قيمة خانة الحساب: فارغة إن لم يُدخل شيء، و0 إن أُدخل صفر يدوياً."""
+        if not amount:
+            return ''
+        return amount[side] or (0 if amount.get(f'{side}_zero') else '')
+
     @http.route('/my_accounting/general_ledger/xlsx', type='http', auth='user')
     def export_general_ledger_xlsx(self, year=None, month=None, states=None, **kwargs):
         # نفس فلتر الحالة المطبَّق على الشاشة، ليطابق ملف Excel ما يراه المستخدم
@@ -79,8 +86,8 @@ class GeneralLedgerController(http.Controller):
             sheet.write(row_idx, col, row['total_credit'], num_fmt); col += 1
             for acc in accounts:
                 amt = row['amounts'].get(acc['id'])
-                sheet.write(row_idx, col, amt['debit'] if amt else '', num_fmt); col += 1
-                sheet.write(row_idx, col, amt['credit'] if amt else '', num_fmt); col += 1
+                sheet.write(row_idx, col, self._ledger_cell(amt, 'debit'), num_fmt); col += 1
+                sheet.write(row_idx, col, self._ledger_cell(amt, 'credit'), num_fmt); col += 1
             row_idx += 1
 
         col = 0

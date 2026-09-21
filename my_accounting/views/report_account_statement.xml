@@ -71,11 +71,11 @@
                             <td><span t-esc="line.account_id.code"/><span> - </span><span t-esc="line.account_id.name"/></td>
                             <td><span t-field="line.name">—</span></td>
                             <td class="text-end">
-                                <span t-if="line.debit"
+                                <span t-if="line.debit or line.debit_zero_entered"
                                       t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                             <td class="text-end">
-                                <span t-if="line.credit"
+                                <span t-if="line.credit or line.credit_zero_entered"
                                       t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                             <td class="text-end">

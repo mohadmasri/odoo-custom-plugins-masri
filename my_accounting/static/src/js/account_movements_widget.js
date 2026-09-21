@@ -110,7 +110,8 @@ export class AccountMovementsPanel extends Component {
         this.state.records = await this.orm.searchRead(
             "myaccounting.move.line",
             [...this.baseDomain, ...filterDomain],
-            ["date", "move_id", "account_id", "name", "debit", "credit", "move_state"],
+            ["date", "move_id", "account_id", "name", "debit", "credit", "move_state",
+             "debit_zero_entered", "credit_zero_entered"],
             { order: "date, id" }
         );
     }

@@ -193,6 +193,14 @@ export class GeneralLedger extends Component {
     fmt(v) {
         return v ? v.toFixed(3) : "";
     }
+
+    // خانة حساب: فارغة إن لم يُدخل شيء، و0 إن أُدخل صفر يدوياً
+    cell(amount, side) {
+        if (!amount) {
+            return "";
+        }
+        return amount[side] ? amount[side].toFixed(3) : (amount[`${side}_zero`] ? "0.000" : "");
+    }
 }
 
 registry.category("actions").add("my_accounting.general_ledger", GeneralLedger);

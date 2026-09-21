@@ -38,38 +38,44 @@
                 </table>
 
                 <table class="table table-bordered" style="width:100%;">
+                    <!-- يظهر من اليمين: المدين (من) | الدائن (الى) | الحساب المدين | الحساب الدائن | البيان
+                         (الصفحة من اليسار لليمين، لذلك الترتيب في الكود معكوس) -->
                     <thead style="background-color:#f2f2f2;">
                         <tr>
-                            <th>الحساب</th>
-                            <th>البيان</th>
-                            <th class="text-end" style="width:15%;">مدين</th>
-                            <th class="text-end" style="width:15%;">دائن</th>
+                            <th class="text-center">البيان</th>
+                            <th class="text-center" style="width:22%;">الحساب الدائن</th>
+                            <th class="text-center" style="width:22%;">الحساب المدين</th>
+                            <th class="text-center" style="width:13%;">الدائن (الى)</th>
+                            <th class="text-center" style="width:13%;">المدين (من)</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr t-foreach="o.line_ids" t-as="line">
-                            <td>
-                                <span t-esc="line.account_id.code"/> - <span t-esc="line.account_label"/>
-                            </td>
+                            <t t-set="account_text">
+                                <t t-if="line.account_id"><span t-esc="line.account_id.code"/> - <span t-esc="line.account_label"/></t>
+                                <t t-elif="line.pending_account_name"><span t-esc="line.pending_account_name"/> (من الملف)</t>
+                            </t>
                             <td><span t-field="line.name">—</span></td>
+                            <td><t t-if="line.is_credit_line" t-out="account_text"/></td>
+                            <td><t t-if="not line.is_credit_line" t-out="account_text"/></td>
                             <td class="text-end">
-                                <span t-if="line.debit"
-                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
+                                <span t-if="line.credit or line.credit_zero_entered"
+                                      t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                             <td class="text-end">
-                                <span t-if="line.credit"
-                                      t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                                <span t-if="line.debit or line.debit_zero_entered"
+                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                         </tr>
                     </tbody>
                     <tfoot>
                         <tr style="background-color:#f2f2f2; font-weight:bold;">
-                            <td colspan="2" class="text-end">الإجمالي</td>
-                            <td class="text-end">
-                                <span t-field="o.total_debit" t-options="{'widget': 'float', 'precision': 3}"/>
-                            </td>
+                            <td colspan="3" class="text-end">الإجمالي</td>
                             <td class="text-end">
                                 <span t-field="o.total_credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="o.total_debit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                         </tr>
                     </tfoot>

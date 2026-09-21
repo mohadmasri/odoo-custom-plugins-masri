@@ -67,6 +67,8 @@ class MyAccountingBackup(models.AbstractModel):
                     'name': line.name or '',
                     'debit': line.debit,
                     'credit': line.credit,
+                    'debit_zero_entered': line.debit_zero_entered,
+                    'credit_zero_entered': line.credit_zero_entered,
                 } for line in move.line_ids],
             } for move in moves],
             'review_notes': [{
@@ -151,6 +153,8 @@ class MyAccountingBackup(models.AbstractModel):
                     'name': line.get('name') or False,
                     'debit': line.get('debit') or 0.0,
                     'credit': line.get('credit') or 0.0,
+                    'debit_zero_entered': bool(line.get('debit_zero_entered')),
+                    'credit_zero_entered': bool(line.get('credit_zero_entered')),
                 }))
             move_vals = {
                 'name': mv.get('name') or '/',

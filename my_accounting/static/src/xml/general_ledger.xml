@@ -102,8 +102,8 @@
                                 <td class="text-end o_gl_num" t-esc="this.fmt(row.total_debit)"/>
                                 <td class="text-end o_gl_num" t-esc="this.fmt(row.total_credit)"/>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <td class="text-end o_gl_num" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].debit) : ''"/>
-                                    <td class="text-end o_gl_num" t-esc="row.amounts[acc.id] ? this.fmt(row.amounts[acc.id].credit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="this.cell(row.amounts[acc.id], 'debit')"/>
+                                    <td class="text-end o_gl_num" t-esc="this.cell(row.amounts[acc.id], 'credit')"/>
                                 </t>
                             </tr>
                         </tbody>
@@ -113,8 +113,8 @@
                                 <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_debit)"/>
                                 <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_credit)"/>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <td class="text-end o_gl_num" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].debit) : ''"/>
-                                    <td class="text-end o_gl_num" t-esc="state.data.totals[acc.id] ? this.fmt(state.data.totals[acc.id].credit) : ''"/>
+                                    <td class="text-end o_gl_num" t-esc="this.cell(state.data.totals[acc.id], 'debit')"/>
+                                    <td class="text-end o_gl_num" t-esc="this.cell(state.data.totals[acc.id], 'credit')"/>
                                 </t>
                             </tr>
                         </tfoot>

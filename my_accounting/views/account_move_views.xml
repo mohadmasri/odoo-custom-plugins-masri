@@ -78,16 +78,29 @@
                     <notebook>
                         <page string="بنود القيد">
                             <field name="line_ids" readonly="state == 'posted'">
+                                <!-- الواجهة من اليسار لليمين، فالترتيب هنا معكوس ليظهر من اليمين:
+                                     المدين (من) | الدائن (الى) | الحساب المدين | الحساب الدائن | البيان.
+                                     الحساب يظهر في عمود المدين أو الدائن حسب القيمة، وينتقل تلقائياً عند إدخالها. -->
                                 <list editable="bottom">
                                     <field name="sequence" widget="myaccounting_line_order" string=" "/>
                                     <field name="account_label" column_invisible="1"/>
                                     <field name="move_state" column_invisible="1"/>
-                                    <field name="account_id" widget="myaccounting_account_selector"/>
-                                    <field name="pending_account_name" string="اسم الحساب في الملف"
-                                           readonly="1" optional="show"/>
+                                    <field name="account_id" column_invisible="1"/>
+                                    <field name="is_credit_line" column_invisible="1"/>
                                     <field name="name"/>
-                                    <field name="debit" sum="إجمالي المدين" digits="[16,3]"/>
-                                    <field name="credit" sum="إجمالي الدائن" digits="[16,3]"/>
+                                    <!-- اسم الحساب كما ورد في ملف Excel: فقط عندما يكون في القيد حساب غير معروف -->
+                                    <field name="pending_account_name" string="اسم الحساب في الملف"
+                                           readonly="1" column_invisible="parent.state != 'incomplete'"/>
+                                    <field name="credit_account_id" widget="myaccounting_account_selector"
+                                           invisible="not is_credit_line"/>
+                                    <field name="debit_account_id" widget="myaccounting_account_selector"
+                                           invisible="is_credit_line"/>
+                                    <field name="debit_zero_entered" column_invisible="1"/>
+                                    <field name="credit_zero_entered" column_invisible="1"/>
+                                    <field name="credit" string="الدائن (الى)" sum="إجمالي الدائن" digits="[16,3]"
+                                           widget="myaccounting_amount" options="{'zero_flag': 'credit_zero_entered'}"/>
+                                    <field name="debit" string="المدين (من)" sum="إجمالي المدين" digits="[16,3]"
+                                           widget="myaccounting_amount" options="{'zero_flag': 'debit_zero_entered'}"/>
                                 </list>
                             </field>
                             <group class="oe_subtotal_footer oe_right">

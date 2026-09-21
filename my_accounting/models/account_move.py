@@ -518,7 +518,8 @@ class MyAccountingMove(models.Model):
             [('parent_id', '=', False)], order='ledger_sequence, code')
 
         rows = []
-        totals = {acc.id: {'debit': 0.0, 'credit': 0.0} for acc in accounts}
+        totals = {acc.id: {'debit': 0.0, 'credit': 0.0, 'debit_zero': False, 'credit_zero': False}
+                  for acc in accounts}
         grand_debit = 0.0
         grand_credit = 0.0
 
@@ -531,12 +532,17 @@ class MyAccountingMove(models.Model):
                     continue
                 root_id = int((line.account_id.parent_path or str(line.account_id.id)).split('/')[0])
                 if root_id not in amounts:
-                    amounts[root_id] = {'debit': 0.0, 'credit': 0.0}
+                    amounts[root_id] = {'debit': 0.0, 'credit': 0.0, 'debit_zero': False, 'credit_zero': False}
                 amounts[root_id]['debit'] += line.debit
                 amounts[root_id]['credit'] += line.credit
+                # صفر مُدخل يدوياً (مثل ضريبة "معفي"): يُعرض 0 بدل خانة فارغة
+                amounts[root_id]['debit_zero'] |= line.debit_zero_entered
+                amounts[root_id]['credit_zero'] |= line.credit_zero_entered
                 if root_id in totals:
                     totals[root_id]['debit'] += line.debit
                     totals[root_id]['credit'] += line.credit
+                    totals[root_id]['debit_zero'] |= line.debit_zero_entered
+                    totals[root_id]['credit_zero'] |= line.credit_zero_entered
             rows.append({
                 'seq': idx,
                 'move_id': move.id,
@@ -649,8 +655,8 @@ class MyAccountingMove(models.Model):
                         line.account_id.code or '',
                         line.account_id.name or line.pending_account_name or '',
                         line.name or '',
-                        line.debit or '',
-                        line.credit or '',
+                        line.debit or (0 if line.debit_zero_entered else ''),
+                        line.credit or (0 if line.credit_zero_entered else ''),
                     ])
         for row_index, row in enumerate(data_rows, start=1):
             for col, value in enumerate(row):
@@ -975,6 +981,11 @@ class MyAccountingMove(models.Model):
                 account_code = ' '.join(str(cell(row, 'account_code') or '').split())
                 debit = self._import_parse_float(cell(row, 'debit'))
                 credit = self._import_parse_float(cell(row, 'credit'))
+                # 0 مكتوب في الخلية (وليس خلية فارغة)
+                debit_zero = debit == 0 and cell(row, 'debit') not in (None, '') \
+                    and str(cell(row, 'debit')).strip() != ''
+                credit_zero = credit == 0 and cell(row, 'credit') not in (None, '') \
+                    and str(cell(row, 'credit')).strip() != ''
 
                 if debit is None or credit is None:
                     entry_errors.append(f'سطر {row_number}: قيمة مدين/دائن غير رقمية ← لم يُستورد السطر')
@@ -1022,6 +1033,8 @@ class MyAccountingMove(models.Model):
                     'name': (str(cell(row, 'label')).strip() if cell(row, 'label') not in (None, '') else False),
                     'debit': debit,
                     'credit': credit,
+                    'debit_zero_entered': debit_zero,
+                    'credit_zero_entered': credit_zero,
                 }
                 if account_id:
                     values['account_id'] = account_id
@@ -1103,8 +1116,52 @@ class MyAccountingMoveLine(models.Model):
     name = fields.Char(string='البيان')
     debit = fields.Float(string='مدين', default=0.0, digits=(16, 3))
     credit = fields.Float(string='دائن', default=0.0, digits=(16, 3))
+    # الخانة الفارغة تُخزَّن 0 أيضاً، لكن الصفر المُدخل يدوياً له معنى محاسبي آخر:
+    # هذان العلمان يميّزانه، فيُعرض "0" فقط عندما أُدخل فعلاً ويبقى غيره فارغاً.
+    debit_zero_entered = fields.Boolean(string='صفر مُدخل في المدين')
+    credit_zero_entered = fields.Boolean(string='صفر مُدخل في الدائن')
     currency_id = fields.Many2one(related='move_id.currency_id', string='العملة', store=True)
     date = fields.Date(related='move_id.date', string='التاريخ', store=True)
+
+    # عرض القيد بعمودين للحساب: يظهر الحساب تحت "الحساب المدين" أو "الحساب الدائن"
+    # حسب القيمة المدخلة (قبل إدخال القيمة يظهر في المدين). الحقل الفعلي يبقى account_id.
+    debit_account_id = fields.Many2one(
+        'myaccounting.account', string='الحساب المدين',
+        compute='_compute_side_accounts', inverse='_inverse_debit_account')
+    credit_account_id = fields.Many2one(
+        'myaccounting.account', string='الحساب الدائن',
+        compute='_compute_side_accounts', inverse='_inverse_credit_account')
+    is_credit_line = fields.Boolean(string='بند دائن', compute='_compute_side_accounts')
+
+    @api.depends('account_id', 'debit', 'credit')
+    def _compute_side_accounts(self):
+        for line in self:
+            is_credit = bool(line.credit and not line.debit)
+            line.is_credit_line = is_credit
+            line.debit_account_id = False if is_credit else line.account_id
+            line.credit_account_id = line.account_id if is_credit else False
+
+    # القيمة الفارغة لا تُكتب: عند انتقال الحساب من عمود لآخر يصبح أحدهما فارغاً
+    # بالحساب لا بقرار المستخدم، فلا يجب أن يمسح الحساب الفعلي.
+    def _inverse_debit_account(self):
+        for line in self:
+            if line.debit_account_id:
+                line.account_id = line.debit_account_id
+
+    def _inverse_credit_account(self):
+        for line in self:
+            if line.credit_account_id:
+                line.account_id = line.credit_account_id
+
+    @api.onchange('debit_account_id')
+    def _onchange_debit_account_id(self):
+        if self.debit_account_id:
+            self.account_id = self.debit_account_id
+
+    @api.onchange('credit_account_id')
+    def _onchange_credit_account_id(self):
+        if self.credit_account_id:
+            self.account_id = self.credit_account_id
 
     @api.depends('account_id', 'account_id.name', 'account_id.parent_id.name', 'pending_account_name')
     def _compute_account_label(self):

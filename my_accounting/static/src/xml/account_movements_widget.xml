@@ -128,8 +128,8 @@
                         <td><strong t-esc="rec.move_id[1]"/></td>
                         <td t-esc="rec.account_id[1]"/>
                         <td t-esc="rec.name or ''"/>
-                        <td class="text-end" t-esc="rec.debit ? rec.debit.toFixed(3) : ''"/>
-                        <td class="text-end" t-esc="rec.credit ? rec.credit.toFixed(3) : ''"/>
+                        <td class="text-end" t-esc="rec.debit ? rec.debit.toFixed(3) : (rec.debit_zero_entered ? '0.000' : '')"/>
+                        <td class="text-end" t-esc="rec.credit ? rec.credit.toFixed(3) : (rec.credit_zero_entered ? '0.000' : '')"/>
                         <td>
                             <span t-attf-class="badge {{ rec.move_state === 'posted' ? 'text-bg-success' : 'text-bg-info' }}"
                                   t-esc="stateLabels[rec.move_state]"/>
