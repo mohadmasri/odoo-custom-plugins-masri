@@ -11,6 +11,10 @@ from .account_move import normalize_digits
 INVOICE_NUMBER_RE = re.compile(
     r'(?:فاتور[ةه]|مطالب[ةه]|(?<![\w])ف)\s*[.:#-]?\s*(?:رقم|ر)?\s*[.:#-]?\s*(\d+)')
 RETURN_RE = re.compile(r'مرتجع|ارجاع|إرجاع')
+# عدة أرقام بعد كلمة الفاتورة في بيان سند القبض: "تحصيل ف 283 و 284" أو "فواتير 280، 282"
+INVOICE_NUMBERS_RE = re.compile(
+    r'(?:فواتير|مطالبات|فاتور[ةه]|مطالب[ةه]|(?<![\w])ف)\s*[.:#-]?\s*(?:رقم|ر)?\s*[.:#-]?\s*'
+    r'(\d+(?:\s*(?:,|،|\+|&|و)\s*\d+)*)')
 
 
 def extract_invoice_number(*labels):
@@ -19,6 +23,16 @@ def extract_invoice_number(*labels):
         if match:
             return int(match.group(1))
     return None
+
+
+def extract_invoice_numbers(label):
+    """كل أرقام الفواتير المذكورة في البيان، بالترتيب ودون تكرار."""
+    numbers = []
+    for match in INVOICE_NUMBERS_RE.finditer(normalize_digits(label or '')):
+        for number in re.findall(r'\d+', match.group(1)):
+            if int(number) not in numbers:
+                numbers.append(int(number))
+    return numbers
 
 
 class MyAccountingCustomers(models.AbstractModel):
@@ -43,14 +57,26 @@ class MyAccountingCustomers(models.AbstractModel):
         return self._accounts_under_roots('ذمم')
 
     @api.model
-    def get_customers_data(self, include_drafts=False):
+    def get_customers_data(self, include_drafts=False, ledger_month=False, ledger_year=False):
         """العملاء وفواتيرهم وتحصيلاتهم.
 
         - العميل: كل حساب تحت "الذمم" عليه فاتورة في قيد إيرادات أو تحصيل في سند قبض.
         - الفاتورة: بند مدين على حساب العميل داخل قيد إيرادات، ورقمها من البيان.
         - المرتجع: بند دائن على حساب العميل داخل قيد إيرادات.
         - الرصيد المستحق = إجمالي مدين الحساب − إجمالي دائنه، من كل القيود.
+        - فلتر الشهر (شهر دفتر الأستاذ): الحركات تقتصر على ذلك الشهر، والرصيد يصبح
+          الرصيد حتى نهايته، مع رصيد افتتاحي (ما قبله). الملاحظات تبقى على كل البيانات.
         """
+        month = int(ledger_month) if ledger_month else 0
+        year = int(ledger_year) if ledger_year else 0
+        # سنة كاملة بلا شهر (صفحة التقارير): الحركات خلال السنة والرصيد حتى نهايتها
+        whole_year = bool(year and not month)
+        if whole_year:
+            month = 12
+        selected_period = year * 100 + month if month and year else 0
+
+        def in_period(period):
+            return period // 100 == year if whole_year else period == selected_period
         states = ['posted', 'draft', 'incomplete'] if include_drafts else ['posted']
         Line = self.env['myaccounting.move.line']
         revenue_ids = set(self._revenue_accounts().ids)
@@ -97,13 +123,22 @@ class MyAccountingCustomers(models.AbstractModel):
                     'amount': amount,
                     'kind': kind,
                     'state': move.state,
+                    'period': move.ledger_year * 100 + int(move.ledger_month or 0),
                 })
 
         for move in receipt_moves:
+            per_customer = {}  # بنود نفس العميل في نفس السند تُجمع في سطر واحد
             for line in move.line_ids:
                 if line.account_id.id in receivable_ids and line.credit:
                     customer_ids.add(line.account_id.id)
-                    receipts.append({
+                    item = per_customer.get(line.account_id.id)
+                    if item:
+                        item['amount'] += line.credit
+                        if line.name and line.name not in item['label']:
+                            item['label'] = f"{item['label']} / {line.name}" if item['label'] else line.name
+                        continue
+                    per_customer[line.account_id.id] = {
+                        'key': f'{move.id}-{line.account_id.id}',
                         'move_id': move.id,
                         'move_name': move.name,
                         'date': move.date and move.date.isoformat(),
@@ -112,15 +147,34 @@ class MyAccountingCustomers(models.AbstractModel):
                         'label': line.name or '',
                         'amount': line.credit,
                         'state': move.state,
-                    })
+                        'period': move.ledger_year * 100 + int(move.ledger_month or 0),
+                    }
+            receipts.extend(per_customer.values())
+
+        self._apply_collections(invoices, receipts)
 
         # الرصيد من كل القيود (بما فيها أي تسويات يدوية) = مدين − دائن
-        balances = {}
-        if customer_ids:
-            groups = Line._read_group(
-                [('account_id', 'in', list(customer_ids)), ('move_id.state', 'in', states)],
-                ['account_id'], ['debit:sum', 'credit:sum'])
-            balances = {account.id: (debit or 0.0) - (credit or 0.0) for account, debit, credit in groups}
+        def balances_until(last_month=None):
+            """الأرصدة حتى نهاية شهر معيّن من السنة المحددة (أو كل القيود عند None)."""
+            if not customer_ids:
+                return {}
+            domain = [('account_id', 'in', list(customer_ids)), ('move_id.state', 'in', states)]
+            if selected_period and last_month is not None:
+                domain += ['|', ('move_id.ledger_year', '<', year),
+                           '&', ('move_id.ledger_year', '=', year),
+                           ('move_id.ledger_month', 'in', [str(m) for m in range(1, last_month + 1)] or ['_'])]
+            groups = Line._read_group(domain, ['account_id'], ['debit:sum', 'credit:sum'])
+            return {account.id: (debit or 0.0) - (credit or 0.0) for account, debit, credit in groups}
+
+        balances = balances_until(month if selected_period else None)
+        openings = balances_until(0 if whole_year else month - 1) if selected_period else {}
+        current_balances = balances_until() if selected_period else balances
+
+        # الملاحظات تُحسب على كل البيانات (تسلسل الأرقام لا يتقيد بالشهر)
+        all_invoices, all_receipts = invoices, receipts
+        if selected_period:
+            invoices = [item for item in invoices if in_period(item['period'])]
+            receipts = [item for item in receipts if in_period(item['period'])]
 
         customers = []
         for account in self.env['myaccounting.account'].browse(list(customer_ids)):
@@ -129,16 +183,24 @@ class MyAccountingCustomers(models.AbstractModel):
             returned = -sum(item['amount'] for item in own_invoices if item['kind'] == 'return')
             collected = sum(item['amount'] for item in receipts if item['customer_id'] == account.id)
             balance = balances.get(account.id, 0.0)
+            opening = openings.get(account.id, 0.0)
+            if selected_period and not own_invoices and not collected \
+                    and abs(balance) < 0.0005 and abs(opening) < 0.0005:
+                continue  # لا حركة في الشهر ولا رصيد
             customers.append({
                 'id': account.id,
                 'code': account.code or '',
                 'name': account.name or '',
                 'invoice_count': len([item for item in own_invoices if item['kind'] == 'invoice']),
+                'open_count': len([item for item in own_invoices
+                                   if item['kind'] == 'invoice' and item['status'] in ('open', 'partial')]),
+                'unapplied': sum(item['unallocated'] for item in receipts if item['customer_id'] == account.id),
                 'invoiced': invoiced,
                 'returned': returned,
                 'collected': collected,
                 # حركات أخرى على الحساب خارج الفواتير والسندات (تسويات، أرصدة افتتاحية...)
-                'other': balance - (invoiced - returned - collected),
+                'other': balance - opening - (invoiced - returned - collected),
+                'opening': opening,
                 'balance': balance,
             })
         customers.sort(key=lambda item: (-round(item['balance'], 3), item['name']))
@@ -152,14 +214,211 @@ class MyAccountingCustomers(models.AbstractModel):
             'returned': sum(item['returned'] for item in customers),
             'collected': sum(item['collected'] for item in customers),
             'balance': sum(item['balance'] for item in customers),
+            'opening': sum(item['opening'] for item in customers),
+            'open_count': sum(item['open_count'] for item in customers),
+            'remaining': sum(item['remaining'] for item in invoices if item['kind'] == 'invoice'),
         }
         return {
             'customers': customers,
             'invoices': invoices,
             'receipts': receipts,
             'totals': totals,
-            'notes': self._review_notes(invoices, receipts, customers),
+            'notes': self._review_notes(all_invoices, all_receipts, [
+                {'id': account.id, 'code': account.code or '', 'name': account.name or '',
+                 'balance': current_balances.get(account.id, 0.0)}
+                for account in self.env['myaccounting.account'].browse(list(customer_ids))]),
         }
+
+    @api.model
+    def get_home_stats(self):
+        """أرقام مربعات الصفحة الرئيسية (نفس أرقام صفحة العملاء، القيود المرحّلة فقط)."""
+        data = self.get_customers_data()
+        totals = data['totals']
+        return {
+            'invoiced': totals['invoiced'] - totals['returned'],
+            'collected': totals['collected'],
+            'balance': totals['balance'],
+            'open_count': totals['open_count'],
+            'remaining': totals['remaining'],
+            'receipt_count': len({rec['move_id'] for rec in data['receipts']}),
+            'customer_count': len([c for c in data['customers'] if c['balance'] > 0.0005]),
+        }
+
+    # ------------------------------------------------------------------
+    # التحصيل: أي الفواتير دُفعت
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _apply_collections(self, invoices, receipts):
+        """يحدد لكل فاتورة المحصّل والمتبقي وحالتها، ولكل سند الفواتير التي غطّاها.
+
+        الترتيب: (1) المرتجع يُطرح من فاتورته (نفس الرقم ونفس العميل).
+        (2) التخصيص اليدوي للسندات. (3) السندات غير المخصّصة (والمرتجعات بلا
+        فاتورة) تُوزَّع تلقائياً على أقدم الفواتير المفتوحة. أما السند المخصّص يدوياً
+        فما يزيد منه يبقى "دفعة غير مخصّصة". لا يغيّر هذا شيئاً في القيود أو الأرصدة.
+        """
+        real = [item for item in invoices if item['kind'] == 'invoice']
+        by_number = {}
+        for inv in real:
+            inv.update({'net': inv['amount'], 'collected': 0.0, 'returned_amount': 0.0, 'payments': []})
+            if inv['number']:
+                by_number.setdefault((inv['customer_id'], inv['number']), []).append(inv)
+        for item in invoices:
+            if item['kind'] == 'return':
+                item.update({'status': False, 'collected': 0.0, 'remaining': 0.0, 'payments': []})
+
+        def apply(inv, amount, source, manual):
+            take = min(amount, inv['net'] - inv['collected'])
+            if take <= 0.0005:
+                return 0.0
+            inv['collected'] += take
+            inv['payments'].append({'receipt': source, 'amount': take, 'manual': manual})
+            return take
+
+        auto_pool = {}  # customer_id -> [(receipt or None, amount)]
+
+        # 1) المرتجعات
+        for item in invoices:
+            if item['kind'] != 'return':
+                continue
+            credit = -item['amount']
+            for inv in by_number.get((item['customer_id'], item['number']), []) if item['number'] else []:
+                take = min(credit, inv['net'])
+                inv['net'] -= take
+                inv['returned_amount'] += take
+                credit -= take
+            if credit > 0.0005:
+                auto_pool.setdefault(item['customer_id'], []).append((None, credit))
+
+        # 2) التخصيص اليدوي
+        manual = {}
+        allocations = self.env['myaccounting.receipt.allocation'].search(
+            [('receipt_move_id', 'in', [rec['move_id'] for rec in receipts] or [0])])
+        for allocation in allocations:
+            manual.setdefault((allocation.receipt_move_id.id, allocation.customer_id.id), []).append(
+                (allocation.invoice_number, allocation.amount))
+
+        ordered_receipts = sorted(receipts, key=lambda rec: (rec['date'] or '', rec['move_name'] or ''))
+        for rec in ordered_receipts:
+            rec.update({'allocations': [], 'mode': 'auto', 'unallocated': 0.0,
+                        'suggested': extract_invoice_numbers(rec['label'])})
+            remaining = rec['amount']
+            rec_manual = manual.get((rec['move_id'], rec['customer_id']))
+            if rec_manual:
+                rec['mode'] = 'manual'
+                for number, amount in rec_manual:
+                    for inv in by_number.get((rec['customer_id'], number), []):
+                        take = apply(inv, min(amount, remaining), rec['move_name'], True)
+                        if take:
+                            rec['allocations'].append({'number': number, 'amount': take, 'manual': True})
+                            amount -= take
+                            remaining -= take
+                rec['unallocated'] = max(remaining, 0.0) if remaining > 0.0005 else 0.0
+            elif remaining > 0.0005:
+                auto_pool.setdefault(rec['customer_id'], []).append((rec, remaining))
+
+        # 3) التوزيع التلقائي على أقدم الفواتير
+        for customer_id, sources in auto_pool.items():
+            open_invoices = sorted(
+                [inv for inv in real if inv['customer_id'] == customer_id],
+                key=lambda inv: (inv['number'] is None, inv['number'] or 0, inv['date'] or '', inv['line_id']))
+            for rec, amount in sources:
+                for inv in open_invoices:
+                    if amount <= 0.0005:
+                        break
+                    take = apply(inv, amount, rec['move_name'] if rec else 'مرتجع', False)
+                    if take and rec:
+                        rec['allocations'].append({'number': inv['number'], 'amount': take, 'manual': False})
+                    amount -= take
+                if rec and amount > 0.0005:
+                    rec['unallocated'] += amount
+
+        for inv in real:
+            inv['remaining'] = max(inv['net'] - inv['collected'], 0.0)
+            if inv['net'] <= 0.0005:
+                inv['status'] = 'returned'
+            elif inv['remaining'] <= 0.0005:
+                inv['status'] = 'paid'
+            elif inv['collected'] > 0.0005:
+                inv['status'] = 'partial'
+            else:
+                inv['status'] = 'open'
+
+    @api.model
+    def _receipt_amount(self, move_id, customer_id):
+        move = self.env['myaccounting.move'].browse(move_id).exists()
+        if not move or move.move_type != 'receipt':
+            raise UserError('سند القبض غير موجود.')
+        return move, sum(move.line_ids.filtered(lambda line: line.account_id.id == customer_id).mapped('credit'))
+
+    @api.model
+    def _allocation_candidates(self, move_id, customer_id):
+        """فواتير العميل مع المتاح للتخصيص من هذا السند
+        (قيمتها بعد المرتجعات − ما خُصِّص لها يدوياً من سندات أخرى)."""
+        data = self.get_customers_data(include_drafts=True)
+        invoices = [inv for inv in data['invoices']
+                    if inv['kind'] == 'invoice' and inv['customer_id'] == customer_id and inv['number']]
+        other_manual = {}
+        for allocation in self.env['myaccounting.receipt.allocation'].search(
+                [('customer_id', '=', customer_id), ('receipt_move_id', '!=', move_id)]):
+            other_manual[allocation.invoice_number] = other_manual.get(allocation.invoice_number, 0.0) + allocation.amount
+        candidates = {}
+        for inv in invoices:
+            entry = candidates.setdefault(inv['number'], {
+                'number': inv['number'], 'date': inv['date'], 'label': inv['label'], 'net': 0.0})
+            entry['net'] += inv['net']
+        for entry in candidates.values():
+            entry['available'] = max(entry['net'] - other_manual.get(entry['number'], 0.0), 0.0)
+        return sorted(candidates.values(), key=lambda entry: entry['number'])
+
+    @api.model
+    def get_receipt_allocation(self, move_id, customer_id):
+        move, amount = self._receipt_amount(move_id, customer_id)
+        current = {allocation.invoice_number: allocation.amount
+                   for allocation in self.env['myaccounting.receipt.allocation'].search(
+                       [('receipt_move_id', '=', move_id), ('customer_id', '=', customer_id)])}
+        labels = ' '.join(move.line_ids.filtered(lambda line: line.account_id.id == customer_id).mapped('name'))
+        candidates = self._allocation_candidates(move_id, customer_id)
+        for entry in candidates:
+            entry['current'] = current.get(entry['number'], 0.0)
+        return {
+            'move_name': move.name,
+            'date': move.date and move.date.isoformat(),
+            'customer': self.env['myaccounting.account'].browse(customer_id).name,
+            'label': labels,
+            'amount': amount,
+            'has_allocation': bool(current),
+            'suggested': extract_invoice_numbers(labels),
+            'invoices': candidates,
+        }
+
+    @api.model
+    def save_receipt_allocation(self, move_id, customer_id, allocations):
+        """allocations: [{'number': int, 'amount': float}] — قائمة فارغة = إلغاء التخصيص
+        (يعود السند للتوزيع التلقائي)."""
+        _move, receipt_amount = self._receipt_amount(move_id, customer_id)
+        candidates = {entry['number']: entry for entry in self._allocation_candidates(move_id, customer_id)}
+        vals_list, total = [], 0.0
+        for allocation in allocations or []:
+            number = int(allocation.get('number') or 0)
+            amount = round(float(allocation.get('amount') or 0.0), 3)
+            if amount <= 0:
+                continue
+            entry = candidates.get(number)
+            if not entry:
+                raise UserError(f'الفاتورة رقم {number} غير موجودة لهذا العميل.')
+            if amount > entry['available'] + 0.0005:
+                raise UserError(f"المبلغ المخصّص للفاتورة {number} ({amount:,.3f}) أكبر من المتبقي عليها "
+                                f"({entry['available']:,.3f}).")
+            total += amount
+            vals_list.append({'receipt_move_id': move_id, 'customer_id': customer_id,
+                              'invoice_number': number, 'amount': amount})
+        if total > receipt_amount + 0.0005:
+            raise UserError(f'مجموع التخصيص ({total:,.3f}) أكبر من مبلغ السند ({receipt_amount:,.3f}).')
+        Allocation = self.env['myaccounting.receipt.allocation']
+        Allocation.search([('receipt_move_id', '=', move_id), ('customer_id', '=', customer_id)]).unlink()
+        Allocation.create(vals_list)
+        return True
 
     # ------------------------------------------------------------------
     # ملاحظات المراجعة: تُحسب تلقائياً من البيانات، وتُحلّ يدوياً مع سبب الحل
@@ -239,7 +498,19 @@ class MyAccountingCustomers(models.AbstractModel):
                 f'سند القبض رقم {number} غير موجود في تسلسل السندات',
                 'قد يكون سنداً لم يُسجَّل بعد أو سنداً ملغى.')
 
-        # 6) عميل رصيده دائن (دفع أكثر من المطلوب أو فاتورته لم تُسجَّل)
+        # 6) سند قبض غير مخصّص لعميل لديه أكثر من فاتورة (التوزيع التلقائي قد لا يطابق الواقع)
+        invoice_counts = {}
+        for item in real_invoices:
+            invoice_counts[item['customer_id']] = invoice_counts.get(item['customer_id'], 0) + 1
+        for rec in receipts:
+            if rec.get('mode') == 'auto' and invoice_counts.get(rec['customer_id'], 0) > 1:
+                applied = ' ، '.join(f"ف {a['number']} ({a['amount']:,.3f})" for a in rec['allocations'] if a['number'])
+                add(f"receipt_unallocated:{rec['move_name']}:{rec['customer']}", 'receipt_unallocated', 'receipts',
+                    f"سند القبض {rec['move_name']} ({rec['customer']}) غير مخصّص لفواتير",
+                    f"وُزِّع تلقائياً على الأقدم: {applied}" if applied else 'لم يُطبَّق على أي فاتورة.',
+                    customer_id=rec['customer_id'], move_id=rec['move_id'])
+
+        # 7) عميل رصيده دائن (دفع أكثر من المطلوب أو فاتورته لم تُسجَّل)
         for customer in customers:
             if customer['balance'] < -0.0005:
                 add(f"credit_balance:{customer['code'] or customer['name']}", 'credit_balance', 'customers',

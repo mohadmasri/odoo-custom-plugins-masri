@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.ReportChart">
+        <div class="o_rep_canvas"><canvas t-ref="canvas"/></div>
+    </t>
+
+    <!-- بطاقة تقرير: عنوان + وصف + الرسم (أو رسالة عند عدم وجود بيانات) -->
+    <t t-name="my_accounting.ReportCard">
+        <div t-attf-class="o_rep_card {{ props.card.wide ? 'o_rep_wide' : '' }}">
+            <div class="o_rep_card_head">
+                <div class="d-flex justify-content-between align-items-start" style="gap: 8px;">
+                    <div class="o_rep_card_title">
+                        <span class="o_rep_num" t-esc="props.card.num"/>
+                        <t t-esc="props.card.title"/>
+                    </div>
+                    <button t-if="props.onTogglePin" type="button"
+                            t-attf-class="btn btn-sm o_rep_pin {{ props.pinned ? 'o_rep_pinned' : '' }}"
+                            t-att-title="props.pinned ? 'مثبّت في الصفحة الرئيسية — اضغط للإزالة' : 'إظهار في الصفحة الرئيسية'"
+                            t-on-click="() => props.onTogglePin(props.card)">
+                        <i class="fa fa-thumb-tack me-1"/>
+                        <t t-if="props.pinned">في الرئيسية</t>
+                        <t t-else="">للرئيسية</t>
+                    </button>
+                    <button t-if="props.onRemove" type="button" class="btn btn-sm btn-link text-muted p-0"
+                            title="إزالة من الصفحة الرئيسية" t-on-click="() => props.onRemove(props.card)">
+                        <i class="fa fa-times"/>
+                    </button>
+                </div>
+                <div t-if="props.card.hint" class="o_rep_card_hint" t-esc="props.card.hint"/>
+            </div>
+            <ReportChart t-if="props.card.config" config="props.card.config"/>
+            <div t-else="" class="o_rep_empty">
+                <i class="fa fa-bar-chart fa-2x d-block mb-2"/>
+                <t t-esc="props.card.empty || 'لا توجد بيانات في هذه الفترة'"/>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="my_accounting.Reports">
+        <div class="o_reports_page p-3" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap mb-3" style="gap: 12px;">
+                <div>
+                    <h2 class="m-0">التقارير</h2>
+                    <div class="text-muted small mt-1">رسوم بيانية للأداء المالي والعملاء والنقد — حسب شهر دفتر الأستاذ</div>
+                </div>
+                <div t-if="state.data" class="d-flex align-items-center" style="gap: 12px;">
+                    <div class="form-check m-0">
+                        <input type="checkbox" class="form-check-input" id="o_rep_drafts"
+                               t-att-checked="state.includeDrafts" t-on-change="(ev) => this.toggleDrafts(ev)"/>
+                        <label class="form-check-label small" for="o_rep_drafts">تضمين القيود غير المرحّلة</label>
+                    </div>
+                    <select class="form-select form-select-sm" style="width:auto;" t-on-change="(ev) => this.onYear(ev)">
+                        <t t-foreach="state.data.years" t-as="y" t-key="y">
+                            <option t-att-value="y" t-att-selected="y === state.data.year" t-esc="y"/>
+                        </t>
+                    </select>
+                </div>
+            </div>
+
+            <div t-if="!state.data" class="text-center text-muted py-5">جارِ التحميل...</div>
+
+            <t t-if="state.data">
+                <div class="o_move_months d-flex flex-wrap align-items-center mb-3">
+                    <span class="text-muted small me-2" t-esc="state.data.year"/>
+                    <t t-foreach="[1,2,3,4,5,6,7,8,9,10,11,12]" t-as="m" t-key="m">
+                        <button type="button"
+                                t-attf-class="btn o_move_month_btn {{ state.month === m ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.onMonthButton(m)" t-esc="m"/>
+                    </t>
+                    <span class="small text-muted ms-2">
+                        الفترة: <b t-esc="periodLabel"/>
+                        <i t-if="state.loading" class="fa fa-spinner fa-spin ms-1"/>
+                    </span>
+                </div>
+
+                <!-- بطاقات الأرقام -->
+                <div class="o_rep_cards mb-3">
+                    <div class="o_rep_kpi">
+                        <div class="o_rep_kpi_label"><i class="fa fa-arrow-down text-success me-1"/>الإيرادات</div>
+                        <div class="o_rep_kpi_value text-success" t-esc="fmt(state.data.cards.revenue)"/>
+                    </div>
+                    <div class="o_rep_kpi">
+                        <div class="o_rep_kpi_label"><i class="fa fa-arrow-up text-danger me-1"/>المصاريف</div>
+                        <div class="o_rep_kpi_value text-danger" t-esc="fmt(state.data.cards.expenses)"/>
+                    </div>
+                    <div class="o_rep_kpi">
+                        <div class="o_rep_kpi_label"><i class="fa fa-line-chart me-1"/>صافي الربح</div>
+                        <div t-attf-class="o_rep_kpi_value {{ state.data.cards.profit &lt; 0 ? 'text-danger' : 'text-success' }}"
+                             t-esc="fmt(state.data.cards.profit)"/>
+                    </div>
+                    <div class="o_rep_kpi" style="cursor:pointer;" t-on-click="() => this.nav.openCustomers({})">
+                        <div class="o_rep_kpi_label"><i class="fa fa-users me-1"/>المستحق على العملاء</div>
+                        <div class="o_rep_kpi_value text-primary" t-esc="fmt(state.data.cards.receivable)"/>
+                    </div>
+                </div>
+
+                <div class="o_rep_pin_help small mb-2">
+                    <i class="fa fa-thumb-tack me-1"/>
+                    اضغط "للرئيسية" على أي تقرير ليظهر في الصفحة الرئيسية أسفل المربعات الأربعة،
+                    واضغطه مرة أخرى لإزالته.
+                    <b t-if="state.pinned.length">(المثبّت الآن: <t t-esc="state.pinned.length"/>)</b>
+                </div>
+
+                <t t-foreach="sections" t-as="section" t-key="section.key">
+                    <h5 class="o_rep_section"><i t-attf-class="fa {{ section.icon }} me-2"/><t t-esc="section.title"/></h5>
+                    <div t-if="section.key === 'cash'" class="o_rep_cards mb-3">
+                        <div class="o_rep_kpi">
+                            <div class="o_rep_kpi_label">رصيد <t t-esc="state.data.bank_name"/> (نهاية الفترة)</div>
+                            <div t-attf-class="o_rep_kpi_value {{ state.data.balances.bank &lt; 0 ? 'text-danger' : '' }}"
+                                 t-esc="fmt(state.data.balances.bank)"/>
+                        </div>
+                        <div class="o_rep_kpi">
+                            <div class="o_rep_kpi_label">رصيد ضريبة المبيعات</div>
+                            <div class="o_rep_kpi_value" t-esc="fmt(state.data.balances.tax)"/>
+                            <div class="o_rep_card_hint">موجب = مستحق عليك · سالب = لك</div>
+                        </div>
+                        <div class="o_rep_kpi">
+                            <div class="o_rep_kpi_label">رصيد الضمان الاجتماعي</div>
+                            <div class="o_rep_kpi_value" t-esc="fmt(state.data.balances.ss)"/>
+                            <div class="o_rep_card_hint">موجب = مستحق عليك · سالب = لك</div>
+                        </div>
+                    </div>
+                    <div class="o_rep_grid">
+                        <t t-foreach="cardsOf(section.key)" t-as="card" t-key="card.key">
+                            <ReportCard card="card" pinned="state.pinned.includes(card.key)"
+                                        onTogglePin="(c) => this.togglePin(c)"/>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </div>
+    </t>
+
+    <!-- التقارير المثبّتة في الصفحة الرئيسية -->
+    <t t-name="my_accounting.HomeReports">
+        <div t-if="state.loaded" class="o_reports_page o_home_reports">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0">
+                    <i class="fa fa-bar-chart me-2"/>التقارير
+                    <span t-if="state.period" class="small text-muted ms-1">(<t t-esc="state.period"/>)</span>
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.openReports()">
+                    <i class="fa fa-thumb-tack me-1"/>
+                    <t t-if="cards.length">تعديل التقارير المعروضة</t>
+                    <t t-else="">اختيار تقارير</t>
+                </button>
+            </div>
+            <div t-if="!cards.length" class="o_rep_empty_home">
+                لا توجد تقارير في الصفحة الرئيسية بعد. افتح صفحة التقارير واضغط
+                <b><i class="fa fa-thumb-tack"/> للرئيسية</b> على التقارير التي تريد رؤيتها هنا.
+            </div>
+            <div t-else="" class="o_rep_grid">
+                <t t-foreach="cards" t-as="card" t-key="card.key">
+                    <ReportCard card="card" onRemove="(c) => this.remove(c)"/>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

@@ -6,6 +6,7 @@ a[data-menu-xmlid="my_accounting.menu_myaccounting_moves"]::before,
 a[data-menu-xmlid="my_accounting.menu_myaccounting_accounts"]::before,
 a[data-menu-xmlid="my_accounting.menu_myaccounting_general_ledger"]::before,
 a[data-menu-xmlid="my_accounting.menu_myaccounting_customers"]::before,
+a[data-menu-xmlid="my_accounting.menu_myaccounting_reports"]::before,
 a[data-menu-xmlid="my_accounting.menu_myaccounting_settings"]::before {
     font-family: "FontAwesome";
     display: inline-block;
@@ -38,6 +39,11 @@ a[data-menu-xmlid="my_accounting.menu_myaccounting_general_ledger"]::before {
 a[data-menu-xmlid="my_accounting.menu_myaccounting_customers"]::before {
     content: "\f0c0"; /* fa-users */
     color: #2E86DE;
+}
+
+a[data-menu-xmlid="my_accounting.menu_myaccounting_reports"]::before {
+    content: "\f080"; /* fa-bar-chart */
+    color: #8E44AD;
 }
 
 a[data-menu-xmlid="my_accounting.menu_myaccounting_settings"]::before {

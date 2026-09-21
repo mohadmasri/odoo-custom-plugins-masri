@@ -3,16 +3,18 @@
 import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { HomeReports } from "./reports";
 
 export class MyAccountingHome extends Component {
     static template = "my_accounting.Home";
     static props = ["*"];
+    static components = { HomeReports };
 
     setup() {
         this.actionService = useService("action");
         this.orm = useService("orm");
         this.notification = useService("notification");
-        this.state = useState({ todos: [], todosAllowed: true, newTodo: "" });
+        this.state = useState({ todos: [], todosAllowed: true, newTodo: "", stats: null });
 
         this.navCards = {
             newMove: {
@@ -45,15 +47,58 @@ export class MyAccountingHome extends Component {
             },
         };
 
-        // مربعات المؤشرات السفلية: تصميم فقط حالياً، وتُربط بالبيانات في خطوة لاحقة
+        // مربعات المؤشرات السفلية (من اليمين): أرقام صفحة العملاء، والضغط يفتح التبويب المناسب
         this.statBoxes = [
-            { key: "claims_1", title: "المطالبات", icon: "fa-file-text-o", color: "#E67E22" },
-            { key: "receipts", title: "سندات القبض", icon: "fa-money", color: "#17A2B8" },
-            { key: "collected", title: "الذمم المحصلة", icon: "fa-check-circle", color: "#28A745" },
-            { key: "claims_2", title: "المطالبات", icon: "fa-file-text-o", color: "#E67E22" },
+            {
+                key: "stat_1", title: "إجمالي الفواتير", icon: "fa-file-text-o", color: "#E67E22",
+                value: (s) => this.fmt(s.invoiced),
+                hint: () => "صافي بعد المرتجعات",
+                context: {},
+            },
+            {
+                key: "stat_2", title: "المحصّل (سندات القبض)", icon: "fa-money", color: "#28A745",
+                value: (s) => this.fmt(s.collected),
+                hint: (s) => `${s.receipt_count} سند قبض`,
+                context: { customers_tab: "receipts" },
+            },
+            {
+                key: "stat_3", title: "المستحق على العملاء", icon: "fa-users", color: "#DC3545",
+                value: (s) => this.fmt(s.balance),
+                hint: (s) => `على ${s.customer_count} عملاء`,
+                context: { customers_tab: "invoices" },
+            },
+            {
+                key: "stat_4", title: "فواتير غير محصّلة", icon: "fa-exclamation-circle", color: "#17A2B8",
+                value: (s) => String(s.open_count),
+                hint: (s) => `متبقٍّ عليها ${this.fmt(s.remaining)}`,
+                context: { customers_tab: "invoices", invoice_status: "open" },
+            },
         ];
 
-        onWillStart(() => this.loadTodos());
+        onWillStart(() => Promise.all([this.loadTodos(), this.loadStats()]));
+    }
+
+    // ------------------------------------------------------------------
+    // مربعات المؤشرات
+    // ------------------------------------------------------------------
+
+    async loadStats() {
+        try {
+            this.state.stats = await this.orm.call("myaccounting.customers", "get_home_stats", []);
+        } catch {
+            this.state.stats = null; // بلا صلاحية على الحسابات: تبقى المربعات بلا أرقام
+        }
+    }
+
+    fmt(value) {
+        return (Math.abs(value || 0) < 0.0005 ? 0 : value)
+            .toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    }
+
+    openStat(box) {
+        this.actionService.doAction("my_accounting.action_myaccounting_customers", {
+            additionalContext: box.context,
+        });
     }
 
     // ------------------------------------------------------------------

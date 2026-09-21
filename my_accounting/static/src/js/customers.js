@@ -5,6 +5,100 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { user } from "@web/core/user";
 import { deserializeDateTime, formatDateTime } from "@web/core/l10n/dates";
+import { Dialog } from "@web/core/dialog/dialog";
+
+const round3 = (value) => Math.round((value || 0) * 1000) / 1000;
+const fmt3 = (value) => (Math.abs(value || 0) < 0.0005 ? 0 : value)
+    .toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+/**
+ * نافذة تخصيص سند قبض لفواتير العميل: لكل فاتورة المتاح عليها وخانة للمبلغ.
+ * بلا تخصيص يُوزَّع السند تلقائياً على أقدم الفواتير.
+ */
+export class ReceiptAllocationDialog extends Component {
+    static template = "my_accounting.ReceiptAllocationDialog";
+    static components = { Dialog };
+    static props = ["moveId", "customerId", "onSaved", "close"];
+
+    setup() {
+        this.orm = useService("orm");
+        this.notification = useService("notification");
+        this.fmt = fmt3;
+        this.state = useState({ data: null, rows: [] });
+        onWillStart(async () => {
+            const data = await this.orm.call("myaccounting.customers", "get_receipt_allocation",
+                [this.props.moveId, this.props.customerId]);
+            const rows = data.invoices.map((inv) => ({ ...inv, checked: inv.current > 0, amount: inv.current }));
+            // أول فتح: نعبّئ الفواتير المذكورة في بيان السند (مثل "تحصيل ف 283 و 284")
+            if (!data.has_allocation) {
+                let left = data.amount;
+                for (const number of data.suggested) {
+                    const row = rows.find((r) => r.number === number);
+                    if (row && left > 0.0005 && row.available > 0.0005) {
+                        row.checked = true;
+                        row.suggested = true;
+                        row.amount = round3(Math.min(row.available, left));
+                        left -= row.amount;
+                    }
+                }
+            }
+            this.state.data = data;
+            this.state.rows = rows;
+        });
+    }
+
+    // الفواتير المسددة بالكامل بتخصيص سندات أخرى لا تظهر
+    get visibleRows() {
+        return this.state.rows.filter((row) => row.available > 0.0005 || row.current > 0.0005 || row.checked);
+    }
+
+    get allocated() {
+        return round3(this.state.rows.reduce((sum, row) => sum + (row.checked ? row.amount || 0 : 0), 0));
+    }
+
+    get left() {
+        return round3(this.state.data.amount - this.allocated);
+    }
+
+    get hasError() {
+        return this.left < -0.0005 || this.state.rows.some((row) => row.checked && row.amount > row.available + 0.0005);
+    }
+
+    toggle(row, ev) {
+        row.checked = ev.target.checked;
+        if (row.checked && !row.amount) {
+            row.amount = round3(Math.max(0, Math.min(row.available, this.left)));
+        }
+        if (!row.checked) {
+            row.amount = 0;
+        }
+    }
+
+    setAmount(row, ev) {
+        row.amount = round3(parseFloat(ev.target.value) || 0);
+        row.checked = row.amount > 0;
+    }
+
+    async save() {
+        const allocations = this.state.rows
+            .filter((row) => row.checked && row.amount > 0)
+            .map((row) => ({ number: row.number, amount: row.amount }));
+        await this.orm.call("myaccounting.customers", "save_receipt_allocation",
+            [this.props.moveId, this.props.customerId, allocations]);
+        this.notification.add(allocations.length ? "تم حفظ التخصيص." : "أُلغي التخصيص: السند يُوزَّع تلقائياً.",
+            { type: "success" });
+        await this.props.onSaved();
+        this.props.close();
+    }
+
+    async clear() {
+        await this.orm.call("myaccounting.customers", "save_receipt_allocation",
+            [this.props.moveId, this.props.customerId, []]);
+        this.notification.add("أُلغي التخصيص: السند يُوزَّع تلقائياً على الأقدم.", { type: "success" });
+        await this.props.onSaved();
+        this.props.close();
+    }
+}
 
 /**
  * صفحة العملاء: أرصدة الذمم، سجل الفواتير الصادرة بالترتيب الرقمي، وسندات القبض.
@@ -18,13 +112,19 @@ export class CustomersPage extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
+        // يمكن فتح الصفحة على تبويب معيّن (من مربعات الصفحة الرئيسية)
+        const context = (this.props.action && this.props.action.context) || {};
         this.state = useState({
             data: null,
             loading: true,
-            tab: "customers",
+            tab: context.customers_tab || (context.customer_id ? "all" : "customers"),
             search: "",
-            customerId: null,
+            customerId: context.customer_id || null,
             includeDrafts: false,
+            invoiceStatus: context.invoice_status || "all", // all | open | partial | paid
+            ledgerMonth: "", // فلتر شهر دفتر الأستاذ (نفس أزرار صفحة القيود)
+            ledgerYear: "",
             notesFilter: "open", // open | resolved | all
             resolvingKey: null,
             resolutionText: "",
@@ -35,13 +135,52 @@ export class CustomersPage extends Component {
     async loadData() {
         this.state.loading = true;
         this.state.data = await this.orm.call("myaccounting.customers", "get_customers_data", [],
-            { include_drafts: this.state.includeDrafts });
+            {
+                include_drafts: this.state.includeDrafts,
+                ledger_month: this.state.ledgerMonth || false,
+                ledger_year: this.state.ledgerYear || false,
+            });
         this.state.loading = false;
     }
 
     toggleDrafts(ev) {
         this.state.includeDrafts = ev.target.checked;
         this.loadData();
+    }
+
+    get currentYear() {
+        return new Date().getFullYear();
+    }
+
+    // أزرار الأشهر 1..12 للسنة الحالية، كما في صفحة القيود
+    get monthButtons() {
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    isMonthActive(month) {
+        return this.state.ledgerMonth === String(month) &&
+            this.state.ledgerYear === String(this.currentYear);
+    }
+
+    // الضغط على الشهر يفعّل الفلتر، والضغط عليه وهو مفعّل يلغيه
+    onMonthButton(month) {
+        if (this.isMonthActive(month)) {
+            this.state.ledgerMonth = "";
+            this.state.ledgerYear = "";
+        } else {
+            this.state.ledgerMonth = String(month);
+            this.state.ledgerYear = String(this.currentYear);
+        }
+        this.loadData();
+    }
+
+    // رصيد أول الشهر المحدد (للعميل المحدد أو لكل العملاء)
+    get openingBalance() {
+        const data = this.state.data;
+        if (!data || !this.state.ledgerMonth) {
+            return 0;
+        }
+        return this.selectedCustomer ? this.selectedCustomer.opening : data.totals.opening;
     }
 
     setTab(tab) {
@@ -120,7 +259,7 @@ export class CustomersPage extends Component {
             (a.date || "").localeCompare(b.date || "") ||
             kindOrder[a.kind] - kindOrder[b.kind] ||
             String(a.number || "").localeCompare(String(b.number || ""), undefined, { numeric: true }));
-        let balance = 0;
+        let balance = this.openingBalance;
         for (const row of rows) {
             balance += row.debit - row.credit;
             row.balance = balance;
@@ -133,15 +272,93 @@ export class CustomersPage extends Component {
         const rows = this.fullLedger;
         const debit = rows.reduce((sum, row) => sum + row.debit, 0);
         const credit = rows.reduce((sum, row) => sum + row.credit, 0);
-        return { debit, credit, balance: debit - credit };
+        return { debit, credit, balance: this.openingBalance + debit - credit };
     }
 
     get invoiceTotals() {
-        const invoiced = this.invoices.filter((inv) => inv.kind === "invoice")
+        const real = this.invoicesShown.filter((inv) => inv.kind === "invoice");
+        const invoiced = real.reduce((sum, inv) => sum + inv.amount, 0);
+        const returned = -this.invoicesShown.filter((inv) => inv.kind === "return")
             .reduce((sum, inv) => sum + inv.amount, 0);
-        const returned = -this.invoices.filter((inv) => inv.kind === "return")
-            .reduce((sum, inv) => sum + inv.amount, 0);
-        return { invoiced, returned, net: invoiced - returned };
+        return {
+            invoiced,
+            returned,
+            net: invoiced - returned,
+            collected: real.reduce((sum, inv) => sum + inv.collected, 0),
+            remaining: real.reduce((sum, inv) => sum + inv.remaining, 0),
+        };
+    }
+
+    // مطابقة: المتبقي على الفواتير − الدفعات غير المخصّصة = المستحق على العملاء.
+    // تظهر فقط دون بحث نصي أو فلتر شهر أو حالة "محصّلة/جزئي"، حتى تكون الأرقام قابلة للمقارنة.
+    get reconciliation() {
+        const data = this.state.data;
+        if (!data || this.state.search.trim() || this.state.ledgerMonth ||
+                !["all", "open"].includes(this.state.invoiceStatus)) {
+            return null;
+        }
+        const remaining = this.invoiceTotals.remaining;
+        const unapplied = this.receipts.reduce((sum, rec) => sum + (rec.unallocated || 0), 0);
+        const balance = this.selectedCustomer ? this.selectedCustomer.balance : data.totals.balance;
+        const other = balance - (remaining - unapplied);
+        if (Math.abs(unapplied) < 0.0005 && Math.abs(other) < 0.0005) {
+            return null; // لا فرق يحتاج توضيحاً
+        }
+        return { remaining, unapplied, other, balance };
+    }
+
+    // ------------------------------------------------------------------
+    // التحصيل: حالة كل فاتورة، وتخصيص السندات
+    // ------------------------------------------------------------------
+
+    // "غير محصّلة" تشمل الجزئية أيضاً (كل فاتورة عليها متبقٍّ)
+    statusMatches(inv, status) {
+        if (status === "all") {
+            return true;
+        }
+        if (inv.kind !== "invoice") {
+            return false;
+        }
+        return status === "open" ? ["open", "partial"].includes(inv.status) : inv.status === status;
+    }
+
+    get invoicesShown() {
+        return this.invoices.filter((inv) => this.statusMatches(inv, this.state.invoiceStatus));
+    }
+
+    get invoiceStatusCounts() {
+        const counts = {};
+        for (const status of ["all", "open", "partial", "paid"]) {
+            counts[status] = this.invoices.filter((inv) =>
+                (status === "all" ? inv.kind === "invoice" : this.statusMatches(inv, status))).length;
+        }
+        return counts;
+    }
+
+    statusLabel(status) {
+        return { open: "غير محصّلة", partial: "جزئي", paid: "محصّلة", returned: "ملغاة بمرتجع" }[status] || "";
+    }
+
+    statusClass(status) {
+        return {
+            open: "text-bg-danger",
+            partial: "text-bg-warning",
+            paid: "text-bg-success",
+            returned: "text-bg-secondary",
+        }[status] || "text-bg-light";
+    }
+
+    paymentsTitle(inv) {
+        return (inv.payments || []).map((p) =>
+            `${p.receipt}: ${fmt3(p.amount)}${p.manual ? "" : " (تلقائي)"}`).join("\n");
+    }
+
+    openAllocation(rec) {
+        this.dialog.add(ReceiptAllocationDialog, {
+            moveId: rec.move_id,
+            customerId: rec.customer_id,
+            onSaved: () => this.loadData(),
+        });
     }
 
     get receiptsTotal() {
@@ -193,6 +410,7 @@ export class CustomersPage extends Component {
             invoice_no_number: "fa-hashtag",
             return_unmatched: "fa-undo",
             missing_receipt: "fa-question-circle",
+            receipt_unallocated: "fa-link",
             credit_balance: "fa-exchange",
         }[kind] || "fa-exclamation-triangle";
     }

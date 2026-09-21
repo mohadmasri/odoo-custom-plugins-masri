@@ -1,0 +1,144 @@
+/* صفحة التقارير */
+.o_reports_page .o_rep_cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    max-width: 1300px;
+}
+
+.o_reports_page .o_rep_kpi,
+.o_reports_page .o_rep_card {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.o_reports_page .o_rep_kpi {
+    padding: 12px 16px;
+}
+
+.o_reports_page .o_rep_kpi_label {
+    font-size: 12px;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_reports_page .o_rep_kpi_value {
+    font-size: 22px;
+    font-weight: 700;
+    direction: ltr;
+    text-align: right;
+}
+
+.o_reports_page .o_rep_section {
+    margin: 22px 0 12px;
+    font-weight: 600;
+}
+
+.o_reports_page .o_rep_grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    max-width: 1300px;
+}
+
+.o_reports_page .o_rep_card {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.o_reports_page .o_rep_wide {
+    grid-column: 1 / -1;
+}
+
+.o_reports_page .o_rep_card_head {
+    margin-bottom: 8px;
+}
+
+.o_reports_page .o_rep_card_title {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.o_reports_page .o_rep_num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: var(--o-surface-2, #eef3fb);
+    font-size: 11px;
+    margin-inline-end: 6px;
+}
+
+.o_reports_page .o_rep_card_hint {
+    font-size: 12px;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_reports_page .o_rep_canvas {
+    position: relative;
+    height: 300px;
+}
+
+.o_reports_page .o_rep_empty {
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--gray-500, #adb5bd);
+    padding: 0 24px;
+}
+
+@media (max-width: 900px) {
+    .o_reports_page .o_rep_grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* زر التثبيت في الصفحة الرئيسية */
+.o_reports_page .o_rep_pin {
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.15));
+    color: var(--gray-600, #6c757d);
+    white-space: nowrap;
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+.o_reports_page .o_rep_pin:hover {
+    border-color: #8E44AD;
+    color: #8E44AD;
+}
+
+.o_reports_page .o_rep_pin.o_rep_pinned {
+    background-color: #8E44AD;
+    border-color: #8E44AD;
+    color: #fff;
+}
+
+.o_reports_page .o_rep_pin_help {
+    color: var(--gray-600, #6c757d);
+}
+
+/* قسم التقارير في الصفحة الرئيسية */
+.o_home_reports {
+    margin-top: 24px;
+    max-width: 1200px;
+}
+
+.o_home_reports .o_rep_grid {
+    max-width: 1200px;
+}
+
+.o_home_reports .o_rep_empty_home {
+    border: 1px dashed var(--o-surface-border, rgba(0, 0, 0, 0.2));
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    color: var(--gray-600, #6c757d);
+}

@@ -27,6 +27,11 @@
         <field name="tag">my_accounting.customers</field>
     </record>
 
+    <record id="action_myaccounting_reports" model="ir.actions.client">
+        <field name="name">التقارير</field>
+        <field name="tag">my_accounting.reports</field>
+    </record>
+
     <record id="action_myaccounting_trial_balance" model="ir.actions.client">
         <field name="name">ميزان المراجعة</field>
         <field name="tag">my_accounting.trial_balance</field>

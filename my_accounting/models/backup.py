@@ -54,6 +54,12 @@ class MyAccountingBackup(models.AbstractModel):
                 'import_notes_reviewed': move.import_notes_reviewed,
                 'currency_code': move.currency_id.name or None,
                 'company_name': move.company_id.name or None,
+                'allocations': [{
+                    'customer_id': allocation.customer_id.id,
+                    'invoice_number': allocation.invoice_number,
+                    'amount': allocation.amount,
+                } for allocation in self.env['myaccounting.receipt.allocation'].search(
+                    [('receipt_move_id', '=', move.id)])],
                 'lines': [{
                     'sequence': line.sequence,
                     'account_id': line.account_id.id,
@@ -171,7 +177,17 @@ class MyAccountingBackup(models.AbstractModel):
             company_id = self._resolve_company_id(mv.get('company_name'))
             if company_id:
                 move_vals['company_id'] = company_id
-            Move.create(move_vals)
+            new_move = Move.create(move_vals)
+            # تخصيص سند القبض لفواتير (غير موجود في النسخ القديمة)
+            for allocation in mv.get('allocations') or []:
+                customer_id = account_id_map.get(allocation.get('customer_id'))
+                if customer_id and allocation.get('invoice_number') and allocation.get('amount'):
+                    self.env['myaccounting.receipt.allocation'].create({
+                        'receipt_move_id': new_move.id,
+                        'customer_id': customer_id,
+                        'invoice_number': allocation['invoice_number'],
+                        'amount': allocation['amount'],
+                    })
 
         # حلول ملاحظات المراجعة (النسخ القديمة لا تحتويها؛ عندها تبقى الحلول الحالية كما هي)
         if 'review_notes' in data:

@@ -88,3 +88,8 @@
     border-radius: 6px;
     padding: 6px 10px;
 }
+
+/* أسطر المطابقة تحت إجمالي سجل الفواتير */
+.o_customers_page .o_cust_table tfoot tr.o_cust_reconcile td {
+    background-color: rgba(23, 162, 184, 0.08);
+}

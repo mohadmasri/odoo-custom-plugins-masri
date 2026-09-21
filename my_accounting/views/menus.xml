@@ -34,6 +34,10 @@
               parent="menu_myaccounting_root" sequence="42"
               action="action_myaccounting_customers"/>
 
+    <menuitem id="menu_myaccounting_reports" name="تقارير"
+              parent="menu_myaccounting_root" sequence="43"
+              action="action_myaccounting_reports"/>
+
     <menuitem id="menu_myaccounting_trial_balance" name="ميزان المراجعة"
               parent="menu_myaccounting_root" sequence="45"
               action="action_myaccounting_trial_balance"/>

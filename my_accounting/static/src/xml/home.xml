@@ -72,15 +72,23 @@
                 </div>
 
                 <t t-foreach="statBoxes" t-as="box" t-key="box.key">
-                    <div class="o_home_stat" t-att-style="'grid-area: ' + box.key">
+                    <div class="o_home_stat" t-att-style="'grid-area: ' + box.key"
+                         t-on-click="() => this.openStat(box)">
                         <div class="o_home_stat_icon" t-attf-style="color: {{ box.color }};">
                             <i t-attf-class="fa {{ box.icon }}"/>
                         </div>
                         <div class="o_home_stat_title" t-esc="box.title"/>
-                        <div class="o_home_stat_value">$$$</div>
+                        <div class="o_home_stat_value" t-attf-style="color: {{ box.color }};">
+                            <t t-if="state.stats" t-esc="box.value(state.stats)"/>
+                            <t t-else="">—</t>
+                        </div>
+                        <div t-if="state.stats" class="o_home_stat_hint" t-esc="box.hint(state.stats)"/>
                     </div>
                 </t>
             </div>
+
+            <!-- التقارير التي اختارها المستخدم من صفحة التقارير (📌) -->
+            <HomeReports/>
         </div>
     </t>
 
