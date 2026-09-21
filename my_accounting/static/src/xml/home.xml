@@ -1,104 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
+    <t t-name="my_accounting.HomeNavCard">
+        <div class="o_home_nav" t-att-style="'grid-area: ' + area" t-on-click="card.action">
+            <div class="o_myaccounting_home_icon" t-attf-style="background-color: {{ card.color }}1a; color: {{ card.color }};">
+                <i t-attf-class="fa {{ card.icon }}"/>
+            </div>
+            <div class="o_myaccounting_home_title" t-esc="card.title"/>
+            <div class="o_myaccounting_home_desc" t-esc="card.desc"/>
+        </div>
+    </t>
+
     <t t-name="my_accounting.Home">
         <div class="o_myaccounting_home p-4" style="overflow:auto; height:100%;">
             <div class="mb-4">
                 <h2 class="m-0">المحاسبة المخصصة</h2>
-                <div class="text-muted small mt-1">اختر من القائمة أدناه للبدء</div>
             </div>
-            <t t-if="state.data">
-                <div class="o_home_kpis mb-4">
-                    <div class="o_home_kpi">
-                        <div class="o_home_kpi_label">قيود الشهر <bdi t-esc="state.data.month_label"/></div>
-                        <div class="o_home_kpi_value" t-esc="state.data.month.moves"/>
-                        <div class="o_home_kpi_sub">
-                            و<t t-esc="state.data.month.receipts"/> سند قبض •
-                            مجموع الحركة <bdi t-esc="fmt(state.data.month.debit)"/>
+
+            <!-- التخطيط مطابق للنموذج: بطاقات التنقل يساراً، قائمة التذكير يميناً،
+                 وأربعة مربعات مؤشرات في الأسفل -->
+            <div class="o_home_layout">
+                <t t-call="my_accounting.HomeNavCard">
+                    <t t-set="card" t-value="navCards.newMove"/><t t-set="area" t-value="'newmove'"/>
+                </t>
+                <t t-call="my_accounting.HomeNavCard">
+                    <t t-set="card" t-value="navCards.moves"/><t t-set="area" t-value="'moves'"/>
+                </t>
+                <t t-call="my_accounting.HomeNavCard">
+                    <t t-set="card" t-value="navCards.accounts"/><t t-set="area" t-value="'accounts'"/>
+                </t>
+                <t t-call="my_accounting.HomeNavCard">
+                    <t t-set="card" t-value="navCards.ledger"/><t t-set="area" t-value="'ledger'"/>
+                </t>
+
+                <div class="o_home_todo" style="grid-area: todo;">
+                    <div class="o_home_todo_head">
+                        <div>
+                            <div class="o_home_todo_title"><i class="fa fa-bell-o me-2"/>قائمة التذكير</div>
+                            <div class="o_home_todo_sub">to do list</div>
                         </div>
+                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.openTodoApp()">
+                            فتح تطبيق المهام
+                        </button>
                     </div>
-                    <div class="o_home_kpi" t-on-click="() => this.openMoves()" style="cursor:pointer;">
-                        <div class="o_home_kpi_label">تحتاج انتباهاً</div>
-                        <div class="o_home_kpi_value"
-                             t-esc="state.data.attention.draft + state.data.attention.incomplete + state.data.attention.unbalanced"/>
-                        <div class="o_home_kpi_sub">
-                            <span t-if="state.data.attention.draft" class="badge text-bg-secondary me-1">
-                                <t t-esc="state.data.attention.draft"/> مسودة</span>
-                            <span t-if="state.data.attention.incomplete" class="badge text-bg-warning me-1">
-                                <t t-esc="state.data.attention.incomplete"/> غير مكتمل</span>
-                            <span t-if="state.data.attention.unbalanced" class="badge text-bg-danger me-1">
-                                <t t-esc="state.data.attention.unbalanced"/> غير متوازن</span>
-                            <span t-if="state.data.attention.notes" class="badge text-bg-info">
-                                <t t-esc="state.data.attention.notes"/> ملاحظات استيراد</span>
-                            <span t-if="!state.data.attention.draft and !state.data.attention.incomplete and !state.data.attention.unbalanced and !state.data.attention.notes"
-                                  class="text-success">كل شيء مرحّل ومتوازن</span>
+                    <t t-if="state.todosAllowed">
+                        <div class="o_home_todo_add">
+                            <input type="text" class="form-control form-control-sm"
+                                   placeholder="أضف تذكيراً جديداً ثم اضغط Enter"
+                                   t-att-value="state.newTodo"
+                                   t-on-input="(ev) => { state.newTodo = ev.target.value; }"
+                                   t-on-keydown="(ev) => this.onTodoKeydown(ev)"/>
+                            <button class="btn btn-sm btn-primary" t-on-click="() => this.addTodo()">
+                                <i class="fa fa-plus"/>
+                            </button>
                         </div>
-                    </div>
-                    <div class="o_home_kpi">
-                        <div class="o_home_kpi_label">الإجمالي في النظام</div>
-                        <div class="o_home_kpi_value" t-esc="state.data.totals.moves + state.data.totals.receipts"/>
-                        <div class="o_home_kpi_sub">
-                            <t t-esc="state.data.totals.moves"/> قيد •
-                            <t t-esc="state.data.totals.receipts"/> سند •
-                            <t t-esc="state.data.totals.accounts"/> حساب
+                        <div class="o_home_todo_list">
+                            <div t-if="!state.todos.length" class="text-muted text-center py-4 small">
+                                لا توجد تذكيرات حالياً
+                            </div>
+                            <div t-foreach="state.todos" t-as="todo" t-key="todo.id" class="o_home_todo_item">
+                                <input type="checkbox" class="form-check-input" title="تم الإنجاز"
+                                       t-on-change="() => this.completeTodo(todo)"/>
+                                <i t-if="todo.starred" class="fa fa-star text-warning"/>
+                                <span t-esc="todo.name"/>
+                            </div>
                         </div>
+                    </t>
+                    <div t-else="" class="text-muted text-center py-4 small">
+                        لا تملك صلاحية تطبيق المهام.
                     </div>
                 </div>
 
-                <div class="o_home_panels mb-4">
-                    <div class="o_home_panel">
-                        <div class="o_home_panel_head">
-                            <span><i class="fa fa-balance-scale me-2"/>أرصدة الحسابات الرئيسية</span>
-                            <button class="btn btn-sm btn-link p-0" t-on-click="() => this.openAccountTree()">
-                                شجرة الحسابات
-                            </button>
+                <t t-foreach="statBoxes" t-as="box" t-key="box.key">
+                    <div class="o_home_stat" t-att-style="'grid-area: ' + box.key">
+                        <div class="o_home_stat_icon" t-attf-style="color: {{ box.color }};">
+                            <i t-attf-class="fa {{ box.icon }}"/>
                         </div>
-                        <table class="table table-sm mb-0">
-                            <tbody>
-                                <tr t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <td style="width:60px;" class="text-muted" t-esc="acc.code"/>
-                                    <td t-esc="acc.name"/>
-                                    <td t-attf-class="text-end {{ balanceClass(acc.balance) }}"
-                                        t-esc="fmt(acc.balance)"/>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="o_home_panel">
-                        <div class="o_home_panel_head">
-                            <span><i class="fa fa-history me-2"/>آخر القيود</span>
-                            <button class="btn btn-sm btn-link p-0" t-on-click="() => this.openMoves()">
-                                كل القيود
-                            </button>
-                        </div>
-                        <table class="table table-sm table-hover mb-0">
-                            <tbody>
-                                <tr t-foreach="state.data.recent" t-as="rec" t-key="rec.id"
-                                    style="cursor:pointer;" t-on-click="() => this.openMove(rec.id)">
-                                    <td style="width:90px;">
-                                        <strong t-esc="rec.name"/>
-                                        <span t-if="rec.is_receipt" class="badge text-bg-info ms-1"
-                                              style="font-size:9px;">سند</span>
-                                    </td>
-                                    <td class="text-muted small" t-esc="rec.date"/>
-                                    <td class="small text-truncate" style="max-width:160px;" t-esc="rec.journal"/>
-                                    <td class="text-end" t-esc="fmt(rec.total)"/>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </t>
-
-            <div class="o_myaccounting_home_grid">
-                <t t-foreach="cards" t-as="card" t-key="card.title">
-                    <div class="o_myaccounting_home_card" t-on-click="card.action">
-                        <div class="o_myaccounting_home_icon" t-attf-style="background-color: {{ card.color }}1a; color: {{ card.color }};">
-                            <i t-attf-class="fa {{ card.icon }}"/>
-                        </div>
-                        <div class="o_myaccounting_home_title" t-esc="card.title"/>
-                        <div class="o_myaccounting_home_desc" t-esc="card.desc"/>
+                        <div class="o_home_stat_title" t-esc="box.title"/>
+                        <div class="o_home_stat_value">$$$</div>
                     </div>
                 </t>
             </div>

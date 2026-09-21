@@ -3,11 +3,33 @@
 
     <t t-name="my_accounting.Settings">
         <div class="o_myaccounting_settings p-4" style="overflow:auto; height:100%;">
-            <div class="mb-4">
+            <div class="mb-3">
                 <h2 class="m-0">إعدادات أخرى</h2>
                 <div class="text-muted small mt-1">إعدادات ووظائف إضافية للنظام</div>
             </div>
 
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'backup' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('backup')">
+                        <i class="fa fa-database me-1"/> النسخ الاحتياطي
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'journals' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('journals')">
+                        <i class="fa fa-list-ul me-1"/> اليوميات
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'system' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('system')">
+                        <i class="fa fa-power-off me-1"/> النظام
+                    </a>
+                </li>
+            </ul>
+
+            <t t-if="state.activeTab === 'backup'">
             <div class="o_settings_section mb-4">
                 <div class="o_settings_section_header">
                     <i class="fa fa-database me-2"/>
@@ -110,6 +132,9 @@
                 </div>
             </div>
 
+            </t>
+
+            <t t-if="state.activeTab === 'journals'">
             <div class="o_settings_section mb-4">
                 <div class="o_settings_section_header">
                     <i class="fa fa-list-ul me-2"/>
@@ -156,6 +181,47 @@
                     </table>
                 </div>
             </div>
+            </t>
+
+            <t t-if="state.activeTab === 'system'">
+            <div class="o_settings_section mb-4">
+                <div class="o_settings_section_header">
+                    <i class="fa fa-power-off me-2"/>
+                    <span>إعادة تشغيل النظام</span>
+                </div>
+                <div class="o_settings_section_body">
+                    <div class="alert alert-warning py-2 px-3 small">
+                        إعادة التشغيل توقف النظام لدقيقة تقريباً وتُخرج كل المستخدمين المتصلين.
+                        استخدمها عند بطء النظام أو بعد تغييرات في الإعدادات. احفظ أي قيد مفتوح أولاً.
+                    </div>
+                    <div class="o_settings_row">
+                        <div class="o_settings_row_text">
+                            <div class="o_settings_row_title">تأكيد الهوية</div>
+                            <div class="o_settings_row_desc text-muted small">
+                                أدخل كلمة مرور حسابك الحالي. تُطلب في كل مرة ولا تُحفظ.
+                            </div>
+                        </div>
+                        <div class="d-flex" style="gap: 8px;">
+                            <input type="password" class="form-control form-control-sm" style="width:200px;"
+                                   autocomplete="off" placeholder="كلمة المرور"
+                                   t-att-disabled="state.rebooting"
+                                   t-att-value="state.rebootPassword"
+                                   t-on-input="(ev) => { state.rebootPassword = ev.target.value; }"/>
+                            <button class="btn btn-sm btn-danger text-nowrap"
+                                    t-att-disabled="state.rebooting or !state.rebootPassword"
+                                    t-on-click="() => this.askReboot()">
+                                <i class="fa fa-power-off me-1"/>
+                                <t t-if="state.rebooting">جارٍ إعادة التشغيل...</t>
+                                <t t-else="">إعادة تشغيل النظام</t>
+                            </button>
+                        </div>
+                    </div>
+                    <div t-if="state.rebooting" class="alert alert-info py-2 px-3 small mt-3 mb-0">
+                        جارٍ إعادة تشغيل الخادم... ستُحدَّث هذه الصفحة تلقائياً فور عودته.
+                    </div>
+                </div>
+            </div>
+            </t>
         </div>
     </t>
 

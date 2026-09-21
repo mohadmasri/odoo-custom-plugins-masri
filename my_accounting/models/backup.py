@@ -1,10 +1,14 @@
 import logging
 import os
+import subprocess
+import sys
+import textwrap
 from datetime import datetime
 
 import odoo.service.db
-from odoo import api, models
-from odoo.exceptions import UserError
+
+from odoo import api, fields, models
+from odoo.exceptions import AccessDenied, AccessError, UserError
 from odoo.tools import config as odoo_config
 
 _logger = logging.getLogger(__name__)
@@ -43,6 +47,7 @@ class MyAccountingBackup(models.AbstractModel):
                 'ref': move.ref or '',
                 'journal': move.journal or '',
                 'state': move.state,
+                'move_type': move.move_type,
                 'ledger_month': move.ledger_month,
                 'ledger_year': move.ledger_year,
                 'import_notes': move.import_notes or '',
@@ -58,6 +63,14 @@ class MyAccountingBackup(models.AbstractModel):
                     'credit': line.credit,
                 } for line in move.line_ids],
             } for move in moves],
+            'review_notes': [{
+                'key': note.key,
+                'kind': note.kind or '',
+                'title': note.title or '',
+                'resolution': note.resolution,
+                'resolved_by': note.resolved_by.login or None,
+                'resolved_on': fields.Datetime.to_string(note.resolved_on) if note.resolved_on else None,
+            } for note in self.env['myaccounting.review.note'].search([], order='id')],
         }
 
     def _resolve_currency_id(self, currency_code):
@@ -146,6 +159,8 @@ class MyAccountingBackup(models.AbstractModel):
             if mv.get('import_notes'):
                 move_vals['import_notes'] = mv['import_notes']
                 move_vals['import_notes_reviewed'] = mv.get('import_notes_reviewed', False)
+            if mv.get('move_type'):
+                move_vals['move_type'] = mv['move_type']
             if mv.get('ledger_month'):
                 move_vals['ledger_month'] = mv['ledger_month']
             if mv.get('ledger_year'):
@@ -157,6 +172,24 @@ class MyAccountingBackup(models.AbstractModel):
             if company_id:
                 move_vals['company_id'] = company_id
             Move.create(move_vals)
+
+        # حلول ملاحظات المراجعة (النسخ القديمة لا تحتويها؛ عندها تبقى الحلول الحالية كما هي)
+        if 'review_notes' in data:
+            Note = self.env['myaccounting.review.note']
+            Note.search([]).unlink()
+            for note in data['review_notes']:
+                if not note.get('key') or not note.get('resolution'):
+                    continue
+                user = self.env['res.users'].search([('login', '=', note.get('resolved_by'))], limit=1) \
+                    if note.get('resolved_by') else False
+                Note.create({
+                    'key': note['key'],
+                    'kind': note.get('kind') or False,
+                    'title': note.get('title') or False,
+                    'resolution': note['resolution'],
+                    'resolved_by': (user or self.env.user).id,
+                    'resolved_on': note.get('resolved_on') or fields.Datetime.now(),
+                })
 
         return {
             'accounts_count': len(data['accounts']),
@@ -268,3 +301,76 @@ class MyAccountingBackup(models.AbstractModel):
             params.set_param(keys['last_status'], status)
             _logger.exception('my_accounting: auto backup failed')
             return {'success': False, 'error': str(error), 'status': status}
+
+    # ========================================================================
+    # إعادة تشغيل الخادم من داخل النظام
+    # ========================================================================
+
+    @api.model
+    def restart_server(self, password):
+        """يعيد تشغيل خادم أودو بعد التحقق من كلمة مرور المستخدم الحالي.
+
+        متاحة لمدير النظام فقط، ويُطلب إدخال كلمة المرور في كل مرة."""
+        if not self.env.user.has_group('base.group_system'):
+            raise AccessError('إعادة تشغيل النظام متاحة لمدير النظام فقط.')
+        if not password:
+            raise UserError('أدخل كلمة المرور لتأكيد إعادة التشغيل.')
+
+        user = self.env.user
+        credential = {'login': user.login, 'password': password, 'type': 'password'}
+        try:
+            user._check_credentials(credential, {'interactive': True})
+        except AccessDenied:
+            raise UserError('كلمة المرور غير صحيحة.') from None
+
+        _logger.warning('my_accounting: server restart requested by %s (uid=%s)', user.login, user.id)
+        return self._restart_now()
+
+    def _restart_now(self):
+        """يعيد تشغيل الخادم فعلياً. لا يتحقق من شيء، فلا تُستدعى مباشرة
+        من الواجهة؛ استخدم restart_server التي تتحقق من الصلاحية وكلمة المرور.
+
+        لا نستخدم odoo.service.server.restart() لأنها على ويندوز توقف الخادم
+        دون أن تعيده. بدلاً منها نشغّل عملية مستقلة تنتظر ثانيتين (ليصل الرد
+        إلى المتصفح)، ثم توقف كل عمليات أودو وتشغّل خادماً جديداً بنفس
+        سطر الأوامر. ننتظر قليلاً قبل الإيقاف حتى تُحفظ المعاملة الحالية."""
+        command = [sys.executable] + list(sys.argv)
+        workdir = os.getcwd()
+        log_path = os.path.join(workdir, 'server.log')
+        helper_path = os.path.join(odoo_config['data_dir'], 'my_accounting_restart.py')
+
+        # نوقف كل عمليات أودو (الجذر وأبناءه)؛ ملف المساعد نفسه لا يحوي
+        # "odoo-bin" في سطر أوامره فلا يوقف نفسه.
+        helper_code = textwrap.dedent(f"""
+            import os, subprocess, time
+
+            time.sleep(3)
+            if os.name == 'nt':
+                subprocess.run([
+                    'powershell', '-NoProfile', '-Command',
+                    "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+                    "Where-Object {{ $_.CommandLine -like '*odoo-bin*' }} | "
+                    "ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}",
+                ], capture_output=True)
+            else:
+                subprocess.run(['pkill', '-f', 'odoo-bin'], capture_output=True)
+            time.sleep(4)
+            kwargs = {{'cwd': {workdir!r}, 'close_fds': True}}
+            if os.name == 'nt':
+                kwargs['creationflags'] = 0x00000008 | 0x00000200
+            else:
+                kwargs['start_new_session'] = True
+            with open({log_path!r}, 'ab') as log:
+                subprocess.Popen({command!r}, stdout=log, stderr=log, **kwargs)
+        """)
+        with open(helper_path, 'w', encoding='utf-8') as helper_file:
+            helper_file.write(helper_code)
+
+        popen_kwargs = {'cwd': workdir, 'close_fds': True}
+        if os.name == 'nt':
+            popen_kwargs['creationflags'] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | NEW_GROUP
+        else:
+            popen_kwargs['start_new_session'] = True
+        subprocess.Popen([sys.executable, helper_path], **popen_kwargs)
+        _logger.warning('my_accounting: restart helper launched (%s)', helper_path)
+        return {'success': True}

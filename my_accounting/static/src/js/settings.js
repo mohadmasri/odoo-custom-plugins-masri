@@ -15,6 +15,9 @@ export class MyAccountingSettings extends Component {
         this.dialogService = useService("dialog");
         this.fileInputRef = useRef("fileInput");
         this.state = useState({
+            activeTab: "backup",
+            rebootPassword: "",
+            rebooting: false,
             restoring: false,
             journals: [],
             backup: null,
@@ -22,6 +25,76 @@ export class MyAccountingSettings extends Component {
             runningBackup: false,
         });
         onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig()]));
+    }
+
+    setTab(tab) {
+        this.state.activeTab = tab;
+    }
+
+    // ------------------------------------------------------------------
+    // إعادة تشغيل النظام (تتطلب كلمة المرور في كل مرة)
+    // ------------------------------------------------------------------
+
+    askReboot() {
+        if (!this.state.rebootPassword) {
+            this.notification.add("أدخل كلمة المرور أولاً.", { type: "warning" });
+            return;
+        }
+        this.dialogService.add(ConfirmationDialog, {
+            title: "إعادة تشغيل النظام",
+            body: "سيتوقف النظام عن العمل لدقيقة تقريباً وسيخرج كل المستخدمين المتصلين. " +
+                  "تأكد من حفظ أي قيد مفتوح. هل تريد المتابعة؟",
+            confirmLabel: "نعم، أعد التشغيل",
+            confirmClass: "btn-danger",
+            confirm: () => this.doReboot(),
+            cancel: () => {},
+        });
+    }
+
+    async doReboot() {
+        const password = this.state.rebootPassword;
+        this.state.rebooting = true;
+        try {
+            await this.orm.call("myaccounting.backup", "restart_server", [password]);
+        } catch (error) {
+            // كلمة مرور خاطئة أو صلاحية ناقصة: نُظهر السبب ونتوقف
+            const message = (error.data && error.data.message) || error.message || "";
+            if (message.includes("كلمة المرور") || message.includes("مدير النظام")) {
+                this.state.rebooting = false;
+                this.state.rebootPassword = "";
+                this.notification.add(message, { type: "danger", sticky: true });
+                return;
+            }
+            // انقطاع الاتصال متوقّع لأن الخادم يُعاد تشغيله أثناء الرد
+        }
+        this.state.rebootPassword = "";
+        this.notification.add("جارٍ إعادة تشغيل النظام... ستُحدَّث الصفحة تلقائياً.", { type: "info" });
+        await this.waitForServer();
+    }
+
+    // ننتظر عودة الخادم ثم نحدّث الصفحة
+    async waitForServer() {
+        const started = Date.now();
+        while (Date.now() - started < 180000) {
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            try {
+                const response = await fetch("/web/webclient/version_info", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ jsonrpc: "2.0", method: "call", params: {} }),
+                });
+                if (response.ok) {
+                    window.location.reload();
+                    return;
+                }
+            } catch (error) {
+                // الخادم ما زال متوقفاً
+            }
+        }
+        this.state.rebooting = false;
+        this.notification.add(
+            "لم يعد الخادم خلال 3 دقائق. حدّث الصفحة يدوياً أو راجع ملف server.log.",
+            { type: "danger", sticky: true });
     }
 
     // ------------------------------------------------------------------

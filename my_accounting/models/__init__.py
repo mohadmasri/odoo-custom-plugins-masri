@@ -1,5 +1,7 @@
 from . import account_account
 from . import journal
+from . import customers
+from . import review_note
 from . import account_move
 from . import backup
 from . import user_admin

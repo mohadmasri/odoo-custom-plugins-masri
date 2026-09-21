@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from markupsafe import Markup, escape
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 
 def normalize_account_key(value):
@@ -238,59 +238,40 @@ class MyAccountingMove(models.Model):
         except Exception:  # noqa: BLE001 - لا نمنع إقلاع الخادم بسبب القوائم
             self.env.cr.rollback()
 
+    # ========================================================================
+    # قائمة التذكير في الصفحة الرئيسية (مرتبطة بتطبيق المهام To-do في أودو)
+    # ========================================================================
+
+    TODO_DOMAIN_OPEN = [('project_id', '=', False), ('state', 'not in', ['1_done', '1_canceled'])]
+
     @api.model
-    def get_home_dashboard(self):
-        """مؤشرات الصفحة الرئيسية: حركة الشهر الحالي، ما يحتاج انتباهاً،
-        أرصدة الحسابات الرئيسية، وآخر القيود."""
-        today = fields.Date.context_today(self)
-        month_domain = [('ledger_year', '=', today.year), ('ledger_month', '=', str(today.month))]
-        month_moves = self.search(month_domain)
-
-        accounts = self.env['myaccounting.account'].search(
-            [('parent_id', '=', False)], order='ledger_sequence, code')
-        balances = {account.id: 0.0 for account in accounts}
-        groups = self.env['myaccounting.move.line']._read_group(
-            [('move_id.state', '=', 'posted'), ('account_id', '!=', False)],
-            ['account_id'], ['debit:sum', 'credit:sum'])
-        for account, debit, credit in groups:
-            root_id = int((account.parent_path or str(account.id)).split('/')[0])
-            if root_id in balances:
-                balances[root_id] += (debit or 0.0) - (credit or 0.0)
-
+    def get_home_todos(self):
+        """مهام المستخدم الشخصية غير المنجزة (نفس مهام تطبيق To-do)."""
+        try:
+            tasks = self.env['project.task'].search(
+                self.TODO_DOMAIN_OPEN + [('user_ids', 'in', [self.env.uid])],
+                order='priority desc, id desc', limit=50)
+        except AccessError:
+            return {'allowed': False, 'items': []}
         return {
-            'month_label': f'{today.month:02d}/{today.year}',
-            'month': {
-                'moves': len(month_moves.filtered(lambda move: move.move_type == 'entry')),
-                'receipts': len(month_moves.filtered(lambda move: move.move_type == 'receipt')),
-                'debit': sum(month_moves.mapped('total_debit')),
-            },
-            'attention': {
-                'draft': self.search_count([('state', '=', 'draft')]),
-                'incomplete': self.search_count([('state', '=', 'incomplete')]),
-                'unbalanced': self.search_count([('is_balanced', '=', False)]),
-                'notes': self.search_count([('has_import_notes', '=', True)]),
-            },
-            'totals': {
-                'moves': self.search_count([('move_type', '=', 'entry')]),
-                'receipts': self.search_count([('move_type', '=', 'receipt')]),
-                'accounts': self.env['myaccounting.account'].search_count([]),
-            },
-            'accounts': [{
-                'id': account.id,
-                'code': account.code,
-                'name': account.name,
-                'balance': balances.get(account.id, 0.0),
-            } for account in accounts],
-            'recent': [{
-                'id': move.id,
-                'name': move.name,
-                'date': move.date and move.date.isoformat(),
-                'journal': move.journal or '',
-                'total': move.total_debit,
-                'state': move.state,
-                'is_receipt': move.move_type == 'receipt',
-            } for move in self.search([], order='id desc', limit=6)],
+            'allowed': True,
+            'items': [{'id': task.id, 'name': task.name, 'starred': task.priority == '1'} for task in tasks],
         }
+
+    @api.model
+    def add_home_todo(self, name):
+        name = (name or '').strip()
+        if not name:
+            raise UserError('اكتب نص التذكير أولاً.')
+        self.env['project.task'].create({'name': name, 'user_ids': [(4, self.env.uid)]})
+        return self.get_home_todos()
+
+    @api.model
+    def done_home_todo(self, task_id):
+        task = self.env['project.task'].browse(task_id).exists()
+        if task and self.env.uid in task.user_ids.ids:
+            task.state = '1_done'
+        return self.get_home_todos()
 
     @api.model
     def action_new_from_journal(self, journal):

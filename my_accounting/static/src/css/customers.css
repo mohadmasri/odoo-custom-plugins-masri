@@ -1,0 +1,90 @@
+/* صفحة العملاء */
+.o_customers_page .o_cust_totals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    max-width: 1100px;
+}
+
+.o_customers_page .o_cust_total {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    padding: 12px 16px;
+}
+
+.o_customers_page .o_cust_total_label {
+    font-size: 12px;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_customers_page .o_cust_total_value {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.o_customers_page .o_cust_search_icon {
+    position: absolute;
+    inset-inline-start: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500, #adb5bd);
+    pointer-events: none;
+}
+
+.o_customers_page .o_cust_selected {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    background-color: var(--o-surface-2, #eef3fb);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 10px;
+    padding: 12px 16px;
+    max-width: 1100px;
+}
+
+.o_customers_page .o_cust_table {
+    max-width: 1100px;
+}
+
+.o_customers_page .o_cust_table thead th,
+.o_customers_page .o_cust_table tfoot td {
+    background-color: var(--o-surface-2, #f2f2f2);
+}
+
+.o_customers_page .o_cust_return td {
+    background-color: rgba(220, 53, 69, 0.06);
+}
+
+.o_customers_page .o_cust_receipt td {
+    background-color: rgba(40, 167, 69, 0.06);
+}
+
+/* تبويب الملاحظات */
+.o_customers_page .o_cust_notes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 1100px;
+}
+
+.o_customers_page .o_cust_note {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-inline-start: 4px solid #f0ad4e;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.o_customers_page .o_cust_note_resolved {
+    border-inline-start-color: #28a745;
+    opacity: 0.85;
+}
+
+.o_customers_page .o_cust_note_resolution {
+    background-color: rgba(40, 167, 69, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+}

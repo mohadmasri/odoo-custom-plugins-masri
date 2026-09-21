@@ -30,6 +30,10 @@
               parent="menu_myaccounting_root" sequence="40"
               action="action_myaccounting_general_ledger"/>
 
+    <menuitem id="menu_myaccounting_customers" name="عملاء"
+              parent="menu_myaccounting_root" sequence="42"
+              action="action_myaccounting_customers"/>
+
     <menuitem id="menu_myaccounting_trial_balance" name="ميزان المراجعة"
               parent="menu_myaccounting_root" sequence="45"
               action="action_myaccounting_trial_balance"/>

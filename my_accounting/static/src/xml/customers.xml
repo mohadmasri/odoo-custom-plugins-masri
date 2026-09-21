@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.Customers">
+        <div class="o_customers_page p-3" style="overflow:auto; height:100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="m-0">العملاء</h2>
+                    <div class="text-muted small mt-1">
+                        الفواتير الصادرة وأرصدة الذمم — رصيد العميل = إجمالي المدين − إجمالي الدائن على حسابه
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
+
+            <t t-if="!state.loading and state.data">
+                <div class="o_cust_totals mb-3">
+                    <div class="o_cust_total">
+                        <div class="o_cust_total_label">إجمالي الفواتير</div>
+                        <div class="o_cust_total_value" t-esc="fmt(state.data.totals.invoiced)"/>
+                    </div>
+                    <div class="o_cust_total">
+                        <div class="o_cust_total_label">المرتجعات</div>
+                        <div class="o_cust_total_value" t-esc="fmt(state.data.totals.returned)"/>
+                    </div>
+                    <div class="o_cust_total">
+                        <div class="o_cust_total_label">المحصّل (سندات القبض)</div>
+                        <div class="o_cust_total_value text-success" t-esc="fmt(state.data.totals.collected)"/>
+                    </div>
+                    <div class="o_cust_total">
+                        <div class="o_cust_total_label">المستحق على العملاء</div>
+                        <div class="o_cust_total_value text-danger" t-esc="fmt(state.data.totals.balance)"/>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center mb-3" style="gap: 12px;">
+                    <div class="position-relative flex-grow-1" style="max-width:420px;">
+                        <i class="fa fa-search o_cust_search_icon"/>
+                        <input type="search" class="form-control" style="padding-inline-start:34px;"
+                               placeholder="بحث باسم العميل أو رقم الفاتورة أو البيان..."
+                               t-att-value="state.search"
+                               t-on-input="(ev) => { state.search = ev.target.value; }"/>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="o_cust_drafts"
+                               t-att-checked="state.includeDrafts" t-on-change="(ev) => this.toggleDrafts(ev)"/>
+                        <label class="form-check-label small" for="o_cust_drafts">تضمين القيود غير المرحّلة</label>
+                    </div>
+                </div>
+
+                <div t-if="selectedCustomer" class="o_cust_selected mb-3">
+                    <div>
+                        <div class="fw-bold">
+                            <span class="text-muted" t-esc="selectedCustomer.code"/>
+                            <span t-esc="selectedCustomer.name"/>
+                        </div>
+                        <div class="small text-muted">
+                            فواتير <bdi t-esc="fmt(selectedCustomer.invoiced)"/>
+                            <t t-if="selectedCustomer.returned"> − مرتجعات <bdi t-esc="fmt(selectedCustomer.returned)"/></t>
+                            − محصّل <bdi t-esc="fmt(selectedCustomer.collected)"/>
+                            <t t-if="Math.abs(selectedCustomer.other) > 0.0005"> ± حركات أخرى <bdi t-esc="fmt(selectedCustomer.other)"/></t>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center" style="gap: 12px;">
+                        <div class="text-end">
+                            <div class="small text-muted">الرصيد المستحق</div>
+                            <div t-attf-class="fs-4 fw-bold {{ balanceClass(selectedCustomer.balance) }}"
+                                 t-esc="fmt(selectedCustomer.balance)"/>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.printStatement(selectedCustomer.id)">
+                            <i class="fa fa-print me-1"/> كشف حساب
+                        </button>
+                        <button class="btn btn-sm btn-link" t-on-click="() => this.clearCustomer()">
+                            <i class="fa fa-times me-1"/> كل العملاء
+                        </button>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'customers' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('customers')">
+                            <i class="fa fa-users me-1"/> أرصدة العملاء (<t t-esc="customers.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'all' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('all')">
+                            <i class="fa fa-list me-1"/> السجل كامل (<t t-esc="fullLedger.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'invoices' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('invoices')">
+                            <i class="fa fa-file-text-o me-1"/> سجل الفواتير (<t t-esc="invoices.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'receipts' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('receipts')">
+                            <i class="fa fa-money me-1"/> سندات القبض (<t t-esc="receipts.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'notes' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('notes')">
+                            <i class="fa fa-sticky-note-o me-1"/> ملاحظات
+                            <span t-if="openNotesCount" class="badge rounded-pill text-bg-danger ms-1" t-esc="openNotesCount"/>
+                            <span t-else="" class="badge rounded-pill text-bg-success ms-1"><i class="fa fa-check"/></span>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- أرصدة العملاء -->
+                <t t-if="state.tab === 'customers'" t-call="my_accounting.CustomersNoteAlert">
+                    <t t-set="alertNotes" t-value="openNotesFor('customers')"/>
+                </t>
+                <table t-if="state.tab === 'customers'" class="table table-sm table-hover o_cust_table">
+                    <thead>
+                        <tr>
+                            <th style="width:70px;">الرمز</th>
+                            <th>العميل</th>
+                            <th class="text-center" style="width:90px;">الفواتير</th>
+                            <th class="text-end" style="width:130px;">قيمة الفواتير</th>
+                            <th class="text-end" style="width:120px;">المرتجعات</th>
+                            <th class="text-end" style="width:130px;">المحصّل</th>
+                            <th class="text-end" style="width:140px;">الرصيد المستحق</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!customers.length">
+                            <td colspan="7" class="text-center text-muted py-4">لا يوجد عملاء مطابقون</td>
+                        </tr>
+                        <tr t-foreach="customers" t-as="c" t-key="c.id" style="cursor:pointer;"
+                            t-on-click="() => this.selectCustomer(c)">
+                            <td class="text-muted" t-esc="c.code"/>
+                            <td>
+                                <t t-esc="c.name"/>
+                                <span t-if="c.balance &lt; -0.0005" class="badge text-bg-primary ms-1" style="font-size:10px;"
+                                      title="المحصّل أكثر من الفواتير المسجّلة: ربما فاتورة لم تُدخل بعد">
+                                    رصيد دائن
+                                </span>
+                            </td>
+                            <td class="text-center" t-esc="c.invoice_count"/>
+                            <td class="text-end" t-esc="fmt(c.invoiced)"/>
+                            <td class="text-end" t-esc="c.returned ? fmt(c.returned) : ''"/>
+                            <td class="text-end" t-esc="c.collected ? fmt(c.collected) : ''"/>
+                            <td t-attf-class="text-end fw-bold {{ balanceClass(c.balance) }}" t-esc="fmt(c.balance)"/>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="3">الإجمالي</td>
+                            <td class="text-end" t-esc="fmt(state.data.totals.invoiced)"/>
+                            <td class="text-end" t-esc="fmt(state.data.totals.returned)"/>
+                            <td class="text-end" t-esc="fmt(state.data.totals.collected)"/>
+                            <td class="text-end" t-esc="fmt(state.data.totals.balance)"/>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- السجل الكامل: الفواتير والمرتجعات وسندات القبض معاً بالترتيب الزمني -->
+                <table t-if="state.tab === 'all'" class="table table-sm table-hover o_cust_table">
+                    <thead>
+                        <tr>
+                            <th style="width:100px;">التاريخ</th>
+                            <th style="width:90px;">النوع</th>
+                            <th style="width:90px;">الرقم</th>
+                            <th>العميل</th>
+                            <th>البيان</th>
+                            <th class="text-end" style="width:120px;">مدين (فواتير)</th>
+                            <th class="text-end" style="width:120px;">دائن (تحصيل/مرتجع)</th>
+                            <th class="text-end" style="width:130px;">الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!fullLedger.length">
+                            <td colspan="8" class="text-center text-muted py-4">لا توجد حركات مطابقة</td>
+                        </tr>
+                        <tr t-foreach="fullLedger" t-as="row" t-key="row.key" style="cursor:pointer;"
+                            t-att-class="{ 'o_cust_return': row.kind === 'return', 'o_cust_receipt': row.kind === 'receipt' }"
+                            t-on-click="() => this.openMove(row.move_id)">
+                            <td t-esc="row.date"/>
+                            <td>
+                                <span t-attf-class="badge {{ row.kind === 'invoice' ? 'text-bg-light border' : (row.kind === 'receipt' ? 'text-bg-success' : 'text-bg-danger') }}"
+                                      t-esc="kindLabel(row.kind)"/>
+                            </td>
+                            <td class="fw-bold">
+                                <t t-if="row.number" t-esc="row.number"/>
+                                <span t-else="" class="text-muted small">—</span>
+                            </td>
+                            <td t-esc="row.customer"/>
+                            <td class="small" t-esc="row.label"/>
+                            <td class="text-end" t-esc="row.debit ? fmt(row.debit) : ''"/>
+                            <td class="text-end text-success" t-esc="row.credit ? fmt(row.credit) : ''"/>
+                            <td t-attf-class="text-end fw-bold {{ balanceClass(row.balance) }}" t-esc="fmt(row.balance)"/>
+                        </tr>
+                    </tbody>
+                    <tfoot t-if="fullLedger.length">
+                        <tr class="fw-bold">
+                            <td colspan="5">الإجمالي</td>
+                            <td class="text-end" t-esc="fmt(fullLedgerTotals.debit)"/>
+                            <td class="text-end text-success" t-esc="fmt(fullLedgerTotals.credit)"/>
+                            <td t-attf-class="text-end {{ balanceClass(fullLedgerTotals.balance) }}" t-esc="fmt(fullLedgerTotals.balance)"/>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- سجل الفواتير بالترتيب الرقمي -->
+                <t t-if="state.tab === 'invoices'">
+                    <t t-call="my_accounting.CustomersNoteAlert">
+                        <t t-set="alertNotes" t-value="openNotesFor('invoices')"/>
+                    </t>
+                    <table class="table table-sm table-hover o_cust_table">
+                        <thead>
+                            <tr>
+                                <th style="width:100px;">رقم الفاتورة</th>
+                                <th style="width:100px;">التاريخ</th>
+                                <th>العميل</th>
+                                <th>البيان</th>
+                                <th class="text-end" style="width:130px;">القيمة</th>
+                                <th style="width:80px;">القيد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-if="!invoices.length">
+                                <td colspan="6" class="text-center text-muted py-4">لا توجد فواتير مطابقة</td>
+                            </tr>
+                            <tr t-foreach="invoices" t-as="inv" t-key="inv.line_id" style="cursor:pointer;"
+                                t-att-class="{ 'o_cust_return': inv.kind === 'return' }"
+                                t-on-click="() => this.openMove(inv.move_id)">
+                                <td class="fw-bold">
+                                    <t t-if="inv.number" t-esc="inv.number"/>
+                                    <span t-else="" class="badge text-bg-secondary">بدون رقم</span>
+                                    <span t-if="inv.kind === 'return'" class="badge text-bg-danger ms-1" style="font-size:10px;">مرتجع</span>
+                                </td>
+                                <td t-esc="inv.date"/>
+                                <td t-esc="inv.customer"/>
+                                <td class="small" t-esc="inv.label"/>
+                                <td t-attf-class="text-end {{ inv.amount &lt; 0 ? 'text-danger' : '' }}" t-esc="fmt(inv.amount)"/>
+                                <td>
+                                    <t t-esc="inv.move_name"/>
+                                    <span t-if="inv.state !== 'posted'" class="badge text-bg-secondary ms-1" style="font-size:9px;">مسودة</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="invoices.length">
+                            <tr t-if="invoiceTotals.returned" class="small text-muted">
+                                <td colspan="4">مجموع الفواتير</td>
+                                <td class="text-end" t-esc="fmt(invoiceTotals.invoiced)"/>
+                                <td/>
+                            </tr>
+                            <tr t-if="invoiceTotals.returned" class="small text-muted">
+                                <td colspan="4">المرتجعات</td>
+                                <td class="text-end text-danger" t-esc="fmt(-invoiceTotals.returned)"/>
+                                <td/>
+                            </tr>
+                            <tr class="fw-bold">
+                                <td colspan="4">الإجمالي<t t-if="invoiceTotals.returned"> (صافي بعد المرتجعات)</t></td>
+                                <td class="text-end" t-esc="fmt(invoiceTotals.net)"/>
+                                <td/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </t>
+
+                <!-- سندات القبض -->
+                <t t-if="state.tab === 'receipts'" t-call="my_accounting.CustomersNoteAlert">
+                    <t t-set="alertNotes" t-value="openNotesFor('receipts')"/>
+                </t>
+                <table t-if="state.tab === 'receipts'" class="table table-sm table-hover o_cust_table">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">السند</th>
+                            <th style="width:100px;">التاريخ</th>
+                            <th>العميل</th>
+                            <th>البيان</th>
+                            <th class="text-end" style="width:130px;">المبلغ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!receipts.length">
+                            <td colspan="5" class="text-center text-muted py-4">لا توجد سندات قبض مطابقة</td>
+                        </tr>
+                        <tr t-foreach="receipts" t-as="rec" t-key="rec_index" style="cursor:pointer;"
+                            t-on-click="() => this.openMove(rec.move_id)">
+                            <td class="fw-bold" t-esc="rec.move_name"/>
+                            <td t-esc="rec.date"/>
+                            <td t-esc="rec.customer"/>
+                            <td class="small" t-esc="rec.label"/>
+                            <td class="text-end text-success" t-esc="fmt(rec.amount)"/>
+                        </tr>
+                    </tbody>
+                    <tfoot t-if="receipts.length">
+                        <tr class="fw-bold">
+                            <td colspan="4">الإجمالي</td>
+                            <td class="text-end text-success" t-esc="fmt(receiptsTotal)"/>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- الملاحظات: كل ملاحظات المراجعة، مع حلها يدوياً وتسجيل سبب الحل -->
+                <t t-if="state.tab === 'notes'">
+                    <div class="btn-group btn-group-sm mb-3" role="group">
+                        <button t-attf-class="btn {{ state.notesFilter === 'open' ? 'btn-primary' : 'btn-outline-primary' }}"
+                                t-on-click="() => { state.notesFilter = 'open'; }">
+                            غير محلولة (<t t-esc="openNotesCount"/>)
+                        </button>
+                        <button t-attf-class="btn {{ state.notesFilter === 'resolved' ? 'btn-primary' : 'btn-outline-primary' }}"
+                                t-on-click="() => { state.notesFilter = 'resolved'; }">
+                            محلولة (<t t-esc="relevantNotes.length - openNotesCount"/>)
+                        </button>
+                        <button t-attf-class="btn {{ state.notesFilter === 'all' ? 'btn-primary' : 'btn-outline-primary' }}"
+                                t-on-click="() => { state.notesFilter = 'all'; }">
+                            الكل (<t t-esc="relevantNotes.length"/>)
+                        </button>
+                    </div>
+
+                    <div t-if="!visibleNotes.length" class="text-center text-muted py-5">
+                        <i class="fa fa-check-circle fa-2x text-success d-block mb-2"/>
+                        <t t-if="state.notesFilter === 'resolved'">لا توجد ملاحظات محلولة</t>
+                        <t t-else="">لا توجد ملاحظات — كل شيء سليم</t>
+                    </div>
+
+                    <div class="o_cust_notes">
+                        <div t-foreach="visibleNotes" t-as="note" t-key="note.key"
+                             t-attf-class="o_cust_note {{ note.resolved ? 'o_cust_note_resolved' : '' }}">
+                            <div class="d-flex align-items-start" style="gap: 12px;">
+                                <i t-attf-class="fa {{ note.resolved ? 'fa-check-circle text-success' : noteIcon(note.kind) + ' text-warning' }} fs-4 mt-1"/>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold" t-esc="note.title"/>
+                                    <div t-if="note.detail" class="small text-muted" t-esc="note.detail"/>
+                                    <div class="small mt-1">
+                                        <span class="badge text-bg-light border" t-esc="noteTabLabel(note.tab)"/>
+                                        <a t-if="note.move_id" href="#" class="ms-2"
+                                           t-on-click.prevent="() => this.openMove(note.move_id)">
+                                            <i class="fa fa-external-link me-1"/>فتح القيد
+                                        </a>
+                                    </div>
+
+                                    <div t-if="note.resolved and state.resolvingKey !== note.key" class="o_cust_note_resolution mt-2">
+                                        <div class="small text-muted">
+                                            <i class="fa fa-check me-1"/>حُلّت بواسطة <t t-esc="note.resolved_by"/>
+                                            — <bdi t-esc="fmtDateTime(note.resolved_on)"/>
+                                        </div>
+                                        <div style="white-space: pre-wrap;" t-esc="note.resolution"/>
+                                    </div>
+
+                                    <div t-if="state.resolvingKey === note.key" class="mt-2">
+                                        <textarea class="form-control form-control-sm" rows="2"
+                                                  placeholder="ملاحظة الحل، مثلاً: الرقم 279 هو رقم إشعار الإرجاع لفاتورة 277"
+                                                  t-att-value="state.resolutionText"
+                                                  t-on-input="(ev) => { state.resolutionText = ev.target.value; }"/>
+                                        <div class="mt-2 d-flex" style="gap: 8px;">
+                                            <button class="btn btn-sm btn-success" t-on-click="() => this.saveResolve(note)">
+                                                <i class="fa fa-check me-1"/>حفظ الحل
+                                            </button>
+                                            <button class="btn btn-sm btn-secondary" t-on-click="() => this.cancelResolve()">إلغاء</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div t-if="state.resolvingKey !== note.key" class="d-flex flex-column" style="gap: 6px;">
+                                    <button t-if="!note.resolved" class="btn btn-sm btn-outline-success"
+                                            t-on-click="() => this.startResolve(note)">
+                                        <i class="fa fa-check me-1"/>حل
+                                    </button>
+                                    <t t-else="">
+                                        <button class="btn btn-sm btn-link p-0" t-on-click="() => this.startResolve(note)">
+                                            <i class="fa fa-pencil me-1"/>تعديل الحل
+                                        </button>
+                                        <button class="btn btn-sm btn-link text-danger p-0" t-on-click="() => this.reopenNote(note)">
+                                            <i class="fa fa-undo me-1"/>إعادة فتح
+                                        </button>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </div>
+    </t>
+
+    <!-- تنبيه بالملاحظات غير المحلولة داخل التبويب، مع رابط لحلها من تبويب الملاحظات -->
+    <t t-name="my_accounting.CustomersNoteAlert">
+        <div t-if="alertNotes.length" class="alert alert-warning py-2 px-3 small">
+            <div class="d-flex justify-content-between align-items-start" style="gap: 12px;">
+                <div>
+                    <div t-foreach="alertNotes" t-as="note" t-key="note.key">
+                        <i t-attf-class="fa {{ noteIcon(note.kind) }} me-1"/>
+                        <t t-esc="note.title"/>
+                        <span t-if="note.detail" class="text-muted"> — <t t-esc="note.detail"/></span>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-warning text-nowrap" t-on-click="() => this.showNotes()">
+                    <i class="fa fa-sticky-note-o me-1"/>حل الملاحظات
+                </button>
+            </div>
+        </div>
+    </t>
+
+</templates>
