@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- قراءة صور القيود في الخلفية: تُشغَّل فوراً عند طلب قراءة، ودورياً لمعالجة ما تبقّى
+         ولتعليم القراءات التي انقطعت (إعادة تشغيل الخادم) كفاشلة -->
+    <record id="ir_cron_photo_read" model="ir.cron">
+        <field name="name">المحاسبة: قراءة صور القيود</field>
+        <field name="model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process_reads()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

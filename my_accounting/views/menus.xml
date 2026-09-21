@@ -42,9 +42,25 @@
               parent="menu_myaccounting_root" sequence="45"
               action="action_myaccounting_trial_balance"/>
 
-    <menuitem id="menu_myaccounting_settings" name="اعدادات اخرى"
-              parent="menu_myaccounting_root" sequence="50"
+    <!-- "اعدادات اخرى" قائمة فرعية: الإعدادات + إدخال القيود عبر الصور (BETA) -->
+    <menuitem id="menu_myaccounting_settings_root" name="اعدادات اخرى"
+              parent="menu_myaccounting_root" sequence="50"/>
+
+    <menuitem id="menu_myaccounting_settings" name="الإعدادات"
+              parent="menu_myaccounting_settings_root" sequence="1"
               action="action_myaccounting_settings"/>
+
+    <menuitem id="menu_myaccounting_photo_capture" name="اضافة قيد عبر صورة BETA"
+              parent="menu_myaccounting_settings_root" sequence="10"
+              action="action_myaccounting_photo_capture"/>
+
+    <menuitem id="menu_myaccounting_photo_batch" name="القراءة الجماعية (Gemini)"
+              parent="menu_myaccounting_settings_root" sequence="25"
+              action="action_myaccounting_photo_batch"/>
+
+    <menuitem id="menu_myaccounting_photo_entries" name="صور القيود (قراءة وتأكيد)"
+              parent="menu_myaccounting_settings_root" sequence="20"
+              action="action_myaccounting_photo_entries"/>
 
     <menuitem id="menu_myaccounting_user_admin_root" name="إدارة المستخدمين" sequence="90"
               action="action_myaccounting_user_admin" groups="base.group_system"

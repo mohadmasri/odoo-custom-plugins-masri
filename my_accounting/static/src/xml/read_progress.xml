@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.ReadProgress">
+        <div t-attf-class="o_read_progress o_read_{{ data.read_state }}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-bold">
+                    <t t-if="data.read_state === 'queued' and retryIn"><i class="fa fa-clock-o me-1"/>فشلت المحاولة <t t-esc="data.read_attempts"/>، إعادة المحاولة بعد <t t-esc="retryIn"/> ثانية</t>
+                    <t t-elif="data.read_state === 'queued'"><i class="fa fa-clock-o me-1"/>في الانتظار، ستبدأ القراءة خلال لحظات</t>
+                    <t t-elif="data.read_state === 'running'"><i class="fa fa-spinner fa-spin me-1"/>جارِ القراءة بـ <t t-esc="providerName"/>
+                        <t t-if="data.read_attempts > 1"> (المحاولة <t t-esc="data.read_attempts"/>)</t></t>
+                    <t t-elif="data.read_state === 'done'"><i class="fa fa-check-circle text-success me-1"/>اكتملت القراءة بـ <t t-esc="providerName"/></t>
+                    <t t-elif="data.read_state === 'failed'"><i class="fa fa-times-circle text-danger me-1"/>فشلت القراءة بـ <t t-esc="providerName"/></t>
+                </div>
+                <div class="small text-muted" t-if="elapsed">
+                    <t t-esc="elapsed"/> ثانية
+                </div>
+            </div>
+
+            <div class="progress mb-2" style="height: 8px;">
+                <div t-attf-class="progress-bar {{ data.read_state === 'failed' ? 'bg-danger' : (data.read_state === 'done' ? 'bg-success' : 'progress-bar-striped progress-bar-animated') }}"
+                     role="progressbar" t-attf-style="width: {{ percent }}%;"/>
+            </div>
+
+            <ol class="o_read_steps">
+                <li t-foreach="steps" t-as="step" t-key="step_index" t-attf-class="o_read_step_{{ stepStatus(step_index) }}">
+                    <i t-if="stepStatus(step_index) === 'done'" class="fa fa-check-circle"/>
+                    <i t-elif="stepStatus(step_index) === 'current'" class="fa fa-circle-o-notch fa-spin"/>
+                    <i t-elif="stepStatus(step_index) === 'failed'" class="fa fa-times-circle"/>
+                    <i t-else="" class="fa fa-circle-o"/>
+                    <span t-esc="step"/>
+                </li>
+            </ol>
+
+            <div t-if="data.read_state === 'failed' and data.read_error" class="alert alert-danger py-2 mb-0 mt-2">
+                <t t-esc="data.read_error"/>
+                <div class="small mt-1">الصورة ما زالت محفوظة: أعد المحاولة أو اقرأها بالنموذج الآخر من الأزرار في الأعلى.</div>
+            </div>
+            <div t-if="active and data.read_error" class="small text-warning mt-1">
+                آخر خطأ: <t t-esc="data.read_error"/>
+            </div>
+            <div t-if="active" class="small text-muted mt-1">
+                تعمل القراءة في الخلفية على الخادم: يمكنك مغادرة الصفحة والعودة لاحقاً لرؤية النتيجة.
+            </div>
+        </div>
+    </t>
+
+</templates>

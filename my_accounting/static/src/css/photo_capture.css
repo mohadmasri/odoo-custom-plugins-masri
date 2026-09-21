@@ -1,0 +1,146 @@
+/* صفحة إضافة قيد عبر صورة: مصمّمة للهاتف أولاً */
+.o_photo_page .o_photo_wrap {
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.o_photo_page .o_photo_card {
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.08));
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.o_photo_page .o_photo_big_btn {
+    padding: 22px 12px;
+    font-size: 20px;
+    border-radius: 12px;
+}
+
+.o_photo_page .o_photo_preview {
+    width: 100%;
+    max-height: 50vh;
+    object-fit: contain;
+    border-radius: 8px;
+    background-color: #000;
+}
+
+.o_photo_page .o_photo_done {
+    border-color: rgba(40, 167, 69, 0.5);
+}
+
+.o_photo_page .o_photo_pending {
+    padding: 10px 4px;
+    border-top: 1px dashed var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    cursor: pointer;
+}
+
+/* صورة المستند في نموذج مراجعة قيد الصورة */
+.o_photo_entry_image,
+.o_photo_entry_image img {
+    max-width: 100%;
+    height: auto;
+}
+
+.o_photo_entry_image img {
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.15));
+    border-radius: 8px;
+}
+
+/* شريط تقدم القراءة في نموذج صورة القيد */
+.o_read_progress {
+    width: 100%;
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    background-color: var(--o-surface, #fff);
+}
+
+.o_read_progress.o_read_failed {
+    border-color: rgba(220, 53, 69, 0.5);
+}
+
+.o_read_progress.o_read_done {
+    border-color: rgba(40, 167, 69, 0.5);
+}
+
+.o_read_steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 13px;
+}
+
+.o_read_steps li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.o_read_step_pending {
+    color: var(--gray-500, #adb5bd);
+}
+
+.o_read_step_current {
+    color: var(--primary, #714B67);
+    font-weight: 600;
+}
+
+.o_read_step_done .fa {
+    color: #28a745;
+}
+
+.o_read_step_failed {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+/* صفحة القراءة الجماعية */
+.o_photo_batch .o_photo_batch_wrap {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.o_photo_batch .o_photo_batch_summary,
+.o_photo_batch .o_photo_batch_empty {
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-radius: 10px;
+    padding: 12px 16px;
+    background-color: var(--o-surface, #fff);
+}
+
+.o_photo_batch .o_photo_batch_list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.o_photo_batch .o_photo_batch_item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-inline-start: 4px solid var(--gray-400, #ced4da);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background-color: var(--o-surface, #fff);
+}
+
+.o_photo_batch .o_pb_running { border-inline-start-color: var(--primary, #714B67); }
+.o_photo_batch .o_pb_queued { border-inline-start-color: #f0ad4e; }
+.o_photo_batch .o_pb_done { border-inline-start-color: #28a745; }
+.o_photo_batch .o_pb_failed { border-inline-start-color: #dc3545; }
+
+.o_photo_batch .o_photo_batch_thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+    flex: 0 0 auto;
+}

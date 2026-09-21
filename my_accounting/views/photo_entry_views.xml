@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+    <!-- قيود الصور بانتظار التأكيد: مراجعة ما قرأه Claude أو Gemini ثم الترحيل -->
+    <record id="view_myaccounting_photo_entry_form" model="ir.ui.view">
+        <field name="name">myaccounting.photo.entry.form</field>
+        <field name="model">myaccounting.photo.entry</field>
+        <field name="arch" type="xml">
+            <form string="قيد من صورة">
+                <header>
+                    <!-- القراءة: أول مرة أو إعادة القراءة بنموذج آخر (الصورة تبقى محفوظة حتى الترحيل) -->
+                    <button name="action_read_claude" type="object" string="قراءة بـ Claude" icon="fa-magic"
+                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running')"/>
+                    <button name="action_read_gemini" type="object" string="قراءة بـ Gemini" icon="fa-magic"
+                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running')"/>
+                    <button name="action_read_claude" type="object" string="إعادة القراءة بـ Claude" icon="fa-refresh"
+                            invisible="state != 'review' or not image or read_state in ('queued', 'running')"
+                            confirm="ستحل القراءة الجديدة محل البنود الحالية وأي تعديل أجريته عليها. متابعة؟"/>
+                    <button name="action_read_gemini" type="object" string="إعادة القراءة بـ Gemini" icon="fa-refresh"
+                            invisible="state != 'review' or not image or read_state in ('queued', 'running')"
+                            confirm="ستحل القراءة الجديدة محل البنود الحالية وأي تعديل أجريته عليها. متابعة؟"/>
+                    <button name="action_post" type="object" string="تأكيد وترحيل القيد" class="btn-success"
+                            invisible="state != 'review'"
+                            confirm="سيُنشأ قيد محاسبي مرحّل بهذه البنود، وتُحذف الصورة من النظام. متابعة؟"/>
+                    <button name="action_stop_read" type="object" string="إيقاف القراءة" icon="fa-stop"
+                            class="btn-danger" invisible="read_state not in ('queued', 'running')"/>
+                    <button name="action_open_move" type="object" string="فتح القيد المُنشأ"
+                            invisible="not move_id"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <field name="image_mimetype" invisible="1"/>
+                    <field name="read_step" invisible="1"/>
+                    <field name="read_provider" invisible="1"/>
+                    <field name="read_error" invisible="1"/>
+                    <field name="read_started" invisible="1"/>
+                    <field name="read_finished" invisible="1"/>
+                    <field name="read_auto_retry" invisible="1"/>
+                    <field name="read_attempts" invisible="1"/>
+                    <field name="read_next_try" invisible="1"/>
+                    <!-- شريط تقدم القراءة في الخلفية (يتحدّث تلقائياً) -->
+                    <field name="read_state" widget="myaccounting_read_progress" nolabel="1"
+                           invisible="read_state == 'idle' or state == 'posted'"/>
+                    <div class="alert alert-info py-2" role="alert" invisible="state != 'new' or read_state in ('queued', 'running')">
+                        <i class="fa fa-camera me-1"/>
+                        الصورة محفوظة بانتظار القراءة. اختر "قراءة بـ Claude" أو "قراءة بـ Gemini" من الأعلى.
+                        تعمل القراءة في الخلفية (حتى دقيقة تقريباً)، ويمكنك مغادرة الصفحة والعودة لاحقاً.
+                    </div>
+                    <div class="alert alert-info py-2" role="alert" invisible="state != 'review'">
+                        <i class="fa fa-magic me-1"/>
+                        قرأه <field name="provider" readonly="1" class="d-inline fw-bold"/> من الصورة
+                        (عدد مرات القراءة: <field name="read_count" readonly="1" class="d-inline"/>).
+                        راجع البنود المعلّمة بالأصفر وقارنها بالصورة، وصحّح أي رقم أو حساب، ثم اضغط "تأكيد وترحيل القيد".
+                        يمكنك أيضاً إعادة القراءة بنموذج آخر.
+                    </div>
+                    <div class="alert alert-danger py-2" role="alert" invisible="not existing_move_id">
+                        <i class="fa fa-exclamation-triangle me-1"/>
+                        يوجد قيد بنفس الرقم مسبقاً: <field name="existing_move_id" nolabel="1" class="d-inline"/>.
+                        تأكّد أن هذا المستند لم يُدخل من قبل. عند الترحيل سيأخذ القيد الجديد الرقم التالي تلقائياً.
+                    </div>
+                    <div class="alert alert-warning py-2" role="alert" invisible="not notes">
+                        <strong>ملاحظات القراءة:</strong>
+                        <field name="notes" nolabel="1"/>
+                    </div>
+                    <div class="row">
+                        <!-- الصورة بجانب البنود للمقارنة أثناء المراجعة -->
+                        <div class="col-lg-5 mb-3" invisible="not image">
+                            <!-- لف الصورة إن التقطها الهاتف بالاتجاه الخطأ (يُحفظ اللف) -->
+                            <div class="d-flex mb-1" style="gap: 6px;" invisible="state == 'posted'">
+                                <button name="action_rotate_right" type="object" icon="fa-rotate-right"
+                                        string="لف يميناً" class="btn btn-sm btn-secondary"/>
+                                <button name="action_rotate_left" type="object" icon="fa-rotate-left"
+                                        string="لف يساراً" class="btn btn-sm btn-secondary"/>
+                            </div>
+                            <field name="image" widget="image" readonly="1" class="o_photo_entry_image"
+                                   options="{'zoom': true, 'zoom_delay': 200}"/>
+                        </div>
+                        <div class="col">
+                            <group invisible="state == 'new'">
+                                <group>
+                                    <field name="name" readonly="state == 'posted'"/>
+                                    <field name="date" readonly="state == 'posted'"/>
+                                    <field name="move_id" invisible="not move_id"/>
+                                </group>
+                                <group>
+                                    <field name="journal" widget="myaccounting_journal" readonly="state == 'posted'"/>
+                                    <field name="ledger_month" readonly="state == 'posted'"/>
+                                    <field name="ledger_year" readonly="state == 'posted'" options="{'format': false}"/>
+                                </group>
+                            </group>
+                            <field name="line_ids" readonly="state == 'posted'" invisible="state == 'new'">
+                                <!-- يظهر من اليمين: المدين | الدائن | الحساب | كما قُرئ | البيان | ملاحظة -->
+                                <list editable="bottom" decoration-warning="uncertain">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="debit_zero_entered" column_invisible="1"/>
+                                    <field name="credit_zero_entered" column_invisible="1"/>
+                                    <field name="uncertain_reason" string="ملاحظة"/>
+                                    <field name="name"/>
+                                    <field name="account_text" readonly="1"/>
+                                    <field name="account_id" required="parent.state == 'review'"/>
+                                    <field name="credit" sum="إجمالي الدائن" widget="myaccounting_amount"
+                                           options="{'zero_flag': 'credit_zero_entered'}"/>
+                                    <field name="debit" sum="إجمالي المدين" widget="myaccounting_amount"
+                                           options="{'zero_flag': 'debit_zero_entered'}"/>
+                                    <field name="uncertain" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer oe_right" invisible="state == 'new'">
+                                <field name="total_debit"/>
+                                <field name="total_credit"/>
+                                <field name="is_balanced" widget="boolean_toggle" readonly="1"/>
+                            </group>
+                        </div>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_photo_entry_list" model="ir.ui.view">
+        <field name="name">myaccounting.photo.entry.list</field>
+        <field name="model">myaccounting.photo.entry</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'posted'">
+                <field name="image" widget="image" options="{'size': [0, 48]}" string="الصورة"/>
+                <field name="display_name" string="القيد"/>
+                <field name="date"/>
+                <field name="total_debit" sum="المدين"/>
+                <field name="total_credit" sum="الدائن"/>
+                <field name="is_balanced" widget="boolean_toggle" readonly="1"/>
+                <field name="uncertain_count"/>
+                <field name="provider"/>
+                <field name="read_count"/>
+                <field name="read_attempts" optional="show"/>
+                <field name="create_date" string="تاريخ التصوير"/>
+                <field name="read_state" widget="badge" decoration-info="read_state in ('queued', 'running')"
+                       decoration-danger="read_state == 'failed'" decoration-success="read_state == 'done'"/>
+                <field name="state" widget="badge" decoration-info="state == 'new'"
+                       decoration-warning="state == 'review'" decoration-success="state == 'posted'"/>
+                <field name="move_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_myaccounting_photo_entry_search" model="ir.ui.view">
+        <field name="name">myaccounting.photo.entry.search</field>
+        <field name="model">myaccounting.photo.entry</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="waiting" string="غير مُرحّلة" domain="[('state', '!=', 'posted')]"/>
+                <filter name="new" string="بانتظار القراءة" domain="[('state', '=', 'new')]"/>
+                <filter name="review" string="بانتظار التأكيد" domain="[('state', '=', 'review')]"/>
+                <filter name="posted" string="مُرحّلة" domain="[('state', '=', 'posted')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_myaccounting_photo_entries" model="ir.actions.act_window">
+        <field name="name">قيود الصور (BETA)</field>
+        <field name="res_model">myaccounting.photo.entry</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_waiting': 1}</field>
+    </record>
+
+    <!-- من قائمة صور القيود: تحديد عدة صور ثم "إجراء" -->
+    <record id="action_server_photo_batch_gemini" model="ir.actions.server">
+        <field name="name">قراءة بـ Gemini مع إعادة المحاولة</field>
+        <field name="model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_batch_read_gemini()</field>
+    </record>
+
+    <record id="action_server_photo_stop_read" model="ir.actions.server">
+        <field name="name">إيقاف القراءة وإعادة المحاولة</field>
+        <field name="model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_view_types">list,form</field>
+        <field name="state">code</field>
+        <field name="code">records.action_stop_read()</field>
+    </record>
+
+    <record id="action_myaccounting_photo_batch" model="ir.actions.client">
+        <field name="name">القراءة الجماعية (Gemini)</field>
+        <field name="tag">my_accounting.photo_batch</field>
+    </record>
+
+    <record id="action_myaccounting_photo_capture" model="ir.actions.client">
+        <field name="name">إضافة قيد عبر صورة (BETA)</field>
+        <field name="tag">my_accounting.photo_capture</field>
+    </record>
+
+    </data>
+</odoo>

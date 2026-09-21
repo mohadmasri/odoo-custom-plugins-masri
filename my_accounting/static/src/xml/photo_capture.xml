@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.PhotoCapture">
+        <div class="o_photo_page p-3" style="overflow:auto; height:100%;">
+            <div class="o_photo_wrap" dir="rtl">
+                <h3 class="mb-1">إضافة قيد عبر صورة <span class="badge text-bg-warning align-middle">BETA</span></h3>
+                <div class="text-muted small mb-3">
+                    صوّر كل مستند قيد على حدة وارفعه. تُحفظ الصور، وتقرؤها لاحقاً من الحاسوب بـ Claude أو Gemini
+                    من شاشة "صور القيود"، ثم تراجعها وترحّلها. تُحذف الصورة من النظام بعد ترحيل قيدها.
+                </div>
+
+                <!-- التصوير -->
+                <input type="file" accept="image/*" capture="environment" class="d-none" t-ref="camera"
+                       t-on-change="(ev) => this.onFile(ev)"/>
+                <input type="file" accept="image/*" class="d-none" t-ref="gallery"
+                       t-on-change="(ev) => this.onFile(ev)"/>
+
+                <t t-if="!state.preview and !state.uploaded">
+                    <button class="btn btn-primary btn-lg w-100 o_photo_big_btn mb-2" t-on-click="() => this.openCamera()">
+                        <i class="fa fa-camera me-2"/>تصوير القيد
+                    </button>
+                    <button class="btn btn-outline-secondary w-100 mb-3" t-on-click="() => this.openGallery()">
+                        <i class="fa fa-picture-o me-2"/>اختيار صورة من الجهاز
+                    </button>
+                </t>
+
+                <div t-if="state.preview" class="o_photo_card mb-3">
+                    <img t-att-src="state.preview" class="o_photo_preview mb-2" alt="صورة القيد"/>
+                    <div t-if="!state.uploading" class="d-flex justify-content-center mb-2" style="gap: 8px;">
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(90)">
+                            <i class="fa fa-rotate-right me-1"/>لف يميناً
+                        </button>
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(-90)">
+                            <i class="fa fa-rotate-left me-1"/>لف يساراً
+                        </button>
+                    </div>
+                    <div t-if="state.uploading" class="text-center py-2">
+                        <i class="fa fa-spinner fa-spin fa-2x d-block mb-2"/>جارِ رفع الصورة...
+                    </div>
+                    <div t-else="" class="d-flex" style="gap: 8px;">
+                        <button class="btn btn-success btn-lg flex-grow-1" t-on-click="() => this.upload()">
+                            <i class="fa fa-cloud-upload me-1"/>رفع الصورة
+                        </button>
+                        <button class="btn btn-outline-secondary btn-lg" t-on-click="() => this.retake()"
+                                title="إعادة التصوير">
+                            <i class="fa fa-refresh"/>
+                        </button>
+                    </div>
+                </div>
+
+                <div t-if="state.error" class="alert alert-danger">
+                    <i class="fa fa-exclamation-triangle me-1"/><t t-esc="state.error"/>
+                </div>
+
+                <div t-if="state.uploaded" class="o_photo_card o_photo_done mb-3">
+                    <div class="fs-5 fw-bold mb-2">
+                        <i class="fa fa-check-circle text-success me-1"/>تم حفظ <t t-esc="state.uploaded.label"/>
+                    </div>
+                    <div class="small text-muted mb-2">اقرأها لاحقاً من الحاسوب من شاشة "صور القيود".</div>
+                    <button class="btn btn-primary btn-lg w-100" t-on-click="() => this.nextPhoto()">
+                        <i class="fa fa-camera me-1"/>تصوير القيد التالي
+                    </button>
+                </div>
+
+                <!-- الصور المحفوظة -->
+                <div t-if="state.info and state.info.recent.length" class="o_photo_card mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-bold">
+                            بانتظار القراءة (<t t-esc="state.info.new_count"/>) ·
+                            بانتظار التأكيد (<t t-esc="state.info.review_count"/>)
+                        </div>
+                        <a href="#" class="small" t-on-click.prevent="() => this.openList()">عرض الكل</a>
+                    </div>
+                    <div t-foreach="state.info.recent" t-as="p" t-key="p.id" class="o_photo_pending"
+                         t-on-click="() => this.openEntry(p.id)">
+                        <span class="fw-bold" t-esc="p.label"/>
+                        <span t-attf-class="badge ms-2 {{ p.state === 'new' ? 'text-bg-info' : 'text-bg-warning' }}"
+                              t-esc="stateLabel(p.state)"/>
+                        <span t-if="p.read_state === 'queued' or p.read_state === 'running'" class="badge text-bg-primary ms-1">
+                            <i class="fa fa-spinner fa-spin me-1"/>جارِ القراءة
+                        </span>
+                        <span t-if="p.read_state === 'failed'" class="badge text-bg-danger ms-1">فشلت القراءة</span>
+                    </div>
+                </div>
+
+                <!-- مفاتيح خدمات القراءة (مدير النظام) -->
+                <details t-if="state.info and state.info.is_admin" class="o_photo_card small"
+                         t-att-open="!state.info.has_claude_key and !state.info.has_gemini_key">
+                    <summary class="fw-bold"><i class="fa fa-key me-1"/>إعدادات خدمات القراءة</summary>
+                    <div class="mt-2">
+                        <!-- الأسماء عبر t-esc حتى لا يترجمها أودو آلياً ("Gemini" ← "الجوزاء") -->
+                        <t t-foreach="[['claude', 'Claude', 'console.anthropic.com', 'sk-ant-...', state.info.has_claude_key],
+                                       ['gemini', 'Gemini', 'aistudio.google.com (Get API key)', 'AIza...', state.info.has_gemini_key]]"
+                           t-as="svc" t-key="svc[0]">
+                            <div class="mb-2">
+                                مفتاح <b t-esc="svc[1]"/> API:
+                                <t t-if="svc[4]"><i class="fa fa-check-circle text-success ms-1"/> محفوظ</t>
+                                <span t-else="" class="text-danger ms-1">غير مضبوط</span>
+                                <a t-if="state.keyProvider !== svc[0]" href="#" class="ms-2"
+                                   t-on-click.prevent="() => this.editKey(svc[0])">
+                                    <t t-if="svc[4]">تغيير</t><t t-else="">إدخال</t>
+                                </a>
+                                <div t-if="state.keyProvider === svc[0]" class="mt-1">
+                                    <div class="text-muted mb-1">من <t t-esc="svc[2]"/></div>
+                                    <input type="password" class="form-control form-control-sm mb-1" autocomplete="off"
+                                           t-att-placeholder="svc[3]" t-att-value="state.apiKey"
+                                           t-on-input="(ev) => { state.apiKey = ev.target.value; }"/>
+                                    <button class="btn btn-sm btn-primary me-1" t-att-disabled="!state.apiKey.trim()"
+                                            t-on-click="() => this.saveKey()">حفظ</button>
+                                    <button class="btn btn-sm btn-secondary" t-on-click="() => { state.keyProvider = null; }">إلغاء</button>
+                                </div>
+                            </div>
+                        </t>
+                        <div class="d-flex align-items-center" style="gap: 6px;">
+                            <span class="text-muted text-nowrap">نموذج <t t-esc="'Gemini'"/>:</span>
+                            <input type="text" class="form-control form-control-sm" dir="ltr" style="max-width: 200px;"
+                                   t-att-value="state.geminiModel" t-on-input="(ev) => { state.geminiModel = ev.target.value; }"/>
+                            <button t-if="state.geminiModel !== state.info.gemini_model" class="btn btn-sm btn-outline-primary"
+                                    t-on-click="() => this.saveGeminiModel()">حفظ</button>
+                        </div>
+                        <div class="text-warning mt-2">
+                            <i class="fa fa-info-circle me-1"/>
+                            في المستوى المجاني لـ <t t-esc="'Gemini'"/> تستخدم Google الصور المرسلة لتحسين منتجاتها.
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </t>
+
+</templates>

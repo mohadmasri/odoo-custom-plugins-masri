@@ -1,0 +1,59 @@
+/* قائمة اليوميات المنسدلة في القيد */
+.o_myaccounting_journal_combo {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.o_myaccounting_journal_combo > input {
+    flex: 1 1 auto;
+    padding-inline-end: 24px;
+}
+
+.o_myaccounting_journal_toggle {
+    position: absolute;
+    inset-inline-end: 0;
+    border: 0;
+    background: transparent;
+    color: var(--gray-600, #6c757d);
+    padding: 0 6px;
+    cursor: pointer;
+}
+
+.o_myaccounting_journal_menu {
+    position: absolute;
+    top: 100%;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    z-index: 1050;
+    margin: 2px 0 0;
+    padding: 4px 0;
+    list-style: none;
+    max-height: 260px;
+    overflow-y: auto;
+    background-color: var(--o-surface, #fff);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.15));
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.o_myaccounting_journal_menu > li {
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.o_myaccounting_journal_menu > li:hover,
+.o_myaccounting_journal_menu > li.o_active {
+    background-color: var(--o-surface-2, rgba(0, 0, 0, 0.06));
+}
+
+.o_myaccounting_journal_menu > li.o_selected {
+    font-weight: 600;
+}
+
+.o_myaccounting_journal_menu > li.o_myaccounting_journal_new {
+    border-top: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.1));
+    color: var(--primary, #714B67);
+}

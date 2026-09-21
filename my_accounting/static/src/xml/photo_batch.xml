@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.PhotoBatch">
+        <div class="o_photo_batch p-3" style="overflow:auto; height:100%;">
+            <div class="o_photo_batch_wrap" dir="rtl">
+                <div class="d-flex justify-content-between align-items-center flex-wrap mb-3" style="gap: 12px;">
+                    <div>
+                        <h3 class="m-0">القراءة الجماعية بـ <t t-esc="'Gemini'"/></h3>
+                        <div class="text-muted small">
+                            تُعاد المحاولة تلقائياً عند ضغط الخدمة حتى تنجح القراءة أو توقفها. تعمل على الخادم، فيمكنك مغادرة الصفحة.
+                        </div>
+                    </div>
+                    <div class="d-flex" style="gap: 8px;">
+                        <button t-if="state.data and state.data.active" class="btn btn-danger" t-on-click="() => this.stopAll()">
+                            <i class="fa fa-stop me-1"/>إيقاف الكل
+                        </button>
+                        <button class="btn btn-secondary" t-on-click="() => this.openList()">
+                            <i class="fa fa-list me-1"/>صور القيود
+                        </button>
+                    </div>
+                </div>
+
+                <div t-if="!state.data" class="text-center text-muted py-5">جارِ التحميل...</div>
+                <div t-elif="!state.data.total" class="o_photo_batch_empty">
+                    لا توجد قراءة جماعية بعد. من "صور القيود" حدّد الصور ثم اختر من قائمة "إجراء":
+                    <b>قراءة بـ <t t-esc="'Gemini'"/> مع إعادة المحاولة</b>.
+                </div>
+                <t t-else="">
+                    <!-- الشريط العام -->
+                    <div class="o_photo_batch_summary mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <div class="fw-bold">
+                                <t t-if="state.data.active"><i class="fa fa-spinner fa-spin me-1"/>جارٍ العمل</t>
+                                <t t-else=""><i class="fa fa-check-circle text-success me-1"/>انتهت الدفعة</t>
+                            </div>
+                            <div class="small">
+                                <span class="text-success"><t t-esc="state.data.done"/> اكتملت</span> ·
+                                <span class="text-primary"><t t-esc="state.data.active"/> قيد العمل</span> ·
+                                <span class="text-danger"><t t-esc="state.data.failed"/> توقفت</span> ·
+                                من <t t-esc="state.data.total"/>
+                            </div>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-success" t-attf-style="width: {{ state.data.total ? state.data.done * 100 / state.data.total : 0 }}%;"/>
+                            <div class="progress-bar bg-danger" t-attf-style="width: {{ state.data.total ? state.data.failed * 100 / state.data.total : 0 }}%;"/>
+                        </div>
+                    </div>
+
+                    <!-- كل صورة -->
+                    <div class="o_photo_batch_list">
+                        <div t-foreach="state.data.items" t-as="item" t-key="item.id"
+                             t-attf-class="o_photo_batch_item o_pb_{{ item.read_state }}">
+                            <img t-attf-src="/web/image/myaccounting.photo.entry/{{ item.id }}/image/64x64"
+                                 class="o_photo_batch_thumb" alt="" t-on-click="() => this.open(item.id)"/>
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="fw-bold" style="cursor: pointer;" t-on-click="() => this.open(item.id)" t-esc="item.label"/>
+                                <div class="small">
+                                    <i t-if="item.read_state === 'running'" class="fa fa-spinner fa-spin me-1 text-primary"/>
+                                    <i t-elif="item.read_state === 'queued'" class="fa fa-clock-o me-1 text-warning"/>
+                                    <i t-elif="item.read_state === 'done'" class="fa fa-check-circle me-1 text-success"/>
+                                    <i t-else="" class="fa fa-times-circle me-1 text-danger"/>
+                                    <t t-esc="statusText(item)"/>
+                                </div>
+                                <div t-if="item.error and item.read_state !== 'done'" class="small text-muted text-truncate"
+                                     t-att-title="item.error">
+                                    آخر خطأ: <t t-esc="item.error"/>
+                                </div>
+                            </div>
+                            <button t-if="item.read_state === 'queued' or item.read_state === 'running'"
+                                    class="btn btn-sm btn-outline-danger" t-on-click="() => this.stop([item.id])">
+                                <i class="fa fa-stop me-1"/>إيقاف
+                            </button>
+                            <button t-elif="item.read_state === 'done'" class="btn btn-sm btn-outline-primary"
+                                    t-on-click="() => this.open(item.id)">مراجعة</button>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

@@ -1,0 +1,5 @@
+/* إشعارات أودو (تم الحفظ، الأخطاء...) في أسفل الشاشة بدل أعلاها */
+.o_notification_manager {
+    top: auto !important;
+    bottom: 16px;
+}
