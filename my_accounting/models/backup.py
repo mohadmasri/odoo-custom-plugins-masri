@@ -354,9 +354,12 @@ class MyAccountingBackup(models.AbstractModel):
         دون أن تعيده. بدلاً منها نشغّل عملية مستقلة تنتظر ثانيتين (ليصل الرد
         إلى المتصفح)، ثم توقف كل عمليات أودو وتشغّل خادماً جديداً بنفس
         سطر الأوامر. ننتظر قليلاً قبل الإيقاف حتى تُحفظ المعاملة الحالية."""
-        command = [sys.executable] + list(sys.argv)
         workdir = os.getcwd()
         log_path = os.path.join(workdir, 'server.log')
+        command = [sys.executable] + list(sys.argv)
+        # الخادم الجديد يكتب سجله دائماً في server.log لتشخيص أي مشكلة لاحقاً
+        if not any(arg.startswith('--logfile') for arg in command):
+            command.append(f'--logfile={log_path}')
         helper_path = os.path.join(odoo_config['data_dir'], 'my_accounting_restart.py')
 
         # نوقف كل عمليات أودو (الجذر وأبناءه)؛ ملف المساعد نفسه لا يحوي
