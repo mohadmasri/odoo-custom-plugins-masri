@@ -118,6 +118,7 @@ class MyAccountingPhotoEntry(models.Model):
 
     name = fields.Char(string='رقم القيد')
     date = fields.Date(string='التاريخ')
+    ref = fields.Char(string='المرجع')
     ledger_month = fields.Selection(LEDGER_MONTH_SELECTION, string='شهر دفتر الأستاذ')
     ledger_year = fields.Integer(string='سنة دفتر الأستاذ')
     journal = fields.Char(string='اليومية', default='القيود اليدوية')
@@ -627,6 +628,7 @@ class MyAccountingPhotoEntry(models.Model):
         vals = {
             'move_type': 'entry',
             'date': self.date,
+            'ref': self.ref or False,
             'journal': self.journal or 'القيود اليدوية',
             'ledger_year': self.ledger_year or self.date.year,
             'ledger_month': self.ledger_month or str(self.date.month),

@@ -81,6 +81,7 @@
                                 <group>
                                     <field name="name" readonly="state == 'posted'"/>
                                     <field name="date" readonly="state == 'posted'"/>
+                                    <field name="ref" readonly="state == 'posted'"/>
                                     <field name="move_id" invisible="not move_id"/>
                                 </group>
                                 <group>
