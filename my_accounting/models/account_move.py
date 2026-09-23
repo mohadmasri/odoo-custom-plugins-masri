@@ -203,9 +203,11 @@ class MyAccountingMove(models.Model):
             move.message_post(body='تمت مراجعة ملاحظات الاستيراد.', subtype_xmlid='mail.mt_note')
         return True
 
-    _name_company_uniq = models.Constraint(
-        'unique(name, company_id)',
-        'رقم القيد هذا مستخدم بالفعل، الرجاء اختيار رقم آخر.',
+    # الترقيم يبدأ من جديد مع كل سنة (1/1 في كانون الثاني من كل عام)، فرقم القيد
+    # وحده لا يميّزه: القيد هو (الرقم + سنة دفتر الأستاذ).
+    _name_year_company_uniq = models.Constraint(
+        'unique(name, ledger_year, company_id)',
+        'رقم القيد هذا مستخدم بالفعل في هذه السنة، الرجاء اختيار رقم آخر.',
     )
 
     @api.model
@@ -222,10 +224,15 @@ class MyAccountingMove(models.Model):
     def _get_default_name(self):
         # لكل نوع ترقيمه المستقل: يؤخذ رقم آخر سجل من نفس النوع ويُزاد واحداً
         move_type = self.env.context.get('default_move_type') or 'entry'
-        last_move = self.search([('move_type', '=', move_type)], order='id desc', limit=1)
+        # أحدث قيد في الترتيب (سنة ثم شهر ثم رقم)، لا آخر ما أُدخل: إدخال قيود
+        # سنة قديمة اليوم لا يغيّر الرقم المقترح للقيد الجديد.
+        last_move = self.search([('move_type', '=', move_type)],
+                                order='sort_key desc, id desc', limit=1)
         candidate = self._increment_name(last_move.name) if last_move and last_move.name else '1'
+        year = last_move.ledger_year or self._get_default_ledger_period()[0]
         guard = 0
-        while guard < 1000 and self.search_count([('name', '=', candidate)]):
+        while guard < 1000 and self.search_count([('name', '=', candidate),
+                                                  ('ledger_year', '=', year)]):
             candidate = self._increment_name(candidate)
             guard += 1
         return candidate
@@ -448,7 +455,7 @@ class MyAccountingMove(models.Model):
 
     @api.model
     def _get_default_ledger_period(self):
-        last_move = self.search([], order='id desc', limit=1)
+        last_move = self.search([], order='sort_key desc, id desc', limit=1)
         if last_move and last_move.ledger_month and last_move.ledger_year:
             return last_move.ledger_year, last_move.ledger_month
         today = fields.Date.context_today(self)
@@ -521,6 +528,23 @@ class MyAccountingMove(models.Model):
                 if move.state == 'posted':
                     raise UserError('لا يمكن حذف قيد مرحّل. أعده إلى مسودة أولاً.')
         return super().unlink()
+
+    @api.model
+    def get_ledger_years(self):
+        """السنوات التي فيها قيود فعلاً، الأحدث أولاً (قائمة السنة في صفحة القيود)."""
+        groups = self._read_group([('ledger_year', '!=', False)], groupby=['ledger_year'])
+        return sorted({group[0] for group in groups if group[0]}, reverse=True)
+
+    @api.model
+    def get_latest_ledger_period(self):
+        """آخر شهر دفتر أستاذ فيه قيود، ليكون الفلتر الافتراضي في صفحة القيود."""
+        move = self.search([
+            ('ledger_year', '!=', False),
+            ('ledger_month', '!=', False),
+        ], order='sort_key desc, id desc', limit=1)
+        if not move:
+            return {}
+        return {'month': move.ledger_month, 'year': move.ledger_year}
 
     @api.model
     def get_general_ledger_matrix(self, year, month, states=None):
@@ -862,21 +886,24 @@ class MyAccountingMove(models.Model):
         return by_code, by_name
 
     @api.model
-    def _import_next_names(self, count, used):
-        """يولّد أرقام قيود متسلسلة غير مستخدمة (داخل قاعدة البيانات أو ضمن نفس الاستيراد)."""
-        names = []
-        last_move = self.search([], order='id desc', limit=1)
+    def _import_name_taken(self, name, year, used):
+        """هل الرقم مستخدم في تلك السنة (في قاعدة البيانات أو ضمن نفس الاستيراد)؟"""
+        return (name, year) in used or bool(self.search_count([
+            ('name', '=', name), ('ledger_year', '=', year)]))
+
+    @api.model
+    def _import_next_name(self, year, used):
+        """رقم قيد شاغر داخل سنة دفتر الأستاذ المعطاة: الترقيم يبدأ من جديد كل سنة،
+        فلا يُحجز رقم سنة بسبب استخدامه في سنة أخرى."""
+        last_move = self.search([('ledger_year', '=', year)],
+                                order='sort_key desc, id desc', limit=1)
         candidate = last_move.name if last_move and last_move.name else '0'
-        for _ in range(count):
-            guard = 0
-            while guard < 10000:
-                candidate = self._increment_name(candidate)
-                if candidate not in used and not self.search_count([('name', '=', candidate)]):
-                    break
-                guard += 1
-            used.add(candidate)
-            names.append(candidate)
-        return names
+        for _ in range(10000):
+            candidate = self._increment_name(candidate)
+            if not self._import_name_taken(candidate, year, used):
+                used.add((candidate, year))
+                return candidate
+        raise UserError('تعذّر توليد رقم قيد جديد.')
 
     def _post_import_notes(self, notes):
         """يحفظ ملاحظات الاستيراد على القيد وينشرها كـ"ملاحظة" داخلية في المحادثة."""
@@ -933,16 +960,21 @@ class MyAccountingMove(models.Model):
         by_code, by_name = self._import_build_account_index()
         Account = self.env['myaccounting.account']
 
-        # تجميع الأسطر في قيود: السطر بلا "رقم قيد" يتبع القيد السابق
-        groups, order, current_key = {}, [], None
+        # تجميع الأسطر في قيود: السطر بلا "رقم قيد" يتبع القيد السابق.
+        # الرقم وحده لا يكفي للتمييز (الترقيم يعاد كل سنة)، فيدخل في المفتاح
+        # رقم السنة كما كُتب في الصف نفسه.
+        groups, order, group_label, current_key = {}, [], {}, None
         for row_number, row in enumerate(rows[1:], start=2):
             if row is None or all(value in (None, '') for value in row):
                 continue
             raw_key = ' '.join(str(cell(row, 'move_key') or '').split())
             if raw_key:
-                current_key = raw_key
+                raw_year = ' '.join(str(cell(row, 'ledger_year') or '').split())
+                current_key = f'{raw_key}|{raw_year}'
+                group_label[current_key] = raw_key
             if current_key is None:
                 current_key = f'__بلا_رقم_{row_number}'
+                group_label[current_key] = None
             if current_key not in groups:
                 groups[current_key] = []
                 order.append(current_key)
@@ -950,8 +982,7 @@ class MyAccountingMove(models.Model):
 
         created, incomplete_count, errors = [], 0, []
         unmatched_names = {}
-        used_names = set()
-        generated_names = iter(self._import_next_names(len(order), used_names))
+        used_names = set()  # (الرقم، السنة) المستخدمة ضمن هذا الاستيراد
         previous = None  # قيم القيد السابق في الملف (التاريخ وشهر/سنة دفتر الأستاذ)
 
         for key in order:
@@ -1073,16 +1104,16 @@ class MyAccountingMove(models.Model):
                     errors.append(f'القيد "{key}": ' + '؛ '.join(entry_errors))
                 continue
 
-            file_name = key if key and not key.startswith('__بلا_رقم_') else None
+            file_name = group_label.get(key)
             move_name = file_name
-            if move_name and (move_name in used_names or self.search_count([('name', '=', move_name)])):
+            if move_name and self._import_name_taken(move_name, ledger_year, used_names):
                 move_name = None
             if move_name:
-                used_names.add(move_name)
+                used_names.add((move_name, ledger_year))
             else:
-                move_name = next(generated_names)
+                move_name = self._import_next_name(ledger_year, used_names)
                 if file_name:
-                    entry_errors.insert(0, f'رقم القيد "{file_name}" مستخدم مسبقاً ← أُعطي الرقم {move_name}')
+                    entry_errors.insert(0, f'رقم القيد "{file_name}" مستخدم مسبقاً في سنة {ledger_year} ← أُعطي الرقم {move_name}')
                 else:
                     entry_errors.insert(0, f'لا يوجد رقم قيد في الملف ← أُعطي الرقم {move_name}')
 

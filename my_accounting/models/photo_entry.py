@@ -166,7 +166,11 @@ class MyAccountingPhotoEntry(models.Model):
         Move = self.env['myaccounting.move']
         for entry in self:
             if entry.name and entry.state == 'review':
-                entry.existing_move_id = Move.search([('name', '=', entry.name)], limit=1)
+                # الرقم يعاد ترقيمه كل سنة، فالمطابقة تكون بالرقم وسنة دفتر الأستاذ معاً
+                entry.existing_move_id = Move.search([
+                    ('name', '=', entry.name),
+                    ('ledger_year', '=', entry.ledger_year),
+                ], limit=1)
             else:
                 entry.existing_move_id = False
 
@@ -792,7 +796,8 @@ class MyAccountingPhotoEntry(models.Model):
             }) for line in self.line_ids],
         }
         # رقم القيد المكتوب على المستند، ما لم يكن مستخدماً (عندها الترقيم التلقائي)
-        if self.name and not Move.search_count([('name', '=', self.name)]):
+        if self.name and not Move.search_count([('name', '=', self.name),
+                                                ('ledger_year', '=', self.ledger_year)]):
             vals['name'] = self.name
         move = Move.create(vals)
         move.action_post()
