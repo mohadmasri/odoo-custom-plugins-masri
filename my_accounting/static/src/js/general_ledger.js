@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -21,6 +22,7 @@ function currentMonth() {
 
 export class GeneralLedger extends Component {
     static template = "my_accounting.GeneralLedger";
+    static components = { PeriodFilter };
     static props = ["*"];
 
     setup() {
@@ -38,24 +40,31 @@ export class GeneralLedger extends Component {
             states: states.length ? states : ["posted"],
         });
         this.stateFilters = STATE_FILTERS;
-        onWillStart(() => this.loadData());
+        this.fixedMonth = !!context.ledger_month;
+        onWillStart(async () => {
+            // الافتتاح على آخر شهر فيه قيود، ما لم يُفتح الدفتر على شهر محدد
+            if (!this.fixedMonth) {
+                const latest = await this.orm.call("myaccounting.move", "get_latest_ledger_period", []);
+                if (latest && latest.month) {
+                    this.state.month = `${latest.year}-${pad(latest.month)}`;
+                }
+            }
+            await this.loadData();
+        });
     }
 
-    get currentYear() {
-        return new Date().getFullYear();
+    get filterYear() {
+        return this.state.month.split("-")[0];
     }
 
-    // أزرار الأشهر 1..12 للسنة الحالية: الوصول لأي شهر بضغطة واحدة
-    get monthButtons() {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    get filterMonth() {
+        return String(parseInt(this.state.month.split("-")[1], 10));
     }
 
-    isMonthActive(month) {
-        return this.state.month === `${this.currentYear}-${pad(month)}`;
-    }
-
-    selectMonth(month) {
-        this.state.month = `${this.currentYear}-${pad(month)}`;
+    // فلتر الفترة الموحّد: الدفتر يعرض شهراً واحداً دائماً، فإلغاء الشهر يبقيه كما هو
+    onPeriodChange({ year, month }) {
+        const current = this.state.month.split("-")[1];
+        this.state.month = `${year || this.filterYear}-${month ? pad(parseInt(month, 10)) : current}`;
         this.loadData();
     }
 

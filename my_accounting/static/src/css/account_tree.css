@@ -122,14 +122,3 @@
     opacity: 0.6;
 }
 
-/* أزرار أشهر السنة الحالية في شجرة الحسابات */
-.o_account_tree_months {
-    gap: 6px;
-}
-.o_account_tree_month_btn {
-    min-width: 46px;
-    padding: 6px 10px;
-    font-weight: 600;
-    font-size: 14px;
-    line-height: 1.1;
-}

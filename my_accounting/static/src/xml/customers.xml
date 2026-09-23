@@ -34,18 +34,8 @@
                     </div>
                 </div>
 
-                <div class="o_move_months d-flex flex-wrap align-items-center mb-3">
-                    <span class="text-muted small me-2" t-esc="currentYear"/>
-                    <t t-foreach="monthButtons" t-as="m" t-key="m">
-                        <button type="button"
-                                t-attf-class="btn o_move_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
-                                t-on-click="() => this.onMonthButton(m)"
-                                t-esc="m"/>
-                    </t>
-                    <span t-if="state.ledgerMonth" class="small text-muted ms-2">
-                        حركات شهر <t t-esc="state.ledgerMonth"/>/<t t-esc="state.ledgerYear"/> — الرصيد حتى نهاية الشهر
-                    </span>
-                </div>
+                <PeriodFilter year="state.ledgerYear" month="state.ledgerMonth" allowAllYears="true"
+                                  onChange.bind="onPeriodChange"/>
 
                 <div class="d-flex flex-wrap align-items-center mb-3" style="gap: 12px;">
                     <div class="position-relative flex-grow-1" style="max-width:420px;">

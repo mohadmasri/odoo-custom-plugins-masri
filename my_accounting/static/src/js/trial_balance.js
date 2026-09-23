@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -16,6 +17,7 @@ function pad(n) {
 
 export class TrialBalance extends Component {
     static template = "my_accounting.TrialBalance";
+    static components = { PeriodFilter };
     static props = ["*"];
 
     setup() {
@@ -34,26 +36,34 @@ export class TrialBalance extends Component {
             showEmpty: false,
         });
         this.stateFilters = STATE_FILTERS;
-        onWillStart(() => this.loadData());
+        onWillStart(async () => {
+            // نفس سلوك بقية الشاشات: الافتتاح على آخر شهر فيه قيود
+            const latest = await this.orm.call("myaccounting.move", "get_latest_ledger_period", []);
+            if (latest && latest.month) {
+                const value = `${latest.year}-${pad(parseInt(latest.month, 10))}`;
+                this.state.ledgerFrom = value;
+                this.state.ledgerTo = value;
+            }
+            await this.loadData();
+        });
     }
 
-    get currentYear() {
-        return new Date().getFullYear();
+    get filterYear() {
+        return (this.state.ledgerFrom || this.state.ledgerTo || "").split("-")[0] ||
+            String(new Date().getFullYear());
     }
 
-    get monthButtons() {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    // شهر واحد مختار (وإلا فالفترة سنة كاملة أو نطاق)
+    get filterMonth() {
+        const from = this.state.ledgerFrom;
+        return from && from === this.state.ledgerTo ? String(parseInt(from.split("-")[1], 10)) : "";
     }
 
-    isMonthActive(month) {
-        const value = `${this.currentYear}-${pad(month)}`;
-        return this.state.ledgerFrom === value && this.state.ledgerTo === value;
-    }
-
-    async selectMonth(month) {
-        const value = `${this.currentYear}-${pad(month)}`;
-        this.state.ledgerFrom = value;
-        this.state.ledgerTo = value;
+    // فلتر الفترة الموحّد: شهر واحد، أو السنة كاملة عند إلغاء الشهر
+    async onPeriodChange({ year, month }) {
+        const target = year || this.filterYear;
+        this.state.ledgerFrom = `${target}-${month ? pad(parseInt(month, 10)) : "01"}`;
+        this.state.ledgerTo = `${target}-${month ? pad(parseInt(month, 10)) : "12"}`;
         this.state.dateFrom = "";
         this.state.dateTo = "";
         await this.loadData();

@@ -50,29 +50,19 @@
                                t-att-checked="state.includeDrafts" t-on-change="(ev) => this.toggleDrafts(ev)"/>
                         <label class="form-check-label small" for="o_rep_drafts">تضمين القيود غير المرحّلة</label>
                     </div>
-                    <select class="form-select form-select-sm" style="width:auto;" t-on-change="(ev) => this.onYear(ev)">
-                        <t t-foreach="state.data.years" t-as="y" t-key="y">
-                            <option t-att-value="y" t-att-selected="y === state.data.year" t-esc="y"/>
-                        </t>
-                    </select>
                 </div>
             </div>
 
             <div t-if="!state.data" class="text-center text-muted py-5">جارِ التحميل...</div>
 
             <t t-if="state.data">
-                <div class="o_move_months d-flex flex-wrap align-items-center mb-3">
-                    <span class="text-muted small me-2" t-esc="state.data.year"/>
-                    <t t-foreach="[1,2,3,4,5,6,7,8,9,10,11,12]" t-as="m" t-key="m">
-                        <button type="button"
-                                t-attf-class="btn o_move_month_btn {{ state.month === m ? 'btn-primary' : 'btn-outline-secondary' }}"
-                                t-on-click="() => this.onMonthButton(m)" t-esc="m"/>
-                    </t>
+                <PeriodFilter year="filterYear" month="filterMonth" years="state.data.years"
+                              onChange.bind="onPeriodChange">
                     <span class="small text-muted ms-2">
                         الفترة: <b t-esc="periodLabel"/>
                         <i t-if="state.loading" class="fa fa-spinner fa-spin ms-1"/>
                     </span>
-                </div>
+                </PeriodFilter>
 
                 <!-- بطاقات الأرقام -->
                 <div class="o_rep_cards mb-3">

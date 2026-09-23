@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useSetupAction } from "@web/search/action_hook";
 import { JournalImportDialog } from "./journal_import_dialog";
@@ -70,6 +71,7 @@ const LEDGER_MONTH_OPTIONS = [
 
 export class MoveList extends Component {
     static template = "my_accounting.MoveList";
+    static components = { PeriodFilter };
     static props = ["*"];
 
     setup() {
@@ -101,15 +103,28 @@ export class MoveList extends Component {
         // تُستدعى قبل مغادرة القائمة (مثلاً عند فتح قيد) فتُحفظ الفلاتر والترتيب
         useSetupAction({
             getLocalState: () => ({
-                moveListFilters: Object.fromEntries(
-                    KEPT_STATE_FIELDS.map((field) => [field, this.state[field]])
-                ),
+                moveListFilters: Object.fromEntries([
+                    // علامة أن الصفحة سبق أن فُتحت: لا يُعاد فرض الشهر الافتراضي
+                    ["visited", true],
+                    ...KEPT_STATE_FIELDS.map((field) => [field, this.state[field]]),
+                ]),
             }),
         });
         this.stateLabels = STATE_LABELS;
         this.ledgerMonthOptions = LEDGER_MONTH_OPTIONS;
         onWillStart(async () => {
-            this.state.journalNames = await this.orm.call("myaccounting.journal", "get_journal_names", []);
+            const [journalNames, latest] = await Promise.all([
+                this.orm.call("myaccounting.journal", "get_journal_names", []),
+                // القيود كثيرة، فالعرض يبدأ بآخر شهر فيه قيود
+                restored.visited
+                    ? {}
+                    : this.orm.call("myaccounting.move", "get_latest_ledger_period", []),
+            ]);
+            this.state.journalNames = journalNames;
+            if (latest && latest.month) {
+                this.state.ledgerMonth = String(latest.month);
+                this.state.ledgerYear = String(latest.year);
+            }
             await this.loadData();
         });
         this._debounceTimer = null;
@@ -351,29 +366,10 @@ export class MoveList extends Component {
         this.loadData();
     }
 
-    get currentYear() {
-        return new Date().getFullYear();
-    }
-
-    // أزرار الأشهر 1..12 للسنة الحالية: الوصول لشهر محاسبي بضغطة واحدة
-    get monthButtons() {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    }
-
-    isMonthActive(month) {
-        return this.state.ledgerMonth === String(month) &&
-            this.state.ledgerYear === String(this.currentYear);
-    }
-
-    // الضغط على الشهر يفعّل الفلتر، والضغط عليه وهو مفعّل يلغيه
-    onMonthButton(month) {
-        if (this.isMonthActive(month)) {
-            this.state.ledgerMonth = "";
-            this.state.ledgerYear = "";
-        } else {
-            this.state.ledgerMonth = String(month);
-            this.state.ledgerYear = String(this.currentYear);
-        }
+    // فلتر الفترة الموحّد (السنة + الأشهر)
+    onPeriodChange({ year, month }) {
+        this.state.ledgerYear = year;
+        this.state.ledgerMonth = month;
         this.loadData();
     }
 
@@ -385,12 +381,6 @@ export class MoveList extends Component {
     onLedgerMonthFilter(ev) {
         this.state.ledgerMonth = ev.target.value;
         this.loadData();
-    }
-
-    onLedgerYearInput(ev) {
-        this.state.ledgerYear = ev.target.value;
-        clearTimeout(this._ledgerYearTimer);
-        this._ledgerYearTimer = setTimeout(() => this.loadData(), 350);
     }
 
     clearFilters() {

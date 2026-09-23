@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 import { user } from "@web/core/user";
 import { BulkAccountDialog } from "./account_bulk_dialog";
 import {
@@ -68,7 +69,7 @@ AccountTreeNode.components = { AccountTreeNode };
 export class AccountTree extends Component {
     static template = "my_accounting.AccountTree";
     static props = ["*"];
-    static components = { AccountTreeNode };
+    static components = { AccountTreeNode, PeriodFilter };
 
     setup() {
         this.orm = useService("orm");
@@ -81,6 +82,8 @@ export class AccountTree extends Component {
             selected: {},
             search: "",
             moveNames: [],
+            // السنة المختارة من القائمة قبل الضغط على شهر (لا فلتر بعد)
+            yearHint: "",
             // قيم حقول الفلتر كما يكتبها المستخدم
             filterForm: emptyMovementFilter(),
             // الفلتر المطبَّق فعلاً (بعد الضغط على "تطبيق") + حركة الحسابات ضمنه
@@ -132,28 +135,36 @@ export class AccountTree extends Component {
     // فلتر الحركة (تاريخ / رقم قيد)
     // ---------------------------------------------------------------------
 
-    get currentYear() {
-        return new Date().getFullYear();
+    get filterYear() {
+        const form = this.state.filterForm;
+        return (form.ledgerFrom || form.ledgerTo || "").split("-")[0] || this.state.yearHint || "";
     }
 
-    // أزرار الأشهر 1..12 للسنة الحالية: فلترة حركة شهر أستاذ واحد بضغطة
-    get monthButtons() {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    // شهر واحد مفعّل في فلتر الحركة
+    get filterMonth() {
+        const form = this.state.filterForm;
+        return form.ledgerFrom && form.ledgerFrom === form.ledgerTo
+            ? String(parseInt(form.ledgerFrom.split("-")[1], 10))
+            : "";
     }
 
-    isMonthActive(month) {
-        const value = `${this.currentYear}-${pad(month)}`;
-        return !!this.state.filter &&
-            this.state.filterForm.ledgerFrom === value &&
-            this.state.filterForm.ledgerTo === value;
-    }
-
-    // الضغط على الشهر يفلتر عليه، والضغط عليه وهو مفعّل يلغيه مع إبقاء باقي الفلاتر
-    async onMonthButton(month) {
-        const value = `${this.currentYear}-${pad(month)}`;
-        const wasActive = this.isMonthActive(month);
-        this.state.filterForm.ledgerFrom = wasActive ? "" : value;
-        this.state.filterForm.ledgerTo = wasActive ? "" : value;
+    // فلتر الفترة الموحّد: الشهر يملأ (من شهر - إلى شهر) في فلتر الحركة
+    async onPeriodChange({ year, month }) {
+        const form = this.state.filterForm;
+        if (!month) {
+            // سنة بلا شهر: تُحفظ لاستخدامها عند الضغط على شهر، ويُلغى فلتر الشهر
+            this.state.yearHint = year;
+            const hadMonth = !!(form.ledgerFrom || form.ledgerTo);
+            form.ledgerFrom = "";
+            form.ledgerTo = "";
+            if (hadMonth) {
+                await this.applyFilter();
+            }
+            return;
+        }
+        const value = `${year}-${pad(parseInt(month, 10))}`;
+        form.ledgerFrom = value;
+        form.ledgerTo = value;
         await this.applyFilter();
     }
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- فلتر الفترة الموحّد: قائمة السنة + أزرار الأشهر (يُستخدم في كل الصفحات) -->
+    <t t-name="my_accounting.PeriodFilter">
+        <div class="o_ma_period d-flex flex-wrap align-items-center mb-3">
+            <select class="form-select form-select-sm me-2 o_ma_year_select" style="width:120px;"
+                    title="سنة دفتر الأستاذ" t-on-change="(ev) => this.onYear(ev)">
+                <option t-if="props.allowAllYears" value="">كل السنوات</option>
+                <t t-foreach="years" t-as="y" t-key="y">
+                    <option t-att-value="y" t-att-selected="isYearActive(y)" t-esc="y"/>
+                </t>
+            </select>
+            <t t-foreach="months" t-as="m" t-key="m">
+                <button type="button"
+                        t-attf-class="btn o_ma_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                        t-on-click="() => this.onMonth(m)" t-esc="m"/>
+            </t>
+            <t t-slot="default"/>
+        </div>
+    </t>
+
+</templates>

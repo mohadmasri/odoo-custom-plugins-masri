@@ -3,6 +3,7 @@
 import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 import { user } from "@web/core/user";
 import { deserializeDateTime, formatDateTime } from "@web/core/l10n/dates";
 import { Dialog } from "@web/core/dialog/dialog";
@@ -106,6 +107,7 @@ export class ReceiptAllocationDialog extends Component {
  */
 export class CustomersPage extends Component {
     static template = "my_accounting.Customers";
+    static components = { PeriodFilter };
     static props = ["*"];
 
     setup() {
@@ -148,29 +150,10 @@ export class CustomersPage extends Component {
         this.loadData();
     }
 
-    get currentYear() {
-        return new Date().getFullYear();
-    }
-
-    // أزرار الأشهر 1..12 للسنة الحالية، كما في صفحة القيود
-    get monthButtons() {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    }
-
-    isMonthActive(month) {
-        return this.state.ledgerMonth === String(month) &&
-            this.state.ledgerYear === String(this.currentYear);
-    }
-
-    // الضغط على الشهر يفعّل الفلتر، والضغط عليه وهو مفعّل يلغيه
-    onMonthButton(month) {
-        if (this.isMonthActive(month)) {
-            this.state.ledgerMonth = "";
-            this.state.ledgerYear = "";
-        } else {
-            this.state.ledgerMonth = String(month);
-            this.state.ledgerYear = String(this.currentYear);
-        }
+    // فلتر الفترة الموحّد (السنة + الأشهر)
+    onPeriodChange({ year, month }) {
+        this.state.ledgerYear = year;
+        this.state.ledgerMonth = month;
         this.loadData();
     }
 

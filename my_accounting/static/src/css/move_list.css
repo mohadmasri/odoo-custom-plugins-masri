@@ -1,14 +1,3 @@
-/* أزرار أشهر السنة الحالية في صفحة القيود: مقاس مريح للضغط */
-.o_move_months {
-    gap: 6px;
-}
-.o_move_month_btn {
-    min-width: 46px;
-    padding: 6px 10px;
-    font-weight: 600;
-    font-size: 14px;
-    line-height: 1.1;
-}
 
 /* أسهم ترتيب بنود القيد */
 .o_myaccounting_line_order .o_line_order_btn {

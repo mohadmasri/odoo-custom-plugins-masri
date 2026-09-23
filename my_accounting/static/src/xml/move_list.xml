@@ -22,15 +22,8 @@
                 </div>
             </div>
 
-            <div class="o_move_months d-flex flex-wrap align-items-center mb-3">
-                <span class="text-muted small me-2" t-esc="currentYear"/>
-                <t t-foreach="monthButtons" t-as="m" t-key="m">
-                    <button type="button"
-                            t-attf-class="btn o_move_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
-                            t-on-click="() => this.onMonthButton(m)"
-                            t-esc="m"/>
-                </t>
-            </div>
+            <PeriodFilter year="state.ledgerYear" month="state.ledgerMonth" allowAllYears="true"
+                          onChange.bind="onPeriodChange"/>
 
             <div class="o_move_filters d-flex flex-wrap align-items-end mb-3" style="gap: 12px;">
                 <div>
@@ -85,12 +78,6 @@
                             </option>
                         </t>
                     </select>
-                </div>
-                <div>
-                    <label class="d-block small text-muted mb-1">سنة دفتر الأستاذ</label>
-                    <input type="number" class="form-control form-control-sm" style="width:110px;"
-                           placeholder="مثال: 2026" t-att-value="state.ledgerYear"
-                           t-on-input="(ev) => this.onLedgerYearInput(ev)"/>
                 </div>
                 <div>
                     <label class="d-block small text-muted mb-1">الحالة</label>

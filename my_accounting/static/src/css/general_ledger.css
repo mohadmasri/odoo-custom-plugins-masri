@@ -100,17 +100,6 @@
     max-width: none !important;
 }
 
-/* أزرار أشهر السنة الحالية: مقاس مريح للضغط بالفأرة واللمس */
-.o_gl_months {
-    gap: 6px;
-}
-.o_gl_month_btn {
-    min-width: 46px;
-    padding: 6px 10px;
-    font-weight: 600;
-    font-size: 14px;
-    line-height: 1.1;
-}
 
 /* تثبيت صفّي الترويسة أثناء التمرير داخل الجدول (بدون أي كود، عبر CSS فقط) */
 .o_general_ledger .o_gl_printable {

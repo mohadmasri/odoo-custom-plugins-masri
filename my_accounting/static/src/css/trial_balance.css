@@ -6,17 +6,6 @@
     padding: 12px 16px;
 }
 
-.o_trial_balance .o_tb_months {
-    gap: 6px;
-}
-
-.o_trial_balance .o_tb_month_btn {
-    min-width: 46px;
-    padding: 6px 10px;
-    font-weight: 600;
-    font-size: 14px;
-    line-height: 1.1;
-}
 
 .o_trial_balance .o_tb_sep {
     align-self: stretch;

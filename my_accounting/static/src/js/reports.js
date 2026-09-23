@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { Component, markRaw, onWillStart, useEffect, useRef, useState } from "@odoo/owl";
+import { PeriodFilter } from "./period_filter";
 import { loadBundle } from "@web/core/assets";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
@@ -322,7 +323,7 @@ export function reportNav(actionService) {
  */
 export class ReportsPage extends Component {
     static template = "my_accounting.Reports";
-    static components = { ReportCard };
+    static components = { ReportCard, PeriodFilter };
     static props = ["*"];
 
     setup() {
@@ -368,13 +369,18 @@ export class ReportsPage extends Component {
         return periodLabel(this.state.data);
     }
 
-    onYear(ev) {
-        this.state.year = parseInt(ev.target.value, 10);
-        this.loadData();
+    get filterYear() {
+        return this.state.year ? String(this.state.year) : "";
     }
 
-    onMonthButton(month) {
-        this.state.month = this.state.month === month ? 0 : month;
+    get filterMonth() {
+        return this.state.month ? String(this.state.month) : "";
+    }
+
+    // فلتر الفترة الموحّد: التقارير تحتاج سنة دائماً، والشهر اختياري
+    onPeriodChange({ year, month }) {
+        this.state.year = parseInt(year, 10) || this.state.year;
+        this.state.month = parseInt(month, 10) || 0;
         this.loadData();
     }
 

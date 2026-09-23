@@ -21,14 +21,7 @@
             </div>
 
             <div class="o_tb_filters mb-3 no-print">
-                <div class="o_tb_months d-flex flex-wrap align-items-center mb-2">
-                    <span class="text-muted small me-2" t-esc="currentYear"/>
-                    <t t-foreach="monthButtons" t-as="m" t-key="m">
-                        <button type="button"
-                                t-attf-class="btn o_tb_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
-                                t-on-click="() => this.selectMonth(m)" t-esc="m"/>
-                    </t>
-                </div>
+                <PeriodFilter year="filterYear" month="filterMonth" onChange.bind="onPeriodChange"/>
                 <div class="d-flex flex-wrap align-items-end" style="gap: 10px;">
                     <div>
                         <label class="form-label small mb-1">من شهر دفتر الأستاذ</label>
