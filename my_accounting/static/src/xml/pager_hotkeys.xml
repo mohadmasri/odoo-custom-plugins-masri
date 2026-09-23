@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- مرجع لعنصر المؤشّر، ليعرف كود الأسهم أين هو وهل هو ظاهر -->
+    <t t-name="my_accounting.PagerHotkeys" t-inherit="web.Pager" t-inherit-mode="extension">
+        <xpath expr="//nav[hasclass('o_pager')]" position="attributes">
+            <attribute name="t-ref">maRoot</attribute>
+        </xpath>
+    </t>
+
+</templates>
