@@ -6,9 +6,11 @@
             <div class="o_photo_batch_wrap" dir="rtl">
                 <div class="d-flex justify-content-between align-items-center flex-wrap mb-3" style="gap: 12px;">
                     <div>
-                        <h3 class="m-0">القراءة الجماعية بـ <t t-esc="'Gemini'"/></h3>
+                        <h3 class="m-0">القراءة الجماعية<t t-if="state.data and state.data.total"> بـ <t t-esc="providerTitle"/></t></h3>
                         <div class="text-muted small">
-                            تُعاد المحاولة تلقائياً عند ضغط الخدمة حتى تنجح القراءة أو توقفها. تعمل على الخادم، فيمكنك مغادرة الصفحة.
+                            <t t-if="providerTitle === 'Claude'">دفعة Claude بنصف السعر: تصل النتائج عادة خلال أقل من ساعة، ويفحصها النظام كل بضع دقائق.</t>
+                            <t t-else="">تُعاد المحاولة تلقائياً عند ضغط الخدمة حتى تنجح القراءة أو توقفها.</t>
+                            تعمل على الخادم، فيمكنك مغادرة الصفحة.
                         </div>
                     </div>
                     <div class="d-flex" style="gap: 8px;">
@@ -24,7 +26,7 @@
                 <div t-if="!state.data" class="text-center text-muted py-5">جارِ التحميل...</div>
                 <div t-elif="!state.data.total" class="o_photo_batch_empty">
                     لا توجد قراءة جماعية بعد. من "صور القيود" حدّد الصور ثم اختر من قائمة "إجراء":
-                    <b>قراءة بـ <t t-esc="'Gemini'"/> مع إعادة المحاولة</b>.
+                    <b>قراءة بـ Claude (دفعة بنصف السعر)</b> أو <b>قراءة بـ <t t-esc="'Gemini'"/> مع إعادة المحاولة</b>.
                 </div>
                 <t t-else="">
                     <!-- الشريط العام -->
@@ -58,6 +60,7 @@
                                 <div class="small">
                                     <i t-if="item.read_state === 'running'" class="fa fa-spinner fa-spin me-1 text-primary"/>
                                     <i t-elif="item.read_state === 'queued'" class="fa fa-clock-o me-1 text-warning"/>
+                                    <i t-elif="item.read_state === 'batch'" class="fa fa-hourglass-half me-1 text-primary"/>
                                     <i t-elif="item.read_state === 'done'" class="fa fa-check-circle me-1 text-success"/>
                                     <i t-else="" class="fa fa-times-circle me-1 text-danger"/>
                                     <t t-esc="statusText(item)"/>
@@ -67,7 +70,7 @@
                                     آخر خطأ: <t t-esc="item.error"/>
                                 </div>
                             </div>
-                            <button t-if="item.read_state === 'queued' or item.read_state === 'running'"
+                            <button t-if="['queued', 'running', 'batch'].includes(item.read_state)"
                                     class="btn btn-sm btn-outline-danger" t-on-click="() => this.stop([item.id])">
                                 <i class="fa fa-stop me-1"/>إيقاف
                             </button>

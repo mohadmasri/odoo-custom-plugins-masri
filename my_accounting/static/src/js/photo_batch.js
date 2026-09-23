@@ -57,7 +57,15 @@ export class PhotoBatchPage extends Component {
         return Math.max(0, item.retry_in - passed);
     }
 
+    get providerTitle() {
+        const items = this.state.data ? this.state.data.items : [];
+        return items.length && items[0].provider === "claude" ? "Claude" : "Gemini";
+    }
+
     statusText(item) {
+        if (item.read_state === "batch") {
+            return "أُرسلت ضمن دفعة Claude (بنصف السعر) — بانتظار النتيجة";
+        }
         if (item.read_state === "running") {
             return `جارِ القراءة (المحاولة ${item.attempts})`;
         }
@@ -81,7 +89,7 @@ export class PhotoBatchPage extends Component {
 
     stopAll() {
         const ids = this.state.data.items
-            .filter((item) => item.read_state === "queued" || item.read_state === "running")
+            .filter((item) => ["queued", "running", "batch"].includes(item.read_state))
             .map((item) => item.id);
         if (ids.length) {
             this.stop(ids);

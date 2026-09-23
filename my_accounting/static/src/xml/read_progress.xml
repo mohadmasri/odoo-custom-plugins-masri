@@ -7,6 +7,7 @@
                 <div class="fw-bold">
                     <t t-if="data.read_state === 'queued' and retryIn"><i class="fa fa-clock-o me-1"/>فشلت المحاولة <t t-esc="data.read_attempts"/>، إعادة المحاولة بعد <t t-esc="retryIn"/> ثانية</t>
                     <t t-elif="data.read_state === 'queued'"><i class="fa fa-clock-o me-1"/>في الانتظار، ستبدأ القراءة خلال لحظات</t>
+                    <t t-elif="data.read_state === 'batch'"><i class="fa fa-hourglass-half me-1"/>أُرسلت إلى Claude ضمن دفعة بنصف السعر، بانتظار النتيجة</t>
                     <t t-elif="data.read_state === 'running'"><i class="fa fa-spinner fa-spin me-1"/>جارِ القراءة بـ <t t-esc="providerName"/>
                         <t t-if="data.read_attempts > 1"> (المحاولة <t t-esc="data.read_attempts"/>)</t></t>
                     <t t-elif="data.read_state === 'done'"><i class="fa fa-check-circle text-success me-1"/>اكتملت القراءة بـ <t t-esc="providerName"/></t>
@@ -40,7 +41,8 @@
                 آخر خطأ: <t t-esc="data.read_error"/>
             </div>
             <div t-if="active" class="small text-muted mt-1">
-                تعمل القراءة في الخلفية على الخادم: يمكنك مغادرة الصفحة والعودة لاحقاً لرؤية النتيجة.
+                <t t-if="data.read_state === 'batch'">تصل نتائج الدفعة عادة خلال أقل من ساعة (وقد تصل إلى 24 ساعة)، ويفحصها النظام كل بضع دقائق. يمكنك مغادرة الصفحة.</t>
+                <t t-else="">تعمل القراءة في الخلفية على الخادم: يمكنك مغادرة الصفحة والعودة لاحقاً لرؤية النتيجة.</t>
             </div>
         </div>
     </t>

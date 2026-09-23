@@ -54,7 +54,7 @@
               parent="menu_myaccounting_settings_root" sequence="10"
               action="action_myaccounting_photo_capture"/>
 
-    <menuitem id="menu_myaccounting_photo_batch" name="القراءة الجماعية (Gemini)"
+    <menuitem id="menu_myaccounting_photo_batch" name="القراءة الجماعية"
               parent="menu_myaccounting_settings_root" sequence="25"
               action="action_myaccounting_photo_batch"/>
 

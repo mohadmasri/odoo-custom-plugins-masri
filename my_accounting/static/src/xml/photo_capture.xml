@@ -77,7 +77,7 @@
                         <span class="fw-bold" t-esc="p.label"/>
                         <span t-attf-class="badge ms-2 {{ p.state === 'new' ? 'text-bg-info' : 'text-bg-warning' }}"
                               t-esc="stateLabel(p.state)"/>
-                        <span t-if="p.read_state === 'queued' or p.read_state === 'running'" class="badge text-bg-primary ms-1">
+                        <span t-if="['queued', 'running', 'batch'].includes(p.read_state)" class="badge text-bg-primary ms-1">
                             <i class="fa fa-spinner fa-spin me-1"/>جارِ القراءة
                         </span>
                         <span t-if="p.read_state === 'failed'" class="badge text-bg-danger ms-1">فشلت القراءة</span>

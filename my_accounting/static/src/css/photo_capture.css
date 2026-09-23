@@ -131,7 +131,8 @@
     background-color: var(--o-surface, #fff);
 }
 
-.o_photo_batch .o_pb_running { border-inline-start-color: var(--primary, #714B67); }
+.o_photo_batch .o_pb_running,
+.o_photo_batch .o_pb_batch { border-inline-start-color: var(--primary, #714B67); }
 .o_photo_batch .o_pb_queued { border-inline-start-color: #f0ad4e; }
 .o_photo_batch .o_pb_done { border-inline-start-color: #28a745; }
 .o_photo_batch .o_pb_failed { border-inline-start-color: #dc3545; }

@@ -11,20 +11,20 @@
                 <header>
                     <!-- القراءة: أول مرة أو إعادة القراءة بنموذج آخر (الصورة تبقى محفوظة حتى الترحيل) -->
                     <button name="action_read_claude" type="object" string="قراءة بـ Claude" icon="fa-magic"
-                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running')"/>
+                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running', 'batch')"/>
                     <button name="action_read_gemini" type="object" string="قراءة بـ Gemini" icon="fa-magic"
-                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running')"/>
+                            class="btn-primary" invisible="state != 'new' or not image or read_state in ('queued', 'running', 'batch')"/>
                     <button name="action_read_claude" type="object" string="إعادة القراءة بـ Claude" icon="fa-refresh"
-                            invisible="state != 'review' or not image or read_state in ('queued', 'running')"
+                            invisible="state != 'review' or not image or read_state in ('queued', 'running', 'batch')"
                             confirm="ستحل القراءة الجديدة محل البنود الحالية وأي تعديل أجريته عليها. متابعة؟"/>
                     <button name="action_read_gemini" type="object" string="إعادة القراءة بـ Gemini" icon="fa-refresh"
-                            invisible="state != 'review' or not image or read_state in ('queued', 'running')"
+                            invisible="state != 'review' or not image or read_state in ('queued', 'running', 'batch')"
                             confirm="ستحل القراءة الجديدة محل البنود الحالية وأي تعديل أجريته عليها. متابعة؟"/>
                     <button name="action_post" type="object" string="تأكيد وترحيل القيد" class="btn-success"
                             invisible="state != 'review'"
                             confirm="سيُنشأ قيد محاسبي مرحّل بهذه البنود، وتُحذف الصورة من النظام. متابعة؟"/>
                     <button name="action_stop_read" type="object" string="إيقاف القراءة" icon="fa-stop"
-                            class="btn-danger" invisible="read_state not in ('queued', 'running')"/>
+                            class="btn-danger" invisible="read_state not in ('queued', 'running', 'batch')"/>
                     <button name="action_open_move" type="object" string="فتح القيد المُنشأ"
                             invisible="not move_id"/>
                     <field name="state" widget="statusbar"/>
@@ -42,7 +42,7 @@
                     <!-- شريط تقدم القراءة في الخلفية (يتحدّث تلقائياً) -->
                     <field name="read_state" widget="myaccounting_read_progress" nolabel="1"
                            invisible="read_state == 'idle' or state == 'posted'"/>
-                    <div class="alert alert-info py-2" role="alert" invisible="state != 'new' or read_state in ('queued', 'running')">
+                    <div class="alert alert-info py-2" role="alert" invisible="state != 'new' or read_state in ('queued', 'running', 'batch')">
                         <i class="fa fa-camera me-1"/>
                         الصورة محفوظة بانتظار القراءة. اختر "قراءة بـ Claude" أو "قراءة بـ Gemini" من الأعلى.
                         تعمل القراءة في الخلفية (حتى دقيقة تقريباً)، ويمكنك مغادرة الصفحة والعودة لاحقاً.
@@ -135,7 +135,7 @@
                 <field name="read_count"/>
                 <field name="read_attempts" optional="show"/>
                 <field name="create_date" string="تاريخ التصوير"/>
-                <field name="read_state" widget="badge" decoration-info="read_state in ('queued', 'running')"
+                <field name="read_state" widget="badge" decoration-info="read_state in ('queued', 'running', 'batch')"
                        decoration-danger="read_state == 'failed'" decoration-success="read_state == 'done'"/>
                 <field name="state" widget="badge" decoration-info="state == 'new'"
                        decoration-warning="state == 'review'" decoration-success="state == 'posted'"/>
@@ -175,6 +175,15 @@
         <field name="code">action = records.action_batch_read_gemini()</field>
     </record>
 
+    <record id="action_server_photo_batch_claude" model="ir.actions.server">
+        <field name="name">قراءة بـ Claude (دفعة بنصف السعر)</field>
+        <field name="model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_model_id" ref="model_myaccounting_photo_entry"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_batch_read_claude()</field>
+    </record>
+
     <record id="action_server_photo_stop_read" model="ir.actions.server">
         <field name="name">إيقاف القراءة وإعادة المحاولة</field>
         <field name="model_id" ref="model_myaccounting_photo_entry"/>
@@ -185,7 +194,7 @@
     </record>
 
     <record id="action_myaccounting_photo_batch" model="ir.actions.client">
-        <field name="name">القراءة الجماعية (Gemini)</field>
+        <field name="name">القراءة الجماعية</field>
         <field name="tag">my_accounting.photo_batch</field>
     </record>
 

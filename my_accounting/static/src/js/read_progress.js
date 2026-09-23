@@ -31,7 +31,7 @@ export class ReadProgressField extends Component {
     }
 
     get active() {
-        return ["queued", "running"].includes(this.data.read_state);
+        return ["queued", "running", "batch"].includes(this.data.read_state);
     }
 
     get providerName() {
@@ -41,7 +41,9 @@ export class ReadProgressField extends Component {
     get steps() {
         return [
             "تجهيز الصورة",
-            `إرسال الصورة وانتظار رد ${this.providerName}`,
+            this.data.read_state === "batch"
+                ? "أُرسلت ضمن دفعة Claude (بنصف السعر) — بانتظار النتيجة"
+                : `إرسال الصورة وانتظار رد ${this.providerName}`,
             "تحليل الرد ومطابقة الحسابات",
             "حفظ البنود",
         ];
@@ -89,6 +91,10 @@ export class ReadProgressField extends Component {
         if (step === 2) {
             // انتظار الرد هو الجزء الأطول: نقدّره بالزمن حتى 85%
             const expected = EXPECTED_SECONDS[this.data.read_provider] || 60;
+            if (this.data.read_state === "batch") {
+                // دفعة Claude: لا نعرف موعد النتيجة (عادة أقل من ساعة)
+                return Math.min(80, 10 + Math.round((this.elapsed / 3600) * 70));
+            }
             return Math.min(85, 8 + Math.round((this.elapsed / expected) * 77));
         }
         return step === 3 ? 90 : 96;

@@ -130,7 +130,7 @@ class MyAccountingPhotoEntry(models.Model):
     # حالة القراءة في الخلفية (لشريط التقدم)
     read_state = fields.Selection([
         ('idle', '—'), ('queued', 'في الانتظار'), ('running', 'جارِ القراءة'),
-        ('done', 'اكتملت القراءة'), ('failed', 'فشلت القراءة'),
+        ('batch', 'بانتظار دفعة Claude'), ('done', 'اكتملت القراءة'), ('failed', 'فشلت القراءة'),
     ], string='حالة القراءة', default='idle', readonly=True)
     read_step = fields.Integer(string='خطوة القراءة', readonly=True)
     read_provider = fields.Selection(PROVIDERS, string='القراءة المطلوبة بـ', readonly=True)
@@ -142,6 +142,10 @@ class MyAccountingPhotoEntry(models.Model):
     read_attempts = fields.Integer(string='عدد المحاولات', readonly=True)
     read_next_try = fields.Datetime(string='المحاولة التالية', readonly=True)
     read_batch = fields.Char(string='دفعة القراءة', readonly=True, index=True)
+    # دفعة Claude (Batch API بنصف السعر): معرّف الدفعة لدى Anthropic
+    read_claude_batch_id = fields.Char(string='معرّف دفعة Claude', readonly=True, index=True, copy=False)
+    # الدفعة انتهت لدى Anthropic وجُمعت نتائجها (حتى الملغاة: نجمع ما عولج منها ودُفع ثمنه)
+    read_claude_batch_done = fields.Boolean(readonly=True, copy=False)
     move_id = fields.Many2one('myaccounting.move', string='القيد المُنشأ', readonly=True, ondelete='set null')
     line_ids = fields.One2many('myaccounting.photo.entry.line', 'entry_id', string='البنود')
     total_debit = fields.Float(string='إجمالي المدين', compute='_compute_totals', digits=(16, 3))
@@ -297,27 +301,50 @@ class MyAccountingPhotoEntry(models.Model):
         return data
 
     @api.model
-    def _read_with_claude(self, image_b64, media_type):
+    def _claude_client(self):
         try:
             import anthropic
         except ImportError as error:
             raise UserError('مكتبة anthropic غير مثبتة على الخادم.') from error
-
         api_key = self.env['ir.config_parameter'].sudo().get_param(API_KEY_PARAM)
         client = anthropic.Anthropic(api_key=api_key, timeout=300) if api_key else anthropic.Anthropic(timeout=300)
+        return anthropic, client
+
+    @api.model
+    def _claude_params(self, image_b64, media_type):
+        """إعدادات طلب قراءة مستند واحد (نفسها للقراءة الفورية ولدفعة Batch API)."""
+        return {
+            'model': CLAUDE_MODEL,
+            'max_tokens': 16000,
+            'thinking': {'type': 'adaptive'},
+            'output_config': {'effort': 'high', 'format': {'type': 'json_schema', 'schema': VOUCHER_SCHEMA}},
+            # شجرة الحسابات ثابتة بين الطلبات: تُخزَّن مؤقتاً لتقليل الكلفة
+            'system': [{'type': 'text', 'text': SYSTEM_PROMPT + self._accounts_prompt(),
+                        'cache_control': {'type': 'ephemeral'}}],
+            'messages': [{'role': 'user', 'content': [
+                {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_b64}},
+                {'type': 'text', 'text': 'اقرأ مستند القيد في الصورة وأخرج بياناته.'},
+            ]}],
+        }
+
+    @api.model
+    def _claude_message_data(self, message):
+        """يتحقق من رد Claude ويستخرج بيانات المستند منه."""
+        if message.stop_reason == 'refusal':
+            raise UserError('رفض Claude قراءة هذه الصورة. جرّب صورة أوضح للمستند.')
+        if message.stop_reason == 'max_tokens':
+            raise TransientReadError('انقطعت القراءة قبل اكتمالها. حاول مرة أخرى.')
+        text = next((block.text for block in message.content if block.type == 'text'), '')
+        data = self._parse_json(text, 'Claude')
+        _logger.info('Photo entry read: %s lines, usage %s', len(data.get('lines') or []), message.usage)
+        return data
+
+    @api.model
+    def _read_with_claude(self, image_b64, media_type):
+        anthropic, client = self._claude_client()
         try:
             response = client.beta.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=16000,
-                thinking={'type': 'adaptive'},
-                output_config={'effort': 'high', 'format': {'type': 'json_schema', 'schema': VOUCHER_SCHEMA}},
-                # شجرة الحسابات ثابتة بين الطلبات: تُخزَّن مؤقتاً لتقليل الكلفة
-                system=[{'type': 'text', 'text': SYSTEM_PROMPT + self._accounts_prompt(),
-                         'cache_control': {'type': 'ephemeral'}}],
-                messages=[{'role': 'user', 'content': [
-                    {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image_b64}},
-                    {'type': 'text', 'text': 'اقرأ مستند القيد في الصورة وأخرج بياناته.'},
-                ]}],
+                **self._claude_params(image_b64, media_type),
                 # إن رفض النموذج الطلب لسبب أمني يُعاد تلقائياً على النموذج البديل المناسب
                 betas=['server-side-fallback-2026-07-01'],
                 fallbacks='default',
@@ -337,14 +364,7 @@ class MyAccountingPhotoEntry(models.Model):
         except anthropic.APIConnectionError as error:
             raise TransientReadError('تعذّر الاتصال بـ Claude API. تحقّق من اتصال الخادم بالإنترنت.') from error
 
-        if response.stop_reason == 'refusal':
-            raise UserError('رفض Claude قراءة هذه الصورة. جرّب صورة أوضح للمستند.')
-        if response.stop_reason == 'max_tokens':
-            raise TransientReadError('انقطعت القراءة قبل اكتمالها. حاول مرة أخرى.')
-        text = next((block.text for block in response.content if block.type == 'text'), '')
-        data = self._parse_json(text, 'Claude')
-        _logger.info('Photo entry read: %s lines, usage %s', len(data.get('lines') or []), response.usage)
-        return data
+        return self._claude_message_data(response)
 
     @api.model
     def _parse_date(self, value):
@@ -427,7 +447,7 @@ class MyAccountingPhotoEntry(models.Model):
             raise UserError('تم ترحيل هذا القيد، ولا يمكن إعادة قراءته.')
         if not self.image:
             raise UserError('لا توجد صورة محفوظة لهذا القيد.')
-        if self.read_state in ('queued', 'running'):
+        if self.read_state in ('queued', 'running', 'batch'):
             raise UserError('هناك قراءة جارية لهذه الصورة. انتظر حتى تنتهي.')
         self.write({'read_state': 'queued', 'read_provider': provider, 'read_step': 0,
                     'read_error': False, 'read_started': False, 'read_finished': False,
@@ -441,7 +461,8 @@ class MyAccountingPhotoEntry(models.Model):
 
     def action_batch_read_gemini(self):
         """من القائمة: قراءة الصور المحددة بـ Gemini، مع إعادة المحاولة تلقائياً حتى النجاح."""
-        entries = self.filtered(lambda e: e.image and e.state != 'posted' and e.read_state not in ('queued', 'running'))
+        entries = self.filtered(lambda e: e.image and e.state != 'posted'
+                                and e.read_state not in ('queued', 'running', 'batch'))
         if not entries:
             raise UserError('لا توجد صور قابلة للقراءة ضمن التحديد (مرحّلة، أو بلا صورة، أو قراءتها جارية).')
         batch = fields.Datetime.to_string(fields.Datetime.now())
@@ -457,15 +478,69 @@ class MyAccountingPhotoEntry(models.Model):
             'context': {'photo_batch': batch},
         }
 
+    def action_batch_read_claude(self):
+        """من القائمة: إرسال الصور المحددة إلى Claude في دفعة واحدة (Batch API بنصف السعر).
+        النتائج تصل خلال دقائق إلى ساعة عادةً (حتى 24 ساعة)، وتجمعها المهمة المجدولة."""
+        entries = self.filtered(lambda e: e.image and e.state != 'posted'
+                                and e.read_state not in ('queued', 'running', 'batch'))
+        if not entries:
+            raise UserError('لا توجد صور قابلة للقراءة ضمن التحديد (مرحّلة، أو بلا صورة، أو قراءتها جارية).')
+        anthropic, client = self._claude_client()
+        from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+        from anthropic.types.messages.batch_create_params import Request
+        requests_list = []
+        for entry in entries:
+            image_b64 = entry.image.decode() if isinstance(entry.image, bytes) else entry.image
+            requests_list.append(Request(
+                custom_id=f'photo-entry-{entry.id}',
+                params=MessageCreateParamsNonStreaming(**self._claude_params(image_b64, entry.image_mimetype or 'image/jpeg')),
+            ))
+        try:
+            claude_batch = client.messages.batches.create(requests=requests_list)
+        except anthropic.AuthenticationError as error:
+            raise UserError('مفتاح Claude API غير صحيح. أدخل المفتاح الصحيح من صفحة التصوير.') from error
+        except anthropic.APIStatusError as error:
+            raise UserError(f'تعذّر إرسال الدفعة إلى Claude ({error.status_code}): {error.message}') from error
+        except anthropic.APIConnectionError as error:
+            raise UserError('تعذّر الاتصال بـ Claude API. تحقّق من اتصال الخادم بالإنترنت.') from error
+        batch = fields.Datetime.to_string(fields.Datetime.now())
+        entries.write({'read_state': 'batch', 'read_provider': 'claude', 'read_step': 2,
+                       'read_error': False, 'read_started': fields.Datetime.now(), 'read_finished': False,
+                       'read_auto_retry': False, 'read_attempts': 1, 'read_next_try': False,
+                       'read_batch': batch, 'read_claude_batch_id': claude_batch.id,
+                       'read_claude_batch_done': False})
+        _logger.info('Photo entries %s: sent to Claude batch %s', entries.ids, claude_batch.id)
+        # أول فحص للنتائج بعد دقيقتين، ثم دورياً مع المهمة (كل 5 دقائق)
+        self._read_cron()._trigger(at=fields.Datetime.now() + timedelta(minutes=2))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'my_accounting.photo_batch',
+            'name': 'القراءة الجماعية بـ Claude',
+            'context': {'photo_batch': batch},
+        }
+
     def action_stop_read(self):
-        """إيقاف إعادة المحاولة. قراءة جارية الآن تكتمل، لكن لا تُعاد إن فشلت."""
+        """إيقاف إعادة المحاولة. قراءة جارية الآن تكتمل، لكن لا تُعاد إن فشلت.
+        صور دفعة Claude: تُعلَّم متوقفة وتُهمل نتيجتها؛ وإن أُوقفت كل صور الدفعة
+        تُلغى الدفعة لدى Anthropic فلا تُحتسب الطلبات التي لم تُعالَج بعد."""
+        claude_batches = set()
         for entry in self:
             vals = {'read_auto_retry': False, 'read_next_try': False}
-            if entry.read_state == 'queued':
+            if entry.read_state in ('queued', 'batch'):
                 last = f' (آخر خطأ: {entry.read_error})' if entry.read_error else ''
                 vals.update({'read_state': 'failed', 'read_finished': fields.Datetime.now(),
                              'read_error': f'أوقفتَ القراءة يدوياً{last}.'})
+                if entry.read_state == 'batch' and entry.read_claude_batch_id:
+                    claude_batches.add(entry.read_claude_batch_id)
             entry.write(vals)
+        for batch_id in claude_batches:
+            if not self.search_count([('read_claude_batch_id', '=', batch_id), ('read_state', '=', 'batch')]):
+                try:
+                    _anthropic, client = self._claude_client()
+                    client.messages.batches.cancel(batch_id)
+                    _logger.info('Claude batch %s canceled (all its photos were stopped)', batch_id)
+                except Exception:
+                    _logger.exception('Could not cancel Claude batch %s', batch_id)
         return True
 
     @api.model
@@ -488,6 +563,7 @@ class MyAccountingPhotoEntry(models.Model):
                 'auto_retry': entry.read_auto_retry,
                 'retry_in': max(0, int((entry.read_next_try - now).total_seconds())) if entry.read_next_try else 0,
                 'error': entry.read_error or '',
+                'provider': entry.read_provider or '',
                 'lines': len(entry.line_ids),
                 'uncertain': entry.uncertain_count,
                 'balanced': entry.is_balanced,
@@ -534,11 +610,91 @@ class MyAccountingPhotoEntry(models.Model):
                               order='read_next_try', limit=1)
         if waiting:
             self._read_cron()._trigger(at=waiting.read_next_try)
+        self._poll_claude_batches()
+
+    @api.model
+    def _poll_claude_batches(self):
+        """يسأل Anthropic عن دفعات Claude المرسلة، ويحفظ نتيجة كل صورة عند انتهاء دفعتها.
+        الدفعات الملغاة تُتابَع أيضاً حتى تنتهي: ما عولج منها قبل الإلغاء دُفع ثمنه، فتُحفظ نتيجته."""
+        batch_ids = set(self.search([('read_claude_batch_id', '!=', False),
+                                     ('read_claude_batch_done', '=', False)]).mapped('read_claude_batch_id'))
+        if not batch_ids:
+            return
+        try:
+            _anthropic, client = self._claude_client()
+        except UserError:
+            _logger.exception('Cannot poll Claude batches')
+            return
+        for batch_id in batch_ids:
+            try:
+                claude_batch = client.messages.batches.retrieve(batch_id)
+                if claude_batch.processing_status != 'ended':
+                    continue
+                results = list(client.messages.batches.results(batch_id))
+            except Exception:
+                _logger.exception('Could not fetch Claude batch %s (will retry later)', batch_id)
+                continue
+            for result in results:
+                entry_id = int(result.custom_id.rsplit('-', 1)[-1])
+                entry = self.search([('id', '=', entry_id), ('read_claude_batch_id', '=', batch_id)])
+                if not entry or entry.state == 'posted':
+                    continue
+                if entry.read_state == 'batch':
+                    entry._apply_batch_result(result)
+                elif (result.result.type == 'succeeded' and entry.read_state == 'failed'
+                      and entry.state == 'new'):
+                    # صورة أُوقفت لكن Anthropic قرأها (ودُفع ثمنها) ولم تُقرأ بطريقة أخرى بعد: نحفظها
+                    entry._apply_batch_result(result)
+            # صور لم تُرجع لها الدفعة نتيجة (نادر): تُعلَّم فاشلة
+            self.search([('read_claude_batch_id', '=', batch_id), ('read_state', '=', 'batch')]).write({
+                'read_state': 'failed', 'read_finished': fields.Datetime.now(),
+                'read_error': 'انتهت دفعة Claude دون نتيجة لهذه الصورة. أعد المحاولة.'})
+            self.search([('read_claude_batch_id', '=', batch_id)]).write({'read_claude_batch_done': True})
+            self.env.cr.commit()
+        if self.search_count([('read_claude_batch_id', '!=', False), ('read_claude_batch_done', '=', False)]):
+            self._read_cron()._trigger(at=fields.Datetime.now() + timedelta(minutes=3))
+
+    def _apply_batch_result(self, result):
+        self.ensure_one()
+        kind = result.result.type
+        try:
+            if kind == 'succeeded':
+                self._apply_voucher(self._claude_message_data(result.result.message), 'claude')
+                self.read_error = False
+                self.env.cr.commit()
+                _logger.info('Photo entry %s: saved %s lines from Claude batch', self.id, len(self.line_ids))
+                return
+            if self.read_state != 'batch':
+                return  # صورة أوقفها المستخدم: لا نغيّر رسالتها إلا عند نجاح القراءة
+            message = {
+                'errored': 'فشل طلب هذه الصورة داخل دفعة Claude. أعد المحاولة.',
+                'canceled': 'أُلغيت دفعة Claude قبل قراءة هذه الصورة.',
+                'expired': 'انتهت مهلة دفعة Claude (24 ساعة) قبل قراءة هذه الصورة. أعد المحاولة.',
+            }.get(kind, f'نتيجة غير متوقعة من دفعة Claude: {kind}')
+            if kind == 'errored':
+                _logger.warning('Photo entry %s: Claude batch error %s', self.id, result.result.error)
+        except UserError as error:
+            self.env.cr.rollback()
+            self.env.invalidate_all()
+            message = error.args[0]
+        self.write({'read_state': 'failed', 'read_error': message, 'read_finished': fields.Datetime.now()})
+        self.env.cr.commit()
 
     def _set_read_step(self, step):
         # كل خطوة تُحفظ فوراً ليراها شريط التقدم في المتصفح
         self.write({'read_step': step})
         self.env.cr.commit()
+
+    def _apply_voucher(self, data, provider):
+        """يحفظ ما قُرئ من المستند كبنود قيد الصورة (يحل محل القراءة السابقة)."""
+        vals = self._vals_from_voucher(data)
+        self.write({'read_step': 4})
+        self.line_ids.unlink()
+        # قراءة جديدة: تبقى اليومية كما اختارها المستخدم
+        vals.pop('journal', None)
+        self.write(dict(vals, provider=provider, state='review', read_count=self.read_count + 1,
+                        read_state='done', read_step=5, read_finished=fields.Datetime.now(),
+                        read_error=False, read_auto_retry=False))
 
     def _run_read(self):
         self.ensure_one()
@@ -552,14 +708,7 @@ class MyAccountingPhotoEntry(models.Model):
             self._set_read_step(2)
             data = self._read_voucher(image_b64, self.image_mimetype or 'image/jpeg', provider)
             self._set_read_step(3)
-            vals = self._vals_from_voucher(data)
-            self._set_read_step(4)
-            self.line_ids.unlink()
-            # قراءة جديدة: تبقى اليومية كما اختارها المستخدم
-            vals.pop('journal', None)
-            self.write(dict(vals, provider=provider, state='review', read_count=self.read_count + 1,
-                            read_state='done', read_step=5, read_finished=fields.Datetime.now(),
-                            read_error=False, read_auto_retry=False))
+            self._apply_voucher(data, provider)
             self.env.cr.commit()
             _logger.info('Photo entry %s: saved %s lines from %s', self.id, len(self.line_ids), provider)
         except Exception as error:
