@@ -1,0 +1,176 @@
+/* مظاهر الواجهة: لون الشريط العلوي والأزرار والروابط والبطاقات.
+   يُختار المظهر من "إعدادات أخرى ← المظهر"، ويوضع اسمه على وسم <html>. */
+:root,
+html[data-ma-theme="odoo"] {
+    --ma-accent: #714B67;
+    --ma-accent-2: #8F5F86;
+    --ma-accent-text: #ffffff;
+}
+
+html[data-ma-theme="ocean"] {
+    --ma-accent: #1B3B6F;
+    --ma-accent-2: #2E86DE;
+    --ma-accent-text: #ffffff;
+}
+
+html[data-ma-theme="emerald"] {
+    --ma-accent: #0B6B4F;
+    --ma-accent-2: #28A745;
+    --ma-accent-text: #ffffff;
+}
+
+html[data-ma-theme="sunset"] {
+    --ma-accent: #B54708;
+    --ma-accent-2: #E67E22;
+    --ma-accent-text: #ffffff;
+}
+
+html[data-ma-theme="midnight"] {
+    --ma-accent: #0F1633;
+    --ma-accent-2: #6C5CE7;
+    --ma-accent-text: #ffffff;
+}
+
+html[data-ma-theme="graphite"] {
+    --ma-accent: #3C4650;
+    --ma-accent-2: #6C757D;
+    --ma-accent-text: #ffffff;
+}
+
+/* الشريط العلوي */
+.o_main_navbar {
+    background: linear-gradient(135deg, var(--ma-accent) 0%, var(--ma-accent-2) 100%) !important;
+    border-bottom-color: var(--ma-accent) !important;
+}
+
+/* الأزرار الرئيسية */
+.btn-primary,
+.btn-primary:focus {
+    background-color: var(--ma-accent-2);
+    border-color: var(--ma-accent-2);
+    color: var(--ma-accent-text);
+}
+
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary.active {
+    background-color: var(--ma-accent);
+    border-color: var(--ma-accent);
+    color: var(--ma-accent-text);
+}
+
+.btn-outline-primary {
+    color: var(--ma-accent-2);
+    border-color: var(--ma-accent-2);
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary.active {
+    background-color: var(--ma-accent-2);
+    border-color: var(--ma-accent-2);
+    color: var(--ma-accent-text);
+}
+
+/* التبويبات والروابط داخل صفحات المحاسبة */
+.o_customers_page .nav-tabs .nav-link.active,
+.o_reports_page .nav-tabs .nav-link.active,
+.o_myaccounting_settings .nav-tabs .nav-link.active {
+    color: var(--ma-accent-2);
+    border-bottom-color: var(--ma-accent-2);
+}
+
+/* أيقونات بطاقات الصفحة الرئيسية وحدودها عند المرور */
+.o_home_nav:hover,
+.o_rep_card:hover {
+    border-color: var(--ma-accent-2);
+}
+
+/* اختيار المظهر في صفحة الإعدادات */
+.o_ma_theme_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    max-width: 820px;
+}
+
+.o_ma_theme_card {
+    border: 2px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+    background-color: var(--o-surface, #fff);
+    transition: transform 0.12s ease-in, box-shadow 0.12s ease-in;
+}
+
+.o_ma_theme_card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.o_ma_theme_card.o_selected {
+    border-color: var(--ma-accent-2);
+}
+
+.o_ma_theme_preview {
+    height: 64px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+/* شريط علوي وبطاقتان داخل المعاينة، تحاكيان شكل الشاشة */
+.o_ma_theme_preview::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.o_ma_theme_preview::after {
+    content: "";
+    position: absolute;
+    inset-inline-start: 8px;
+    bottom: 8px;
+    width: 42%;
+    height: 22px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.o_ma_scheme_card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    min-width: 190px;
+}
+
+.o_ma_scheme_card.o_selected {
+    border-color: var(--ma-accent-2);
+}
+
+.o_ma_scheme_icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.o_ma_scheme_light .o_ma_scheme_icon {
+    background: #f6f6f6;
+    color: #f0ad4e;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.o_ma_scheme_dark .o_ma_scheme_icon {
+    background: #1b2130;
+    color: #cdd3e0;
+}

@@ -22,12 +22,65 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'theme' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('theme')">
+                        <i class="fa fa-paint-brush me-1"/> المظهر
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.activeTab === 'system' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('system')">
                         <i class="fa fa-power-off me-1"/> النظام
                     </a>
                 </li>
             </ul>
+
+            <t t-if="state.activeTab === 'theme'">
+                <div class="mb-4">
+                    <h5 class="mb-1">الوضع</h5>
+                    <div class="text-muted small mb-2">يُطبَّق على كل الشاشات، ويُعاد تحميل الصفحة عند التبديل.</div>
+                    <div class="d-flex flex-wrap" style="gap: 12px;">
+                        <div t-attf-class="o_ma_scheme_card o_ma_scheme_light {{ !isDark ? 'o_selected' : '' }}"
+                             t-on-click="() => this.setScheme('light')">
+                            <div class="o_ma_scheme_icon"><i class="fa fa-sun-o"/></div>
+                            <div>
+                                <div class="fw-bold">فاتح</div>
+                                <div class="small text-muted">الوضع الافتراضي</div>
+                            </div>
+                            <i t-if="!isDark" class="fa fa-check-circle text-success ms-auto"/>
+                        </div>
+                        <div t-attf-class="o_ma_scheme_card o_ma_scheme_dark {{ isDark ? 'o_selected' : '' }}"
+                             t-on-click="() => this.setScheme('dark')">
+                            <div class="o_ma_scheme_icon"><i class="fa fa-moon-o"/></div>
+                            <div>
+                                <div class="fw-bold">داكن</div>
+                                <div class="small text-muted">مريح للعين ليلاً</div>
+                            </div>
+                            <i t-if="isDark" class="fa fa-check-circle text-success ms-auto"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h5 class="mb-1">لون الواجهة</h5>
+                    <div class="text-muted small mb-2">
+                        يغيّر لون الشريط العلوي والأزرار والروابط. يُطبَّق فوراً ويُحفظ لك وحدك،
+                        فلكل مستخدم مظهره.
+                    </div>
+                    <div class="o_ma_theme_grid">
+                        <div t-foreach="state.themes" t-as="item" t-key="item.key"
+                             t-attf-class="o_ma_theme_card {{ state.theme === item.key ? 'o_selected' : '' }}"
+                             t-on-click="() => this.setTheme(item.key)">
+                            <div class="o_ma_theme_preview"
+                                 t-attf-style="background: linear-gradient(135deg, {{ item.colors[0] }} 0%, {{ item.colors[1] }} 100%);"/>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span t-esc="item.name"/>
+                                <i t-if="state.theme === item.key" class="fa fa-check-circle text-success"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
 
             <t t-if="state.activeTab === 'backup'">
             <div class="o_settings_section mb-4">

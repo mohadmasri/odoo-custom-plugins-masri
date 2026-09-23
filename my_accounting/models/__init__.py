@@ -4,6 +4,7 @@ from . import customers
 from . import review_note
 from . import receipt_allocation
 from . import reports
+from . import theme
 from . import photo_entry
 from . import account_move
 from . import backup

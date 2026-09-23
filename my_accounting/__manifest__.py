@@ -98,6 +98,8 @@
             'my_accounting/static/src/xml/user_admin.xml',
             'my_accounting/static/src/css/user_admin.css',
             'my_accounting/static/src/js/dark_mode_toggle.js',
+            'my_accounting/static/src/js/theme_service.js',
+            'my_accounting/static/src/css/themes.css',
             'my_accounting/static/src/xml/dark_mode_toggle.xml',
         ],
         # الوضع الداكن: نحقن متغيّرات الألوان الداكنة في حزمتي الأنماط الداكنة

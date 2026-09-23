@@ -4,6 +4,10 @@ import { Component, onWillStart, useState, useRef } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { browser } from "@web/core/browser/browser";
+import { applyTheme } from "./theme_service";
+
+const SCHEME_COOKIE = "color_scheme";
 
 export class MyAccountingSettings extends Component {
     static template = "my_accounting.Settings";
@@ -23,12 +27,44 @@ export class MyAccountingSettings extends Component {
             backup: null,
             savingBackup: false,
             runningBackup: false,
+            theme: "odoo",
+            themes: [],
         });
-        onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig()]));
+        onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig(), this.loadTheme()]));
     }
 
     setTab(tab) {
         this.state.activeTab = tab;
+    }
+
+    // ------------------------------------------------------------------
+    // المظهر: الوضع (فاتح/داكن) ولون الواجهة
+    // ------------------------------------------------------------------
+
+    async loadTheme() {
+        const result = await this.orm.call("myaccounting.theme", "get_theme", []);
+        this.state.theme = result.theme;
+        this.state.themes = result.themes;
+    }
+
+    get isDark() {
+        return document.cookie.split(";").map((c) => c.trim()).includes(`${SCHEME_COOKIE}=dark`);
+    }
+
+    // الوضع الداكن يغيّر حزمة الأنماط التي يرسلها الخادم، فتلزم إعادة تحميل الصفحة
+    setScheme(scheme) {
+        if ((scheme === "dark") === this.isDark) {
+            return;
+        }
+        document.cookie = `${SCHEME_COOKIE}=${scheme}; path=/; max-age=${60 * 60 * 24 * 365}`;
+        browser.location.reload();
+    }
+
+    async setTheme(theme) {
+        this.state.theme = theme;
+        applyTheme(theme); // فوري، بلا إعادة تحميل
+        await this.orm.call("myaccounting.theme", "set_theme", [theme]);
+        this.notification.add("تم حفظ المظهر.", { type: "success" });
     }
 
     // ------------------------------------------------------------------
