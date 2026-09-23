@@ -117,6 +117,8 @@
                             <field name="attachment_ids" widget="many2many_binary" nolabel="1"/>
                         </page>
                     </notebook>
+                    <!-- كيف يظهر هذا القيد وحده في دفتر الأستاذ العام -->
+                    <widget name="my_accounting.move_ledger_row"/>
                 </sheet>
                 <chatter/>
             </form>

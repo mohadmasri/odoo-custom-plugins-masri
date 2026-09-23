@@ -134,13 +134,13 @@ class MyAccountingAccount(models.Model):
         self.ensure_one()
         if line_ids is not None:
             lines = self.env['myaccounting.move.line'].browse(line_ids).exists()
-            return lines.sorted(key=lambda line: (line.date or fields.Date.today(), line.id))
+            return lines.sorted(key=lambda line: (line.move_sort_key or '', line.sequence, line.id))
         # نفس شروط فلتر شجرة الحسابات تماماً، حتى تطابق الطباعة ما يظهر على الشاشة
         ctx = self.env.context
         domain = [('account_id', 'child_of', self.id)] + self._movement_line_domain(
             date_from, date_to, ctx.get('move_from'), ctx.get('move_to'),
             ctx.get('ledger_from'), ctx.get('ledger_to'))
-        return self.env['myaccounting.move.line'].search(domain, order='date, id')
+        return self.env['myaccounting.move.line'].search(domain, order='move_sort_key, sequence, id')
 
     def statement_opening_balance(self, date_from=False):
         """رصيد الحساب قبل بداية الفلتر ("رصيد سابق" في كشف الحساب).
@@ -204,8 +204,22 @@ class MyAccountingAccount(models.Model):
 
     @api.model
     def _ordered_moves(self):
-        moves = self.env['myaccounting.move'].search([])
-        return moves.sorted(key=lambda move: (self._move_sort_key(move), move.id))
+        return self.env['myaccounting.move'].search([], order='sort_key, id')
+
+    @api.model
+    def get_ledger_columns(self):
+        """أعمدة دفتر الأستاذ العام: الحسابات الرئيسية بترتيب الدفتر، مع ربط كل
+        حساب (فرعي أو رئيسي) بحسابه الرئيسي. تُستخدم لعرض سطر قيد واحد بنفس
+        شكل الدفتر داخل شاشة القيد."""
+        roots = self.search([('parent_id', '=', False)], order='ledger_sequence, code')
+        root_of = {
+            account.id: int((account.parent_path or str(account.id)).split('/')[0])
+            for account in self.search([])
+        }
+        return {
+            'accounts': [{'id': acc.id, 'code': acc.code, 'name': acc.name} for acc in roots],
+            'root_of': root_of,
+        }
 
     @api.model
     def _parse_ledger_period(self, value):

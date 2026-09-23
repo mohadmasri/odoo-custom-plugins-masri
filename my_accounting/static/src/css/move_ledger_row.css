@@ -1,0 +1,46 @@
+/* سطر القيد في دفتر الأستاذ العام (أسفل شاشة القيد): نفس شكل جدول الدفتر */
+.o_move_ledger_row .o_mlr_table thead tr {
+    background-color: var(--o-surface-2, #f2f2f2);
+}
+
+.o_move_ledger_row .o_mlr_table {
+    table-layout: fixed;
+    width: auto;
+}
+
+.o_move_ledger_row .o_mlr_num {
+    width: 92px;
+    min-width: 92px;
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.o_move_ledger_row .o_mlr_move {
+    width: 120px;
+    min-width: 120px;
+}
+
+.o_move_ledger_row .o_mlr_date {
+    width: 104px;
+    min-width: 104px;
+}
+
+.o_move_ledger_row .o_mlr_ref {
+    width: 160px;
+    min-width: 160px;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* خلايا القيد نفسه أوضح قليلاً من ترويسة الأعمدة */
+.o_move_ledger_row .o_mlr_table tbody td {
+    font-weight: 500;
+}
+
+@media print {
+    .o_move_ledger_row {
+        display: none;
+    }
+}

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.MoveLedgerRow">
+        <div class="o_move_ledger_row mt-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap mb-2" style="gap: 8px;">
+                <h4 class="m-0">
+                    <i class="fa fa-table me-1"/>سطر القيد في دفتر الأستاذ العام
+                    <span t-if="ledgerPeriod" class="text-muted small ms-2" t-esc="ledgerPeriod"/>
+                </h4>
+                <div class="d-flex" style="gap: 8px;">
+                    <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.toggleOnlyUsed()">
+                        <i class="fa fa-columns me-1"/>
+                        <t t-if="state.onlyUsed">كل الحسابات</t>
+                        <t t-else="">الحسابات المستخدمة فقط</t>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.openLedger()">
+                        <i class="fa fa-book me-1"/>فتح الدفتر
+                    </button>
+                </div>
+            </div>
+
+            <div t-if="!state.columns" class="text-muted small">جارِ التحميل...</div>
+
+            <t t-else="">
+                <div class="o_mlr_scroll" style="overflow-x:auto;">
+                    <table class="table table-bordered table-sm o_mlr_table m-0" style="white-space:nowrap;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" class="o_mlr_move">القيد</th>
+                                <th rowspan="2" class="o_mlr_date">التاريخ</th>
+                                <th rowspan="2" class="o_mlr_ref">المرجع</th>
+                                <th rowspan="2" class="text-end o_mlr_num">إجمالي مدين</th>
+                                <th rowspan="2" class="text-end o_mlr_num">إجمالي دائن</th>
+                                <t t-foreach="accounts" t-as="acc" t-key="acc.id">
+                                    <th colspan="2" class="text-center">
+                                        <t t-esc="acc.code"/><t t-esc="' - '"/><t t-esc="acc.name"/>
+                                    </th>
+                                </t>
+                            </tr>
+                            <tr>
+                                <t t-foreach="accounts" t-as="acc" t-key="acc.id">
+                                    <th class="text-end small o_mlr_num">من</th>
+                                    <th class="text-end small o_mlr_num">إلى</th>
+                                </t>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="o_mlr_move">
+                                    <strong t-esc="record.data.name or 'قيد جديد'"/>
+                                    <span t-if="record.data.state !== 'posted'"
+                                          t-attf-class="badge ms-1 {{ record.data.state === 'draft' ? 'text-bg-secondary' : 'text-bg-warning' }}"
+                                          style="font-size:9px;"
+                                          t-esc="record.data.state === 'draft' ? 'مسودة' : 'غير مكتمل'"/>
+                                </td>
+                                <td class="o_mlr_date" t-esc="dateText"/>
+                                <td class="o_mlr_ref" t-esc="record.data.ref or ''"/>
+                                <td class="text-end o_mlr_num" t-esc="this.fmt(row.totalDebit)"/>
+                                <td class="text-end o_mlr_num" t-esc="this.fmt(row.totalCredit)"/>
+                                <t t-foreach="accounts" t-as="acc" t-key="acc.id">
+                                    <td class="text-end o_mlr_num" t-esc="this.cell(row.amounts[acc.id], 'debit')"/>
+                                    <td class="text-end o_mlr_num" t-esc="this.cell(row.amounts[acc.id], 'credit')"/>
+                                </t>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div t-if="state.onlyUsed and !accounts.length" class="text-muted small mt-1">
+                    لا يوجد بند بحساب محدّد في هذا القيد بعد.
+                </div>
+                <div t-if="row.missing" class="text-warning small mt-1">
+                    <i class="fa fa-exclamation-triangle me-1"/>
+                    <t t-esc="row.missing"/> بند بلا حساب: مبلغه ضمن الإجمالي لكن بلا عمود في الدفتر.
+                </div>
+                <div t-if="difference" class="text-danger small mt-1">
+                    <i class="fa fa-exclamation-circle me-1"/>
+                    القيد غير متوازن: الفرق <t t-esc="differenceText"/>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

@@ -26,12 +26,16 @@ export class GeneralLedger extends Component {
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
+        // عند الفتح من شاشة قيد: نبدأ على شهر ذلك القيد وبحالته، ليظهر سطره مباشرة
+        const context = (this.props.action && this.props.action.context) || {};
+        const states = (context.ledger_states || []).filter(
+            (state) => STATE_FILTERS.some((flt) => flt.value === state));
         this.state = useState({
-            month: currentMonth(),
+            month: context.ledger_month || currentMonth(),
             data: null,
             loading: true,
             // فلتر الحالة (اختيار متعدد مثل صفحة القيود): مرحّل فقط افتراضياً
-            states: ["posted"],
+            states: states.length ? states : ["posted"],
         });
         this.stateFilters = STATE_FILTERS;
         onWillStart(() => this.loadData());
