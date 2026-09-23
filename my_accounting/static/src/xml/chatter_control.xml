@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.ChatterControl">
+        <Dropdown menuClass="'o_ma_chatter_menu'">
+            <button class="o_ma_chatter_btn d-flex align-items-center justify-content-center px-2"
+                    t-att-title="'المحادثة: ' + current.label">
+                <i t-attf-class="fa {{ state.mode === 'hidden' ? 'fa-comment-o' : 'fa-comments-o' }}"
+                   style="font-size:16px;"/>
+            </button>
+            <t t-set-slot="content">
+                <div class="px-3 py-1 small text-muted">مكان المحادثة والمرفقات</div>
+                <DropdownItem t-foreach="modes" t-as="mode" t-key="mode.key"
+                              onSelected="() => this.setMode(mode.key)">
+                    <span class="d-flex align-items-center" style="gap: 8px;">
+                        <i t-attf-class="fa {{ mode.icon }} fa-fw"/>
+                        <span class="flex-grow-1">
+                            <span t-esc="mode.label"/>
+                            <span class="d-block small text-muted" t-esc="mode.hint"/>
+                        </span>
+                        <i t-if="mode.key === state.mode" class="fa fa-check text-success"/>
+                    </span>
+                </DropdownItem>
+            </t>
+        </Dropdown>
+    </t>
+
+</templates>

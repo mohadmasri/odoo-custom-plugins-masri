@@ -1,0 +1,11 @@
+/* زر التحكم بالمحادثة في الشريط العلوي */
+.o_ma_chatter_btn {
+    height: 100%;
+    background: none;
+    border: 0;
+    color: inherit;
+}
+
+.o_ma_chatter_menu {
+    min-width: 260px;
+}
