@@ -6,9 +6,45 @@
     width: 100%;
 }
 
-.o_myaccounting_journal_combo > input {
+.o_myaccounting_journal_box {
     flex: 1 1 auto;
-    padding-inline-end: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding-inline-end: 22px;
+    border-bottom: 1px solid var(--o-input-border-color, rgba(0, 0, 0, 0.2));
+}
+
+.o_myaccounting_journal_tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--o-surface-2, #eef3fb);
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    padding: 1px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.o_myaccounting_journal_tag_x {
+    border: 0;
+    background: transparent;
+    color: var(--gray-600, #6c757d);
+    padding: 0;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.o_myaccounting_journal_search {
+    flex: 1 1 80px;
+    min-width: 80px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    padding: 2px 0;
 }
 
 .o_myaccounting_journal_toggle {

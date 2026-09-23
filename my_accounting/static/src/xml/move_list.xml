@@ -64,6 +64,17 @@
                            t-on-input="(ev) => this.onTextInput('account', ev)"/>
                 </div>
                 <div>
+                    <label class="d-block small text-muted mb-1">اليومية</label>
+                    <select class="form-select form-select-sm" style="width:170px;"
+                            t-on-change="(ev) => this.onJournalFilter(ev)">
+                        <option value="">-- الكل --</option>
+                        <t t-foreach="state.journalNames" t-as="journalName" t-key="journalName">
+                            <option t-att-value="journalName" t-att-selected="journalName === state.journal"
+                                    t-esc="journalName"/>
+                        </t>
+                    </select>
+                </div>
+                <div>
                     <label class="d-block small text-muted mb-1">شهر دفتر الأستاذ</label>
                     <select class="form-select form-select-sm" style="width:150px;"
                             t-on-change="(ev) => this.onLedgerMonthFilter(ev)">
@@ -180,7 +191,7 @@
                                title="لهذا القيد ملاحظات استيراد لم تُراجع بعد"/>
                         </td>
                         <td t-esc="rec.date"/>
-                        <td t-esc="rec.ledger_period_label"/>
+                        <td t-esc="rec.ledger_period_label or ''"/>
                         <td t-esc="rec.ref or ''"/>
                         <td t-esc="rec.journal or ''"/>
                         <td class="text-end" t-esc="rec.total_debit.toFixed(3)"/>

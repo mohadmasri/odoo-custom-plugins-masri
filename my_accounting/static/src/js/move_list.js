@@ -55,7 +55,7 @@ function compareMoveNames(a, b) {
 // الفلاتر والترتيب التي تُحفظ عند فتح قيد وتُستعاد عند الرجوع إلى القائمة
 const KEPT_STATE_FIELDS = [
     "name", "ref", "account", "dateFrom", "dateTo",
-    "stateFilters", "typeFilter", "ledgerMonth", "ledgerYear",
+    "stateFilters", "typeFilter", "journal", "ledgerMonth", "ledgerYear",
     "sortField", "sortDir",
 ];
 
@@ -88,6 +88,8 @@ export class MoveList extends Component {
             dateTo: "",
             stateFilters: [],
             typeFilter: "",
+            journal: "",
+            journalNames: [],
             ledgerMonth: "",
             ledgerYear: "",
             selected: {},
@@ -106,7 +108,10 @@ export class MoveList extends Component {
         });
         this.stateLabels = STATE_LABELS;
         this.ledgerMonthOptions = LEDGER_MONTH_OPTIONS;
-        onWillStart(() => this.loadData());
+        onWillStart(async () => {
+            this.state.journalNames = await this.orm.call("myaccounting.journal", "get_journal_names", []);
+            await this.loadData();
+        });
         this._debounceTimer = null;
     }
 
@@ -231,6 +236,10 @@ export class MoveList extends Component {
         if (this.state.typeFilter) {
             domain.push(["move_type", "=", this.state.typeFilter]);
         }
+        if (this.state.journal) {
+            // القيد قد يحمل أكثر من يومية في الخانة نفسها، فنبحث عن الاسم ضمنها
+            domain.push(["journal", "ilike", this.state.journal]);
+        }
         if (this.state.ledgerMonth) {
             domain.push(["ledger_month", "=", this.state.ledgerMonth]);
         }
@@ -247,7 +256,9 @@ export class MoveList extends Component {
             ["name", "date", "ref", "journal", "total_debit", "total_credit", "state",
              "ledger_period_label", "ledger_month", "ledger_year", "has_import_notes", "move_type",
              "attachment_count"],
-            { order: "date desc, id desc" }
+            // بدون ترتيب مختار: الأحدث أولاً حسب مفتاح الترتيب الموحّد (السنة، الشهر، النوع،
+            // رقم القيد)، لا حسب ترتيب الإدخال، فيأتي 12/8 فوق 11/8 أياً كان المُدخل أولاً
+            { order: "sort_key desc, id desc" }
         );
         this.state.selected = {};
     }
@@ -366,6 +377,11 @@ export class MoveList extends Component {
         this.loadData();
     }
 
+    onJournalFilter(ev) {
+        this.state.journal = ev.target.value;
+        this.loadData();
+    }
+
     onLedgerMonthFilter(ev) {
         this.state.ledgerMonth = ev.target.value;
         this.loadData();
@@ -386,6 +402,7 @@ export class MoveList extends Component {
             dateTo: "",
             stateFilters: [],
             typeFilter: "",
+            journal: "",
             ledgerMonth: "",
             ledgerYear: "",
         });

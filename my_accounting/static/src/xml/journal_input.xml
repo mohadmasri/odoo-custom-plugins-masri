@@ -4,13 +4,21 @@
     <t t-name="my_accounting.JournalInput">
         <span t-if="props.readonly" t-esc="value"/>
         <div t-else="" class="o_myaccounting_journal_combo">
-            <input type="text" class="o_input" t-ref="input" autocomplete="off"
-                   placeholder="اختر يومية أو اكتب اسماً جديداً"
-                   t-att-value="text"
-                   t-on-input="(ev) => this.onInput(ev)"
-                   t-on-focus="() => this.onFocus()"
-                   t-on-blur="() => this.onBlur()"
-                   t-on-keydown="(ev) => this.onKeydown(ev)"/>
+            <div class="o_myaccounting_journal_box">
+                <!-- اليوميات المختارة: وسم لكل واحدة مع × لإزالتها -->
+                <span t-foreach="selected" t-as="journalName" t-key="journalName" class="o_myaccounting_journal_tag">
+                    <t t-esc="journalName"/>
+                    <button type="button" class="o_myaccounting_journal_tag_x" title="إزالة"
+                            t-on-mousedown.prevent="() => this.remove(journalName)">×</button>
+                </span>
+                <input type="text" class="o_myaccounting_journal_search" t-ref="input" autocomplete="off"
+                       t-att-placeholder="selected.length ? 'إضافة يومية...' : 'اختر يومية أو اكتب اسماً جديداً'"
+                       t-att-value="state.text"
+                       t-on-input="(ev) => this.onInput(ev)"
+                       t-on-focus="() => { state.open = true; }"
+                       t-on-blur="() => this.onBlur()"
+                       t-on-keydown="(ev) => this.onKeydown(ev)"/>
+            </div>
             <!-- mousedown.prevent: لا تفقد الخانة التركيز قبل تسجيل الاختيار -->
             <button type="button" class="o_myaccounting_journal_toggle" tabindex="-1"
                     title="عرض كل اليوميات"
@@ -19,14 +27,13 @@
             </button>
             <ul t-if="state.open and (options.length or newName)" class="o_myaccounting_journal_menu">
                 <li t-foreach="options" t-as="journalName" t-key="journalName"
-                    t-attf-class="{{ journalName === value ? 'o_selected' : '' }} {{ journalName_index === state.active ? 'o_active' : '' }}"
-                    t-on-mousedown.prevent="() => this.select(journalName)">
-                    <i t-if="journalName === value" class="fa fa-check me-1"/>
+                    t-attf-class="{{ journalName_index === state.active ? 'o_active' : '' }}"
+                    t-on-mousedown.prevent="() => this.add(journalName)">
                     <t t-esc="journalName"/>
                 </li>
                 <li t-if="newName"
                     t-attf-class="o_myaccounting_journal_new {{ options.length === state.active ? 'o_active' : '' }}"
-                    t-on-mousedown.prevent="() => this.select(newName)">
+                    t-on-mousedown.prevent="() => this.add(newName)">
                     <i class="fa fa-plus me-1"/>إضافة يومية جديدة: <b t-esc="newName"/>
                 </li>
             </ul>

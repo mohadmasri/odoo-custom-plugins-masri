@@ -19,19 +19,21 @@ class MyAccountingJournal(models.Model):
     _name_uniq = models.Constraint('unique(name)', 'اسم اليومية مستخدم بالفعل.')
 
     def _compute_move_count(self):
+        # القيد قد يحمل أكثر من يومية، فيُحتسب في كل واحدة منها
         Move = self.env['myaccounting.move']
+        counts = {}
+        for move in Move.search([]):
+            for name in Move.split_journals(move.journal):
+                counts[name] = counts.get(name, 0) + 1
         for journal in self:
-            journal.move_count = Move.search_count([('journal', '=', journal.name)])
+            journal.move_count = counts.get(journal.name, 0)
 
     @api.model
     def _sync_journals(self):
         """يبقي قائمة اليوميات مطابقة لليوميات المستخدمة فعلاً في القيود:
         يضيف الجديدة (مع تفعيلها في القائمة) ويحذف التي لم تعد مستخدمة."""
-        used = {
-            (move.journal or '').strip()
-            for move in self.env['myaccounting.move'].search([])
-            if move.journal and move.journal.strip()
-        }
+        Move = self.env['myaccounting.move']
+        used = {name for move in Move.search([]) for name in Move.split_journals(move.journal)}
         existing = self.search([])
         by_name = {journal.name: journal for journal in existing}
 
