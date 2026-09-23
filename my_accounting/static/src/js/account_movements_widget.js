@@ -112,7 +112,7 @@ export class AccountMovementsPanel extends Component {
             [...this.baseDomain, ...filterDomain],
             ["date", "move_id", "account_id", "name", "debit", "credit", "move_state",
              "debit_zero_entered", "credit_zero_entered"],
-            { order: "date, id" }
+            { order: "move_sort_key, sequence, id" }
         );
     }
 

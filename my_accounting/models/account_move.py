@@ -127,7 +127,7 @@ LEDGER_MONTH_SELECTION = [
 class MyAccountingMove(models.Model):
     _name = 'myaccounting.move'
     _description = 'قيد محاسبي'
-    _order = 'date desc, id desc'
+    _order = 'sort_key desc, id desc'
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char(string='رقم القيد', required=True, copy=False, tracking=True,
@@ -135,7 +135,9 @@ class MyAccountingMove(models.Model):
     date = fields.Date(string='التاريخ', required=True, tracking=True,
                        default=lambda self: self._get_default_date())
     ref = fields.Char(string='المرجع')
-    journal = fields.Char(string='اليومية', default='القيود اليدوية')
+    journal = fields.Char(
+        string='اليومية', default='القيود اليدوية',
+        help='يمكن اختيار أكثر من يومية للقيد الواحد (مثل: ايرادات، رواتب).')
 
     ledger_month = fields.Selection(
         LEDGER_MONTH_SELECTION, string='شهر دفتر الأستاذ', required=True, tracking=True,
@@ -147,6 +149,9 @@ class MyAccountingMove(models.Model):
         default=lambda self: self._get_default_ledger_period()[0],
     )
     ledger_period_label = fields.Char(string='الشهر المحاسبي', compute='_compute_ledger_period_label', store=True)
+    # مفتاح الترتيب الموحّد لكل الشاشات: السنة ثم الشهر ثم النوع ثم رقم القيد
+    # (11/8 قبل 12/8 مهما كان ترتيب الإدخال، والقيود القديمة المُدخلة لاحقاً تأخذ مكانها)
+    sort_key = fields.Char(string='مفتاح الترتيب', compute='_compute_sort_key', store=True, index=True)
 
     move_type = fields.Selection(
         MOVE_TYPES, string='النوع', default='entry', required=True, copy=True,
@@ -274,10 +279,21 @@ class MyAccountingMove(models.Model):
         return self.get_home_todos()
 
     @api.model
+    @api.model
+    def split_journals(self, text):
+        """اليومية قد تحوي أكثر من اسم: "ايرادات، رواتب" → ['ايرادات', 'رواتب']."""
+        return [part.strip() for part in re.split(r'[،,+]', text or '') if part.strip()]
+
+    def has_journal(self, name):
+        self.ensure_one()
+        return name in self.split_journals(self.journal)
+
     def action_new_from_journal(self, journal):
         """ينشئ قيداً جديداً مطابقاً لبنود آخر قيد في نفس اليومية،
         برقم وتاريخ وشهر أستاذ يتبع آخر ما وصلت إليه القيود، ويفتحه للتعديل."""
-        template = self.search([('journal', '=', journal)], order='id desc', limit=1)
+        # آخر قيد تحوي يومياته هذه اليومية (قد يحمل القيد أكثر من يومية)
+        template = next((move for move in self.search([('journal', 'ilike', journal)], order='id desc')
+                         if move.has_journal(journal)), self.browse())
         if not template:
             raise UserError(f'لا يوجد قيد سابق في اليومية "{journal}" لاستخدامه كقالب.')
         ledger_year, ledger_month = self._get_default_ledger_period()
@@ -310,7 +326,7 @@ class MyAccountingMove(models.Model):
         return res
 
     def unlink(self):
-        journals = {move.journal for move in self if move.journal}
+        journals = {name for move in self for name in self.split_journals(move.journal)}
         res = super().unlink()
         if journals:
             self._sync_journal_template_menus()
@@ -318,7 +334,7 @@ class MyAccountingMove(models.Model):
 
     def _ensure_journal_menus(self):
         """يسجّل أي يومية جديدة ويحدّث القائمة عند الحاجة."""
-        journals = {move.journal.strip() for move in self if move.journal and move.journal.strip()}
+        journals = {name for move in self for name in self.split_journals(move.journal)}
         if not journals:
             return
         Journal = self.env['myaccounting.journal']
@@ -438,6 +454,13 @@ class MyAccountingMove(models.Model):
         today = fields.Date.context_today(self)
         return today.year, str(today.month)
 
+    @api.depends('name', 'ledger_year', 'ledger_month', 'move_type')
+    def _compute_sort_key(self):
+        Account = self.env['myaccounting.account']
+        for move in self:
+            year, month, kind, number, rest = Account._move_sort_key(move)
+            move.sort_key = f'{year:04d}{month:02d}{kind}{number:010d}{rest}'
+
     @api.depends('ledger_month', 'ledger_year')
     def _compute_ledger_period_label(self):
         for move in self:
@@ -511,7 +534,7 @@ class MyAccountingMove(models.Model):
             ('ledger_year', '=', int(year)),
             ('ledger_month', '=', str(int(month))),
             ('state', 'in', states),
-        ], order='date, id')
+        ], order='sort_key, id')
 
         # ترتيب الأعمدة حسب "ترتيب في دفتر الأستاذ" المحدَّد في كل حساب رئيسي
         accounts = self.env['myaccounting.account'].search(
@@ -1106,6 +1129,7 @@ class MyAccountingMoveLine(models.Model):
 
     move_id = fields.Many2one('myaccounting.move', string='القيد', required=True, ondelete='cascade')
     move_state = fields.Selection(related='move_id.state', string='حالة القيد', store=True)
+    move_sort_key = fields.Char(related='move_id.sort_key', string='ترتيب القيد', store=True, index=True)
     account_id = fields.Many2one('myaccounting.account', string='الحساب')
     pending_account_name = fields.Char(
         string='اسم الحساب في الملف', copy=False,
