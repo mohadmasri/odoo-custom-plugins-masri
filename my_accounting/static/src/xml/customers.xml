@@ -269,6 +269,7 @@
                                     <t t-if="inv.number" t-esc="inv.number"/>
                                     <span t-else="" class="badge text-bg-secondary">بدون رقم</span>
                                     <span t-if="inv.kind === 'return'" class="badge text-bg-danger ms-1" style="font-size:10px;">مرتجع</span>
+                                    <div t-if="inv.kind === 'return' and inv.cancels" class="small text-muted fw-normal">عن ف <t t-esc="inv.cancels"/></div>
                                 </td>
                                 <td t-esc="inv.date"/>
                                 <td t-esc="inv.customer"/>

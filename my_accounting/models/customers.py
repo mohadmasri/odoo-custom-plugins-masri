@@ -110,6 +110,15 @@ class MyAccountingCustomers(models.AbstractModel):
                 # (نمط القيد: ذمم ← إيرادات ← ضريبة لكل فاتورة)
                 next_revenue_label = next(
                     (other.name or '' for other in lines[index + 1:] if other.account_id.id in revenue_ids), '')
+                number = extract_invoice_number(line.name, next_revenue_label)
+                cancels = None
+                if kind == 'return':
+                    # المرتجع له رقم خاص به مثل الفواتير: الرقم الأول في البيان رقمه، والثاني
+                    # رقم الفاتورة الملغاة. مثال: "فاتورة رقم 279 مرتجع عن فاتورة رقم 277"
+                    numbers = extract_invoice_numbers(line.name)
+                    if numbers:
+                        number = numbers[0]
+                        cancels = numbers[1] if len(numbers) > 1 else None
                 customer_ids.add(line.account_id.id)
                 invoices.append({
                     'line_id': line.id,
@@ -118,7 +127,8 @@ class MyAccountingCustomers(models.AbstractModel):
                     'date': move.date and move.date.isoformat(),
                     'customer_id': line.account_id.id,
                     'customer': line.account_id.name,
-                    'number': extract_invoice_number(line.name, next_revenue_label),
+                    'number': number,
+                    'cancels': cancels,  # للمرتجع: رقم الفاتورة الملغاة
                     'label': line.name or '',
                     'amount': amount,
                     'kind': kind,
@@ -282,7 +292,7 @@ class MyAccountingCustomers(models.AbstractModel):
             if item['kind'] != 'return':
                 continue
             credit = -item['amount']
-            for inv in by_number.get((item['customer_id'], item['number']), []) if item['number'] else []:
+            for inv in by_number.get((item['customer_id'], item['cancels']), []) if item['cancels'] else []:
                 take = min(credit, inv['net'])
                 inv['net'] -= take
                 inv['returned_amount'] += take
@@ -447,23 +457,25 @@ class MyAccountingCustomers(models.AbstractModel):
                           'customer_id': customer_id, 'move_id': move_id})
 
         real_invoices = [item for item in invoices if item['kind'] == 'invoice']
-        numbered = [item for item in real_invoices if item['number']]
+        # الفواتير والمرتجعات تشترك في تسلسل الأرقام نفسه
+        numbered = [item for item in invoices if item['number']]
 
-        # 1) أرقام ناقصة في تسلسل الفواتير
+        # 1) أرقام ناقصة في تسلسل الفواتير والمرتجعات
         for number in self._sequence_gaps([item['number'] for item in numbered]):
             add(f'missing_invoice:{number}', 'missing_invoice', 'invoices',
                 f'رقم الفاتورة {number} غير موجود في تسلسل الفواتير',
-                'قد تكون فاتورة لم تُسجَّل بعد، أو رقماً استُخدم لإشعار إرجاع.')
+                'قد تكون فاتورة أو مرتجعاً لم يُسجَّل بعد.')
 
-        # 2) رقم فاتورة مكرر
+        # 2) رقم مكرر (بين الفواتير والمرتجعات)
         by_number = {}
         for item in numbered:
             by_number.setdefault(item['number'], []).append(item)
         for number, items in sorted(by_number.items()):
             if len(items) > 1:
                 add(f'duplicate_invoice:{number}', 'duplicate_invoice', 'invoices',
-                    f'رقم الفاتورة {number} مكرر في {len(items)} فواتير',
-                    ' ، '.join(f"{item['customer']} ({item['move_name']})" for item in items),
+                    f'الرقم {number} مستخدم في {len(items)} مستندات',
+                    ' ، '.join(f"{'مرتجع' if item['kind'] == 'return' else 'فاتورة'} {item['customer']} "
+                               f"({item['move_name']})" for item in items),
                     move_id=items[0]['move_id'])
 
         # 3) فاتورة بلا رقم
@@ -474,17 +486,24 @@ class MyAccountingCustomers(models.AbstractModel):
                     f"فاتورة بدون رقم على {item['customer']} في القيد {item['move_name']}",
                     item['label'], customer_id=item['customer_id'], move_id=item['move_id'])
 
-        # 4) مرتجع لا يشير إلى فاتورة موجودة لنفس العميل
+        # 4) مرتجع لا يذكر الفاتورة الملغاة، أو يذكر فاتورة غير موجودة لنفس العميل
         for item in invoices:
             if item['kind'] != 'return':
                 continue
-            matched = item['number'] and any(
-                inv['number'] == item['number'] and inv['customer_id'] == item['customer_id'] for inv in real_invoices)
-            if not matched:
-                reference = f"الفاتورة {item['number']}" if item['number'] else 'فاتورة (بلا رقم في البيان)'
-                add(f"return_unmatched:{item['move_name']}:{item['customer']}:{item['number'] or ''}",
+            own = f" رقم {item['number']}" if item['number'] else ''
+            if not item['cancels']:
+                add(f"return_no_ref:{item['move_name']}:{item['customer']}:{item['number'] or ''}",
                     'return_unmatched', 'invoices',
-                    f"مرتجع على {item['customer']} يشير إلى {reference} غير موجودة لهذا العميل",
+                    f"المرتجع{own} على {item['customer']} لا يذكر رقم الفاتورة الملغاة",
+                    f"البيان: {item['label']} — الصيغة المتوقعة: \"فاتورة رقم (رقم المرتجع) مرتجع عن فاتورة رقم (الفاتورة الملغاة)\"",
+                    customer_id=item['customer_id'], move_id=item['move_id'])
+                continue
+            matched = any(inv['number'] == item['cancels'] and inv['customer_id'] == item['customer_id']
+                          for inv in real_invoices)
+            if not matched:
+                add(f"return_unmatched:{item['move_name']}:{item['customer']}:{item['cancels']}",
+                    'return_unmatched', 'invoices',
+                    f"المرتجع{own} على {item['customer']} يلغي الفاتورة {item['cancels']} غير الموجودة لهذا العميل",
                     item['label'], customer_id=item['customer_id'], move_id=item['move_id'])
 
         # 5) أرقام ناقصة في تسلسل سندات القبض (أرقام السندات الرقمية فقط)
