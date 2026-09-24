@@ -44,9 +44,8 @@ export function openRecord(actionService, resModel, resId, isMiddleClick, option
     );
 }
 
-// شاشاتنا التي تفتح سجلات بالنقر: نمنع فيها دائرة التمرير التلقائي التي يظهرها
-// المتصفح عند ضغط الزر الأوسط، فيبقى الأثر الوحيد هو فتح التبويب الجديد.
-const CLICKABLE_PAGES = [
+// شاشاتنا التي تفتح سجلات بالنقر (يستخدمها middle_scroll.js أيضاً)
+export const CLICKABLE_PAGES = [
     ".o_move_list",
     ".o_general_ledger",
     ".o_customers_page",
@@ -56,9 +55,3 @@ const CLICKABLE_PAGES = [
     ".o_photo_batch",
     ".o_account_movements_panel",
 ].join(",");
-
-document.addEventListener("mousedown", (ev) => {
-    if (ev.button === 1 && ev.target instanceof Element && ev.target.closest(CLICKABLE_PAGES)) {
-        ev.preventDefault();
-    }
-});
