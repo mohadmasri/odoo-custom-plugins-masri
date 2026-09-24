@@ -13,25 +13,26 @@
                 <!-- التصوير -->
                 <input type="file" accept="image/*" capture="environment" class="d-none" t-ref="camera"
                        t-on-change="(ev) => this.onFile(ev)"/>
-                <input type="file" accept="image/*" class="d-none" t-ref="gallery"
+                <input type="file" accept="image/*" multiple="multiple" class="d-none" t-ref="gallery"
                        t-on-change="(ev) => this.onFile(ev)"/>
 
-                <t t-if="!state.preview and !state.uploaded">
+                <t t-if="!state.queue.length and !state.uploaded">
                     <button class="btn btn-primary btn-lg w-100 o_photo_big_btn mb-2" t-on-click="() => this.openCamera()">
                         <i class="fa fa-camera me-2"/>تصوير القيد
                     </button>
                     <button class="btn btn-outline-secondary w-100 mb-3" t-on-click="() => this.openGallery()">
-                        <i class="fa fa-picture-o me-2"/>اختيار صورة من الجهاز
+                        <i class="fa fa-picture-o me-2"/>اختيار صور من الجهاز
                     </button>
                 </t>
 
-                <div t-if="state.preview" class="o_photo_card mb-3">
-                    <img t-att-src="state.preview" class="o_photo_preview mb-2" alt="صورة القيد"/>
+                <!-- صورة واحدة: معاينة كبيرة مع اللف -->
+                <div t-if="state.queue.length === 1" class="o_photo_card mb-3">
+                    <img t-att-src="state.queue[0].preview" class="o_photo_preview mb-2" alt="صورة القيد"/>
                     <div t-if="!state.uploading" class="d-flex justify-content-center mb-2" style="gap: 8px;">
-                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(90)">
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(90, 0)">
                             <i class="fa fa-rotate-right me-1"/>لف يميناً
                         </button>
-                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(-90)">
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.rotate(-90, 0)">
                             <i class="fa fa-rotate-left me-1"/>لف يساراً
                         </button>
                     </div>
@@ -42,9 +43,57 @@
                         <button class="btn btn-success btn-lg flex-grow-1" t-on-click="() => this.upload()">
                             <i class="fa fa-cloud-upload me-1"/>رفع الصورة
                         </button>
+                        <button class="btn btn-outline-secondary btn-lg" t-on-click="() => this.openGallery()"
+                                title="إضافة صور أخرى">
+                            <i class="fa fa-plus"/>
+                        </button>
                         <button class="btn btn-outline-secondary btn-lg" t-on-click="() => this.retake()"
                                 title="إعادة التصوير">
                             <i class="fa fa-refresh"/>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- عدة صور: كل صورة تصبح قيداً مستقلاً -->
+                <div t-if="state.queue.length > 1" class="o_photo_card mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-bold"><t t-esc="state.queue.length"/> صور جاهزة للرفع</div>
+                        <button t-if="!state.uploading" class="btn btn-sm btn-link text-muted p-0"
+                                t-on-click="() => this.clearQueue()">إلغاء الكل</button>
+                    </div>
+                    <div class="small text-muted mb-2">كل صورة تُحفظ كقيد صورة مستقل.</div>
+
+                    <div class="o_photo_grid mb-2">
+                        <div t-foreach="state.queue" t-as="item" t-key="item.key" class="o_photo_thumb_box">
+                            <img t-att-src="item.preview" class="o_photo_thumb" alt=""/>
+                            <div t-if="!state.uploading" class="o_photo_thumb_bar">
+                                <button class="btn btn-sm btn-light" title="لف يساراً"
+                                        t-on-click="() => this.rotate(-90, item_index)">
+                                    <i class="fa fa-rotate-left"/>
+                                </button>
+                                <button class="btn btn-sm btn-light" title="لف يميناً"
+                                        t-on-click="() => this.rotate(90, item_index)">
+                                    <i class="fa fa-rotate-right"/>
+                                </button>
+                                <button class="btn btn-sm btn-light text-danger" title="إزالة"
+                                        t-on-click="() => this.removeImage(item_index)">
+                                    <i class="fa fa-times"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div t-if="state.uploading" class="text-center py-2">
+                        <i class="fa fa-spinner fa-spin fa-2x d-block mb-2"/>
+                        جارِ الرفع... <t t-esc="state.progress"/> من <t t-esc="state.progress + state.queue.length"/>
+                    </div>
+                    <div t-else="" class="d-flex" style="gap: 8px;">
+                        <button class="btn btn-success btn-lg flex-grow-1" t-on-click="() => this.upload()">
+                            <i class="fa fa-cloud-upload me-1"/>رفع <t t-esc="state.queue.length"/> صور
+                        </button>
+                        <button class="btn btn-outline-secondary btn-lg" t-on-click="() => this.openGallery()"
+                                title="إضافة صور أخرى">
+                            <i class="fa fa-plus"/>
                         </button>
                     </div>
                 </div>
@@ -58,8 +107,11 @@
                         <i class="fa fa-check-circle text-success me-1"/>تم حفظ <t t-esc="state.uploaded.label"/>
                     </div>
                     <div class="small text-muted mb-2">اقرأها لاحقاً من الحاسوب من شاشة "صور القيود".</div>
-                    <button class="btn btn-primary btn-lg w-100" t-on-click="() => this.nextPhoto()">
+                    <button class="btn btn-primary btn-lg w-100 mb-2" t-on-click="() => this.nextPhoto()">
                         <i class="fa fa-camera me-1"/>تصوير القيد التالي
+                    </button>
+                    <button class="btn btn-outline-secondary w-100" t-on-click="() => this.morePhotos()">
+                        <i class="fa fa-picture-o me-1"/>اختيار صور أخرى من الجهاز
                     </button>
                 </div>
 

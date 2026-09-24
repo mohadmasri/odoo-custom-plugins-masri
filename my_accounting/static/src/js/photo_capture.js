@@ -7,9 +7,10 @@ import { useService } from "@web/core/utils/hooks";
 const MAX_SIDE = 2000; // تصغير الصورة قبل الرفع: أسرع على الهاتف وأقل كلفة عند القراءة
 
 /**
- * صفحة "إضافة قيد عبر صورة (BETA)": تُفتح من الهاتف لتصوير المستندات ورفعها فقط
- * (كل صورة على حدة). القراءة بـ Claude أو Gemini تتم لاحقاً من الحاسوب من شاشة
- * "صور القيود"، والصورة تبقى محفوظة حتى ترحيل القيد.
+ * صفحة "إضافة قيد عبر صورة (BETA)": تُفتح من الهاتف لتصوير المستندات ورفعها،
+ * أو تُختار عدة صور من الجهاز دفعة واحدة. كل صورة تصبح قيد صورة مستقلاً.
+ * القراءة بـ Claude أو Gemini تتم لاحقاً من الحاسوب من شاشة "صور القيود"،
+ * والصورة تبقى محفوظة حتى ترحيل القيد.
  */
 export class PhotoCapturePage extends Component {
     static template = "my_accounting.PhotoCapture";
@@ -23,10 +24,11 @@ export class PhotoCapturePage extends Component {
         this.galleryRef = useRef("gallery");
         this.state = useState({
             info: null,
-            preview: null,
-            image: null, // { data, mediaType }
+            // الصور المختارة بانتظار الرفع: { key, preview, data, mediaType }
+            queue: [],
             uploading: false,
-            uploaded: null,
+            progress: 0, // كم صورة رُفعت من الدفعة الحالية
+            uploaded: null, // { count, label }
             error: null,
             keyProvider: null, // المفتاح الجاري تعديله: claude | gemini
             apiKey: "",
@@ -77,20 +79,40 @@ export class PhotoCapturePage extends Component {
     }
 
     async onFile(ev) {
-        const file = ev.target.files && ev.target.files[0];
+        const files = [...(ev.target.files || [])];
         ev.target.value = "";
-        if (!file) {
+        if (!files.length) {
             return;
         }
         this.state.uploaded = null;
         this.state.error = null;
-        try {
-            const dataUrl = await this.resize(file);
-            this.state.preview = dataUrl;
-            this.state.image = { data: dataUrl.split(",")[1], mediaType: "image/jpeg" };
-        } catch {
-            this.state.error = "تعذّر فتح الصورة. جرّب صورة أخرى.";
+        let failed = 0;
+        for (const file of files) {
+            try {
+                const dataUrl = await this.resize(file);
+                this.state.queue.push({
+                    key: `${Date.now()}-${this.state.queue.length}`,
+                    preview: dataUrl,
+                    data: dataUrl.split(",")[1],
+                    mediaType: "image/jpeg",
+                });
+            } catch {
+                failed += 1;
+            }
         }
+        if (failed) {
+            this.state.error = failed === files.length
+                ? "تعذّر فتح الصور المختارة. جرّب صوراً أخرى."
+                : `تعذّر فتح ${failed} من الصور المختارة، والباقي جاهز للرفع.`;
+        }
+    }
+
+    removeImage(index) {
+        this.state.queue.splice(index, 1);
+    }
+
+    clearQueue() {
+        this.state.queue = [];
     }
 
     // تصغير الصورة إلى MAX_SIDE بكسل كحد أقصى وتحويلها إلى JPEG
@@ -115,8 +137,12 @@ export class PhotoCapturePage extends Component {
         });
     }
 
-    // لف الصورة قبل الرفع (90 = يميناً مع عقارب الساعة، -90 = يساراً)
-    rotate(degrees) {
+    // لف صورة قبل الرفع (90 = يميناً مع عقارب الساعة، -90 = يساراً)
+    rotate(degrees, index = 0) {
+        const item = this.state.queue[index];
+        if (!item) {
+            return;
+        }
         const source = new Image();
         source.onload = () => {
             const canvas = document.createElement("canvas");
@@ -127,40 +153,56 @@ export class PhotoCapturePage extends Component {
             ctx.rotate((degrees * Math.PI) / 180);
             ctx.drawImage(source, -source.width / 2, -source.height / 2);
             const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-            this.state.preview = dataUrl;
-            this.state.image = { data: dataUrl.split(",")[1], mediaType: "image/jpeg" };
+            item.preview = dataUrl;
+            item.data = dataUrl.split(",")[1];
         };
-        source.src = this.state.preview;
+        source.src = item.preview;
     }
 
+    // ترفع كل الصور المختارة، كل واحدة قيد صورة مستقل
     async upload() {
-        if (!this.state.image || this.state.uploading) {
+        if (!this.state.queue.length || this.state.uploading) {
             return;
         }
         this.state.uploading = true;
+        this.state.progress = 0;
         this.state.error = null;
+        const saved = [];
         try {
-            this.state.uploaded = await this.orm.call("myaccounting.photo.entry", "upload_image",
-                [this.state.image.data, this.state.image.mediaType]);
-            this.state.image = null;
-            this.state.preview = null;
-            await this.loadInfo();
+            for (const item of [...this.state.queue]) {
+                const result = await this.orm.call("myaccounting.photo.entry", "upload_image",
+                    [item.data, item.mediaType]);
+                saved.push(result.label);
+                this.state.progress = saved.length;
+                this.state.queue.shift();
+            }
         } catch (error) {
             this.state.error = error.data?.message || error.message || "تعذّر رفع الصورة.";
         } finally {
             this.state.uploading = false;
+            if (saved.length) {
+                this.state.uploaded = {
+                    count: saved.length,
+                    label: saved.length === 1 ? saved[0] : `${saved.length} صور`,
+                };
+            }
+            await this.loadInfo();
         }
     }
 
     retake() {
-        this.state.image = null;
-        this.state.preview = null;
+        this.state.queue = [];
         this.openCamera();
     }
 
     nextPhoto() {
         this.state.uploaded = null;
         this.openCamera();
+    }
+
+    morePhotos() {
+        this.state.uploaded = null;
+        this.openGallery();
     }
 
     stateLabel(state) {
