@@ -137,31 +137,39 @@
                 window.addEventListener('load', function () {
                     var MM_TO_PX = 96 / 25.4;
                     var availableHeight = (297 - 16) * MM_TO_PX; // A4 عمودي ناقص الهوامش
+                    var pageWidthMm = 194;                       // عرض الورقة بين الهوامش
                     document.querySelectorAll('.o_move_print_page').forEach(function (page) {
-                        page.style.zoom = '';
+                        // التكبير يوسّع الصفحة أيضاً، فنضيّق عرضها بنفس النسبة
+                        // حتى يبقى العرض المطبوع 194 مم مهما كبر القيد أو صغر،
+                        // فلا يخرج أي عمود خارج الورقة.
+                        var apply = function (zoom) {
+                            page.style.width = (pageWidthMm / zoom).toFixed(3) + 'mm';
+                            page.style.zoom = zoom.toFixed(4);
+                        };
                         var zoom = 1;
-                        // نملأ الصفحة: نكبّر القيد الصغير ونصغّر الكبير حتى يتّسع تماماً.
-                        // التغيير يعيد تنسيق المحتوى قليلاً، فنكرّر القياس حتى يستقر.
-                        for (var i = 0; i &lt; 10; i++) {
+                        apply(zoom);
+                        // نملأ الصفحة: نكبّر القيد الصغير ونصغّر الكبير. التغيير
+                        // يعيد تنسيق النص، فنكرّر القياس حتى يستقر.
+                        for (var i = 0; i &lt; 12; i++) {
                             var height = page.getBoundingClientRect().height;
                             if (!height) {
                                 break;
                             }
                             var target = zoom * (availableHeight / height) * 0.99;
-                            target = Math.min(Math.max(target, 0.02), 2.5);
-                            if (Math.abs(target - zoom) &lt; 0.005) {
+                            target = Math.min(Math.max(target, 0.05), 2.5);
+                            if (Math.abs(target - zoom) &lt; 0.01) {
                                 break;
                             }
                             zoom = target;
-                            page.style.zoom = zoom.toFixed(4);
+                            apply(zoom);
                         }
-                        // ضمان أخير: لا يتجاوز المحتوى الصفحة بعد آخر تنسيق
-                        for (var j = 0; j &lt; 4; j++) {
-                            if (page.getBoundingClientRect().height &lt;= availableHeight) {
+                        // ضمان أخير: لا يتجاوز المحتوى ارتفاع الصفحة
+                        for (var j = 0; j &lt; 20; j++) {
+                            if (page.getBoundingClientRect().height &lt;= availableHeight || zoom &lt;= 0.05) {
                                 break;
                             }
-                            zoom = Math.max(zoom * 0.97, 0.02);
-                            page.style.zoom = zoom.toFixed(4);
+                            zoom = Math.max(zoom * 0.96, 0.05);
+                            apply(zoom);
                         }
                     });
                     window.print();
