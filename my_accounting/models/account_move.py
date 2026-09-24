@@ -529,6 +529,44 @@ class MyAccountingMove(models.Model):
                     raise UserError('لا يمكن حذف قيد مرحّل. أعده إلى مسودة أولاً.')
         return super().unlink()
 
+    def ledger_print_cells(self):
+        """سطر هذا القيد في دفتر الأستاذ العام للطباعة: خانة لكل حساب رئيسي
+        مستخدم في القيد (مدين/دائن)، ثم خانة الإجمالي.
+
+        الترتيب هنا من اليسار لليمين لأن صفحة الطباعة كذلك، فيُقرأ الجدول من
+        اليمين كما يظهر على الشاشة: الإجمالي ثم الحسابات بترتيب الدفتر.
+        """
+        self.ensure_one()
+        roots = self.env['myaccounting.account'].search(
+            [('parent_id', '=', False)], order='ledger_sequence, code')
+        amounts = {}
+        missing = 0
+        for line in self.line_ids:
+            if not line.account_id:
+                # بند بلا حساب: ضمن الإجمالي فقط، بلا خانة في الدفتر
+                missing += 1
+                continue
+            root_id = int((line.account_id.parent_path or str(line.account_id.id)).split('/')[0])
+            cell = amounts.setdefault(root_id, {
+                'debit': 0.0, 'credit': 0.0, 'debit_zero': False, 'credit_zero': False})
+            cell['debit'] += line.debit
+            cell['credit'] += line.credit
+            cell['debit_zero'] |= line.debit_zero_entered
+            cell['credit_zero'] |= line.credit_zero_entered
+
+        cells = [{
+            'title': 'الإجمالي',
+            'debit': self.total_debit,
+            'credit': self.total_credit,
+            'debit_zero': False,
+            'credit_zero': False,
+        }]
+        for account in roots:
+            if account.id in amounts:
+                cells.append(dict(amounts[account.id], title=f'{account.code} - {account.name}'))
+        cells.reverse()
+        return {'cells': cells, 'missing': missing}
+
     @api.model
     def get_ledger_years(self):
         """السنوات التي فيها قيود فعلاً، الأحدث أولاً (قائمة السنة في صفحة القيود)."""

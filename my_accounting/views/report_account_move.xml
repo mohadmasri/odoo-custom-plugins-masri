@@ -5,37 +5,19 @@
     <template id="report_myaccounting_move_document">
         <t t-call="web.external_layout">
             <div class="page">
-                <div class="d-flex justify-content-between align-items-start mb-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
-                        <h2 class="mb-0">قيد محاسبي</h2>
+                        <h2 class="mb-0">
+                            قيد محاسبي
+                            <span t-if="o.state != 'posted'" class="text-muted" style="font-size:16px;">(مسودة)</span>
+                        </h2>
                         <h3 class="text-muted mt-0" t-field="o.name"/>
                     </div>
                     <div class="text-end">
-                        <span t-if="o.state == 'posted'"
-                              class="badge rounded-pill text-bg-success" style="font-size:14px; padding:8px 16px;">
-                            مرحّل
-                        </span>
-                        <span t-else=""
-                              class="badge rounded-pill text-bg-warning" style="font-size:14px; padding:8px 16px;">
-                            مسودة
-                        </span>
+                        <div><strong>التاريخ:</strong> <span t-field="o.date"/></div>
+                        <div t-if="o.ref"><strong>المرجع:</strong> <span t-field="o.ref"/></div>
                     </div>
                 </div>
-
-                <table class="table table-borderless mb-4" style="width:100%;">
-                    <tr>
-                        <td style="width:25%;"><strong>التاريخ:</strong></td>
-                        <td style="width:25%;"><span t-field="o.date"/></td>
-                        <td style="width:25%;"><strong>اليومية:</strong></td>
-                        <td style="width:25%;"><span t-field="o.journal"/></td>
-                    </tr>
-                    <tr>
-                        <td><strong>المرجع:</strong></td>
-                        <td><span t-field="o.ref">—</span></td>
-                        <td><strong>العملة:</strong></td>
-                        <td><span t-field="o.currency_id.name"/></td>
-                    </tr>
-                </table>
 
                 <table class="table table-bordered" style="width:100%;">
                     <!-- يظهر من اليمين: المدين (من) | الدائن (الى) | الحساب المدين | الحساب الدائن | البيان
@@ -81,29 +63,47 @@
                     </tfoot>
                 </table>
 
-                <div class="mt-2">
-                    <span t-if="o.is_balanced" class="text-success">
-                        <i class="fa fa-check-circle"/> <strong>القيد متوازن</strong>
-                    </span>
-                    <span t-else="" class="text-danger">
-                        <i class="fa fa-exclamation-triangle"/> <strong>القيد غير متوازن</strong>
-                    </span>
+                <!-- سطر هذا القيد في دفتر الأستاذ العام (الحسابات المستخدمة فقط) -->
+                <t t-set="ledger" t-value="o.ledger_print_cells()"/>
+                <div t-if="ledger['cells']" class="mt-4">
+                    <div style="font-weight:bold; margin-bottom:4px;">سطر القيد في دفتر الأستاذ العام</div>
+                    <table class="table table-bordered o_move_ledger_print" style="width:100%; table-layout:fixed;">
+                        <thead style="background-color:#f2f2f2;">
+                            <tr>
+                                <th t-foreach="ledger['cells']" t-as="cell" colspan="2" class="text-center"
+                                    style="word-break:break-word;">
+                                    <span t-esc="cell['title']"/>
+                                </th>
+                            </tr>
+                            <tr>
+                                <t t-foreach="ledger['cells']" t-as="cell">
+                                    <th class="text-center">إلى</th>
+                                    <th class="text-center">من</th>
+                                </t>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <t t-foreach="ledger['cells']" t-as="cell">
+                                    <td class="text-end">
+                                        <span t-if="cell['credit'] or cell['credit_zero']"
+                                              t-esc="cell['credit']"
+                                              t-options="{'widget': 'float', 'precision': 3}"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="cell['debit'] or cell['debit_zero']"
+                                              t-esc="cell['debit']"
+                                              t-options="{'widget': 'float', 'precision': 3}"/>
+                                    </td>
+                                </t>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div t-if="ledger['missing']" class="small text-muted">
+                        <span t-esc="ledger['missing']"/> بند بلا حساب: مبلغه ضمن الإجمالي بلا خانة في الدفتر.
+                    </div>
                 </div>
 
-                <div class="row mt-5" style="page-break-inside: avoid;">
-                    <div class="col-4 text-center">
-                        <p class="mb-5">إعداد</p>
-                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
-                    </div>
-                    <div class="col-4 text-center">
-                        <p class="mb-5">مراجعة</p>
-                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
-                    </div>
-                    <div class="col-4 text-center">
-                        <p class="mb-5">اعتماد</p>
-                        <p style="border-top:1px solid #000; padding-top:4px;">التوقيع</p>
-                    </div>
-                </div>
             </div>
         </t>
     </template>
@@ -119,6 +119,10 @@
                     margin: 0 auto;
                     transform-origin: top center;
                 }
+                /* سطر دفتر الأستاذ: يبقى ضمن عرض الصفحة مهما كثرت الحسابات */
+                .o_move_ledger_print { font-size: 11px; }
+                .o_move_ledger_print th,
+                .o_move_ledger_print td { padding: 3px 4px; }
                 @media print {
                     .o_move_print_page { break-after: page; page-break-after: always; }
                     .o_move_print_page:last-child { break-after: auto; page-break-after: auto; }
@@ -136,17 +140,28 @@
                     document.querySelectorAll('.o_move_print_page').forEach(function (page) {
                         page.style.zoom = '';
                         var zoom = 1;
-                        // التصغير يعيد تنسيق المحتوى قليلاً، فنكرّر القياس حتى يتّسع فعلاً
-                        for (var i = 0; i &lt; 8; i++) {
+                        // نملأ الصفحة: نكبّر القيد الصغير ونصغّر الكبير حتى يتّسع تماماً.
+                        // التغيير يعيد تنسيق المحتوى قليلاً، فنكرّر القياس حتى يستقر.
+                        for (var i = 0; i &lt; 10; i++) {
                             var height = page.getBoundingClientRect().height;
-                            if (height &lt;= availableHeight) {
+                            if (!height) {
                                 break;
                             }
-                            zoom = Math.max(zoom * (availableHeight / height) * 0.995, 0.02);
+                            var target = zoom * (availableHeight / height) * 0.99;
+                            target = Math.min(Math.max(target, 0.02), 2.5);
+                            if (Math.abs(target - zoom) &lt; 0.005) {
+                                break;
+                            }
+                            zoom = target;
                             page.style.zoom = zoom.toFixed(4);
-                            if (zoom &lt;= 0.02) {
+                        }
+                        // ضمان أخير: لا يتجاوز المحتوى الصفحة بعد آخر تنسيق
+                        for (var j = 0; j &lt; 4; j++) {
+                            if (page.getBoundingClientRect().height &lt;= availableHeight) {
                                 break;
                             }
+                            zoom = Math.max(zoom * 0.97, 0.02);
+                            page.style.zoom = zoom.toFixed(4);
                         }
                     });
                     window.print();
