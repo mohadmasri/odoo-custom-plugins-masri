@@ -28,12 +28,9 @@
     background-color: var(--o-surface-hover, rgba(113, 75, 163, 0.06));
 }
 
-/* الطباعة: صفحة A4 عمودية، بتصغير محسوب قبل الطباعة (--tb-print-scale) */
+/* الطباعة: صفحة A4 عمودية، بتصغير محسوب قبل الطباعة (--tb-print-scale).
+   اتجاه الصفحة يُحقن لحظة الطباعة من هذه الشاشة وحدها، انظر print_page_size.js */
 @media print {
-    @page {
-        size: A4 portrait;
-        margin: 10mm;
-    }
     .o_trial_balance {
         overflow: visible !important;
         height: auto !important;

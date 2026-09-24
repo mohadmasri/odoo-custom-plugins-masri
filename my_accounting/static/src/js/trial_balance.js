@@ -4,6 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
+import { usePrintPageSize } from "./print_page_size";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -36,6 +37,8 @@ export class TrialBalance extends Component {
             showEmpty: false,
         });
         this.stateFilters = STATE_FILTERS;
+        // ميزان المراجعة يبقى عمودياً
+        this.printPage = usePrintPageSize("A4 portrait", "10mm");
         onWillStart(async () => {
             // نفس سلوك بقية الشاشات: الافتتاح على آخر شهر فيه قيود
             const latest = await this.orm.call("myaccounting.move", "get_latest_ledger_period", []);

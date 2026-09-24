@@ -46,12 +46,9 @@
     text-overflow: ellipsis;
 }
 
-/* الطباعة: صفحة A4 أفقية واحدة، بتصغير محسوب قبل الطباعة (--gl-print-scale) */
+/* الطباعة: صفحة A4 أفقية واحدة، بتصغير محسوب قبل الطباعة (--gl-print-scale).
+   اتجاه الصفحة (أفقي) يُحقن لحظة الطباعة من هذه الشاشة وحدها، انظر print_page_size.js */
 @media print {
-    @page {
-        size: A4 landscape;
-        margin: 8mm;
-    }
     .o_general_ledger {
         overflow: visible !important;
         height: auto !important;

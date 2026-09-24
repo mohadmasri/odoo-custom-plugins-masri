@@ -4,6 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
+import { usePrintPageSize } from "./print_page_size";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -40,6 +41,8 @@ export class GeneralLedger extends Component {
             states: states.length ? states : ["posted"],
         });
         this.stateFilters = STATE_FILTERS;
+        // دفتر الأستاذ يُطبع دائماً بالعرض (صفحة أفقية)
+        this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.fixedMonth = !!context.ledger_month;
         onWillStart(async () => {
             // الافتتاح على آخر شهر فيه قيود، ما لم يُفتح الدفتر على شهر محدد
@@ -156,6 +159,7 @@ export class GeneralLedger extends Component {
         const contentHeight = () => printable.scrollHeight + (title ? title.offsetHeight : 0);
 
         page.classList.add("o_gl_print_fit");
+        this.printPage.enable();
         try {
             // 1) أقل عرض يكفي الأرقام = أطول رقم + الحشو الداخلي للخلية
             const valueCells = [...table.querySelectorAll("tbody .o_gl_num, tfoot .o_gl_num")]
@@ -189,6 +193,7 @@ export class GeneralLedger extends Component {
             page.style.setProperty("--gl-print-scale", scale.toFixed(4));
             window.print();
         } finally {
+            this.printPage.disable();
             page.classList.remove("o_gl_print_fit");
             page.style.removeProperty("--gl-num-w");
             page.style.removeProperty("--gl-ref-w");
