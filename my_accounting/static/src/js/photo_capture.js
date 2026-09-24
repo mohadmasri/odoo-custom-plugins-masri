@@ -3,6 +3,7 @@
 import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { openRecord } from "./open_record";
 
 const MAX_SIDE = 2000; // تصغير الصورة قبل الرفع: أسرع على الهاتف وأقل كلفة عند القراءة
 
@@ -209,14 +210,8 @@ export class PhotoCapturePage extends Component {
         return { new: "بانتظار القراءة", review: "بانتظار التأكيد" }[state] || state;
     }
 
-    openEntry(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.photo.entry",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+    openEntry(id, isMiddleClick = false) {
+        openRecord(this.actionService, "myaccounting.photo.entry", id, isMiddleClick);
     }
 
     openList() {

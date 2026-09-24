@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
+import { openRecord } from "./open_record";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -112,18 +113,11 @@ export class GeneralLedger extends Component {
         this.loadData();
     }
 
-    openMove(id) {
+    openMove(id, isMiddleClick = false) {
         const rows = (this.state.data && this.state.data.rows) || [];
-        this.actionService.doAction(
-            {
-                type: "ir.actions.act_window",
-                res_model: "myaccounting.move",
-                res_id: id,
-                views: [[false, "form"]],
-                target: "current",
-            },
-            { props: { resIds: rows.map((row) => row.move_id) } }
-        );
+        openRecord(this.actionService, "myaccounting.move", id, isMiddleClick, {
+            props: { resIds: rows.map((row) => row.move_id) },
+        });
     }
 
     // عرض النص داخل خلية (بدون تأثير عرض العمود)

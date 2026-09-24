@@ -3,6 +3,7 @@
 import { Component, onMounted, onWillStart, onWillUnmount, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { openRecord } from "./open_record";
 
 const POLL_MS = 3000;
 
@@ -96,14 +97,8 @@ export class PhotoBatchPage extends Component {
         }
     }
 
-    open(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.photo.entry",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+    open(id, isMiddleClick = false) {
+        openRecord(this.actionService, "myaccounting.photo.entry", id, isMiddleClick);
     }
 
     openList() {

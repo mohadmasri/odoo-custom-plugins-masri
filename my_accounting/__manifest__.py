@@ -72,6 +72,7 @@
             'my_accounting/static/src/xml/account_line_selector.xml',
             'my_accounting/static/src/js/account_movements_widget.js',
             'my_accounting/static/src/xml/account_movements_widget.xml',
+            'my_accounting/static/src/js/open_record.js',
             'my_accounting/static/src/js/print_page_size.js',
             'my_accounting/static/src/js/general_ledger.js',
             'my_accounting/static/src/xml/general_ledger.xml',

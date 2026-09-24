@@ -107,7 +107,7 @@
                         </thead>
                         <tbody>
                             <tr t-foreach="state.data.rows" t-as="row" t-key="row.id"
-                                style="cursor:pointer;" t-on-click="() => this.openAccount(row.id)">
+                                style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openAccount(row.id, isMiddleClick)">
                                 <td class="text-muted" t-esc="row.code"/>
                                 <td>
                                     <t t-esc="row.name"/>

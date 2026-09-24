@@ -194,7 +194,7 @@
                         </tr>
                         <tr t-foreach="fullLedger" t-as="row" t-key="row.key" style="cursor:pointer;"
                             t-att-class="{ 'o_cust_return': row.kind === 'return', 'o_cust_receipt': row.kind === 'receipt' }"
-                            t-on-click="() => this.openMove(row.move_id)">
+                            t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
                             <td t-esc="row.date"/>
                             <td>
                                 <span t-attf-class="badge {{ row.kind === 'invoice' ? 'text-bg-light border' : (row.kind === 'receipt' ? 'text-bg-success' : 'text-bg-danger') }}"
@@ -254,7 +254,7 @@
                             </tr>
                             <tr t-foreach="invoicesShown" t-as="inv" t-key="inv.line_id" style="cursor:pointer;"
                                 t-att-class="{ 'o_cust_return': inv.kind === 'return' }"
-                                t-on-click="() => this.openMove(inv.move_id)">
+                                t-custom-click="(ev, isMiddleClick) => this.openMove(inv.move_id, isMiddleClick)">
                                 <td class="fw-bold">
                                     <t t-if="inv.number" t-esc="inv.number"/>
                                     <span t-else="" class="badge text-bg-secondary">بدون رقم</span>
@@ -360,7 +360,7 @@
                             <td colspan="7" class="text-center text-muted py-4">لا توجد سندات قبض مطابقة</td>
                         </tr>
                         <tr t-foreach="receipts" t-as="rec" t-key="rec.key" style="cursor:pointer;"
-                            t-on-click="() => this.openMove(rec.move_id)">
+                            t-custom-click="(ev, isMiddleClick) => this.openMove(rec.move_id, isMiddleClick)">
                             <td class="fw-bold" t-esc="rec.move_name"/>
                             <td t-esc="rec.date"/>
                             <td t-esc="rec.customer"/>
@@ -423,7 +423,7 @@
                                     <div class="small mt-1">
                                         <span class="badge text-bg-light border" t-esc="noteTabLabel(note.tab)"/>
                                         <a t-if="note.move_id" href="#" class="ms-2"
-                                           t-on-click.prevent="() => this.openMove(note.move_id)">
+                                           t-custom-click.prevent="(ev, isMiddleClick) => this.openMove(note.move_id, isMiddleClick)">
                                             <i class="fa fa-external-link me-1"/>فتح القيد
                                         </a>
                                     </div>

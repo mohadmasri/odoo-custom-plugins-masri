@@ -162,7 +162,7 @@
                     </tr>
                     <tr t-foreach="sortedRecords" t-as="rec" t-key="rec.id"
                         t-att-class="{ 'o_move_has_import_notes': rec.has_import_notes }"
-                        style="cursor:pointer;" t-on-click="() => this.openMove(rec.id)">
+                        style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(rec.id, isMiddleClick)">
                         <td t-on-click="(ev) => ev.stopPropagation()">
                             <input type="checkbox" class="form-check-input"
                                    t-att-checked="state.selected[rec.id] || false"

@@ -4,6 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
+import { openRecord } from "./open_record";
 import { user } from "@web/core/user";
 import { deserializeDateTime, formatDateTime } from "@web/core/l10n/dates";
 import { Dialog } from "@web/core/dialog/dialog";
@@ -463,14 +464,8 @@ export class CustomersPage extends Component {
         return "text-success";
     }
 
-    openMove(moveId) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.move",
-            res_id: moveId,
-            views: [[false, "form"]],
-            target: "current",
-        });
+    openMove(moveId, isMiddleClick = false) {
+        openRecord(this.actionService, "myaccounting.move", moveId, isMiddleClick);
     }
 
     printStatement(customerId) {

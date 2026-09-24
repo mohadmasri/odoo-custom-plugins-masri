@@ -4,6 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
+import { openRecord } from "./open_record";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useSetupAction } from "@web/search/action_hook";
 import { JournalImportDialog } from "./journal_import_dialog";
@@ -399,19 +400,12 @@ export class MoveList extends Component {
         this.loadData();
     }
 
-    openMove(id) {
+    openMove(id, isMiddleClick = false) {
         // نمرّر قائمة القيود المعروضة (بنفس ترتيبها وفلاترها) حتى تعمل أسهم
         // التنقل بين القيود داخل نموذج القيد.
-        this.actionService.doAction(
-            {
-                type: "ir.actions.act_window",
-                res_model: "myaccounting.move",
-                res_id: id,
-                views: [[false, "form"]],
-                target: "current",
-            },
-            { props: { resIds: this.sortedRecords.map((rec) => rec.id) } }
-        );
+        openRecord(this.actionService, "myaccounting.move", id, isMiddleClick, {
+            props: { resIds: this.sortedRecords.map((rec) => rec.id) },
+        });
     }
 
     createMove() {

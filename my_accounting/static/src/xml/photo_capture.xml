@@ -125,7 +125,7 @@
                         <a href="#" class="small" t-on-click.prevent="() => this.openList()">عرض الكل</a>
                     </div>
                     <div t-foreach="state.info.recent" t-as="p" t-key="p.id" class="o_photo_pending"
-                         t-on-click="() => this.openEntry(p.id)">
+                         t-custom-click="(ev, isMiddleClick) => this.openEntry(p.id, isMiddleClick)">
                         <span class="fw-bold" t-esc="p.label"/>
                         <span t-attf-class="badge ms-2 {{ p.state === 'new' ? 'text-bg-info' : 'text-bg-warning' }}"
                               t-esc="stateLabel(p.state)"/>

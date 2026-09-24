@@ -145,7 +145,7 @@
                     <AccountTreeNode node="root" depth="0" expanded="state.expanded" selected="state.selected"
                         filterActive="!!state.filter"
                         onToggle="(id) => this.toggle(id)"
-                        onOpen="(id) => this.openAccount(id)"
+                        onOpen="(id, isMiddleClick) => this.openAccount(id, isMiddleClick)"
                         onAddChild="(id) => this.createAccount(id)"
                         onToggleSelect="(id, checked) => this.toggleSelect(id, checked)"/>
                 </t>
@@ -168,7 +168,7 @@
                     <i t-attf-class="fa {{ isExpanded ? 'fa-caret-down' : 'fa-caret-right' }}"/>
                 </span>
                 <span t-else="" class="o_account_tree_caret"/>
-                <span class="flex-grow-1 o_account_tree_label" t-on-click="() => props.onOpen(node.id)"
+                <span class="flex-grow-1 o_account_tree_label" t-custom-click="(ev, isMiddleClick) => props.onOpen(node.id, isMiddleClick)"
                       t-att-class="{ 'o_account_tree_no_movement': props.filterActive and !node.hasMovement }">
                     <span class="o_account_tree_code" t-esc="node.code"/>
                     <span t-att-class="{ 'o_account_tree_match': node.matched }" t-esc="node.name"/>

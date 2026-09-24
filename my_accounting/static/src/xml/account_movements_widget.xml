@@ -123,7 +123,7 @@
                         <td colspan="7" class="text-center text-muted py-4">لا توجد حركات مطابقة</td>
                     </tr>
                     <tr t-foreach="state.records" t-as="rec" t-key="rec.id"
-                        style="cursor:pointer;" t-on-click="() => this.openMove(rec.move_id[0])">
+                        style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(rec.move_id[0], isMiddleClick)">
                         <td t-esc="rec.date"/>
                         <td><strong t-esc="rec.move_id[1]"/></td>
                         <td t-esc="rec.account_id[1]"/>

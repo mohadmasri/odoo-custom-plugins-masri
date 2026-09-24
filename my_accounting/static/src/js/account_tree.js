@@ -4,6 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
+import { openRecord } from "./open_record";
 import { user } from "@web/core/user";
 import { BulkAccountDialog } from "./account_bulk_dialog";
 import {
@@ -418,20 +419,13 @@ export class AccountTree extends Component {
 
     // ---------------------------------------------------------------------
 
-    openAccount(id) {
+    openAccount(id, isMiddleClick = false) {
         // نمرّر علامة للوحة حركات الحساب حتى تطبّق نفس فلتر الشجرة المحفوظ،
         // ونمرّر الحسابات الظاهرة للتنقل بينها بالأسهم داخل الحساب.
-        this.actionService.doAction(
-            {
-                type: "ir.actions.act_window",
-                res_model: "myaccounting.account",
-                res_id: id,
-                views: [[false, "form"]],
-                target: "current",
-                context: { my_accounting_from_tree: true },
-            },
-            { props: { resIds: this.visibleIds } }
-        );
+        openRecord(this.actionService, "myaccounting.account", id, isMiddleClick, {
+            props: { resIds: this.visibleIds },
+            context: { my_accounting_from_tree: true },
+        });
     }
 
     createAccount(parentId) {

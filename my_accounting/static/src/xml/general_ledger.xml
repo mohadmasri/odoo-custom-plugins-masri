@@ -82,7 +82,7 @@
                         </thead>
                         <tbody>
                             <tr t-foreach="state.data.rows" t-as="row" t-key="row.move_id"
-                                style="cursor:pointer;" t-on-click="() => this.openMove(row.move_id)">
+                                style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
                                 <td class="o_gl_seq" t-esc="row.seq"/>
                                 <td class="o_gl_move">
                                     <strong t-esc="row.move_name"/>

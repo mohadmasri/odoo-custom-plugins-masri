@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { user } from "@web/core/user";
+import { openRecord } from "./open_record";
 import {
     emptyMovementFilter,
     hasMovementFilter,
@@ -159,19 +160,10 @@ export class AccountMovementsPanel extends Component {
         this.loadData();
     }
 
-    openMove(id) {
+    openMove(id, isMiddleClick = false) {
         // أكثر من بند قد ينتمي لنفس القيد، فنزيل التكرار مع الحفاظ على الترتيب
         const resIds = [...new Set(this.state.records.map((rec) => rec.move_id[0]))];
-        this.actionService.doAction(
-            {
-                type: "ir.actions.act_window",
-                res_model: "myaccounting.move",
-                res_id: id,
-                views: [[false, "form"]],
-                target: "current",
-            },
-            { props: { resIds } }
-        );
+        openRecord(this.actionService, "myaccounting.move", id, isMiddleClick, { props: { resIds } });
     }
 
     printStatement() {

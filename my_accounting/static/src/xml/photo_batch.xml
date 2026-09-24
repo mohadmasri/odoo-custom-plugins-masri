@@ -54,9 +54,9 @@
                         <div t-foreach="state.data.items" t-as="item" t-key="item.id"
                              t-attf-class="o_photo_batch_item o_pb_{{ item.read_state }}">
                             <img t-attf-src="/web/image/myaccounting.photo.entry/{{ item.id }}/image/64x64"
-                                 class="o_photo_batch_thumb" alt="" t-on-click="() => this.open(item.id)"/>
+                                 class="o_photo_batch_thumb" alt="" t-custom-click="(ev, isMiddleClick) => this.open(item.id, isMiddleClick)"/>
                             <div class="flex-grow-1" style="min-width: 0;">
-                                <div class="fw-bold" style="cursor: pointer;" t-on-click="() => this.open(item.id)" t-esc="item.label"/>
+                                <div class="fw-bold" style="cursor: pointer;" t-custom-click="(ev, isMiddleClick) => this.open(item.id, isMiddleClick)" t-esc="item.label"/>
                                 <div class="small">
                                     <i t-if="item.read_state === 'running'" class="fa fa-spinner fa-spin me-1 text-primary"/>
                                     <i t-elif="item.read_state === 'queued'" class="fa fa-clock-o me-1 text-warning"/>
@@ -75,7 +75,7 @@
                                 <i class="fa fa-stop me-1"/>إيقاف
                             </button>
                             <button t-elif="item.read_state === 'done'" class="btn btn-sm btn-outline-primary"
-                                    t-on-click="() => this.open(item.id)">مراجعة</button>
+                                    t-custom-click="(ev, isMiddleClick) => this.open(item.id, isMiddleClick)">مراجعة</button>
                         </div>
                     </div>
                 </t>

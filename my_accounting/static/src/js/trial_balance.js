@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
+import { openRecord } from "./open_record";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -125,14 +126,8 @@ export class TrialBalance extends Component {
         return Math.abs(value || 0) < 0.0005 ? "" : value.toFixed(3);
     }
 
-    openAccount(id) {
-        this.actionService.doAction({
-            type: "ir.actions.act_window",
-            res_model: "myaccounting.account",
-            res_id: id,
-            views: [[false, "form"]],
-            target: "current",
-        });
+    openAccount(id, isMiddleClick = false) {
+        openRecord(this.actionService, "myaccounting.account", id, isMiddleClick);
     }
 
     // الطباعة في صفحة A4 عمودية واحدة، مع تصغير محسوب إن طال الجدول
