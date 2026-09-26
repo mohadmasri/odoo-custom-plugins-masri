@@ -128,14 +128,12 @@
                     .o_statement_page:last-child { break-after: auto; page-break-after: auto; }
                 }
             </style>
-            <div data-ma-print="1" data-ma-title="فهرس كشوف الحسابات المطبوعة"
-                 data-ma-headers="رمز الحساب|اسم الحساب|الرصيد" data-ma-orientation="portrait"/>
             <t t-foreach="docs" t-as="o">
-                <div class="o_statement_page" data-ma-doc="1"
-                     t-attf-data-ma-info="{{ o.code or '—' }}|{{ o.name }}|{{ '%.3f' % o.balance }}">
+                <div class="o_statement_page">
                     <t t-call="my_accounting.report_myaccounting_account_statement_document"/>
                 </div>
             </t>
+            <script>window.addEventListener('load', function () { window.print(); });</script>
         </t>
     </template>
 

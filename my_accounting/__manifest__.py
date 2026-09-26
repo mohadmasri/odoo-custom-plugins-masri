@@ -73,9 +73,6 @@
             'my_accounting/static/src/js/account_movements_widget.js',
             'my_accounting/static/src/xml/account_movements_widget.xml',
             'my_accounting/static/src/js/open_record.js',
-            'my_accounting/static/src/js/print_index_dialog.js',
-            'my_accounting/static/src/xml/print_index_dialog.xml',
-            'my_accounting/static/src/css/report_print_index.css',
             'my_accounting/static/src/js/middle_scroll.js',
             'my_accounting/static/src/js/print_page_size.js',
             'my_accounting/static/src/js/general_ledger.js',
@@ -123,11 +120,6 @@
         ],
         # الوضع الداكن: نحقن متغيّرات الألوان الداكنة في حزمتي الأنماط الداكنة
         # قبل تجميع بقية الملفات، فتُعاد صياغة كل ألوان الواجهة تلقائياً.
-        # تقارير الطباعة: سؤال "مع فهرس" وبناء صفحة الفهرس وترقيم الصفحات
-        'web.report_assets_common': [
-            'my_accounting/static/src/js/report_print_index.js',
-            'my_accounting/static/src/css/report_print_index.css',
-        ],
         'web.assets_web_dark': [
             ('before', 'web/static/src/scss/primary_variables.scss',
              'my_accounting/static/src/scss/dark_variables.scss'),
