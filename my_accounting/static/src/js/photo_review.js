@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useExternalListener } from "@odoo/owl";
@@ -27,6 +27,13 @@ export class PhotoReview extends Component {
         this.actionService = useService("action");
         this.notification = useService("notification");
         this.months = MONTHS;
+        // مراجع خانات الترويسة: التصحيح بضغطة يحدّث ما تراه في الخانة أيضاً
+        this.fieldRefs = {
+            name: useRef("f_name"),
+            date: useRef("f_date"),
+            ledger_month: useRef("f_ledger_month"),
+            ledger_year: useRef("f_ledger_year"),
+        };
         this.state = useState({
             loading: true,
             entries: [],
@@ -102,6 +109,26 @@ export class PhotoReview extends Component {
 
     setHeader(field, value) {
         this.entry[field] = value;
+    }
+
+    // الفحوصات التلقائية: تصحيح بضغطة ثم إعادة الفحص من الخادم
+    async applyFix(check) {
+        this.setHeader(check.fix.field, check.fix.value);
+        // الخانة المرسومة لا تتبع القيمة وحدها، فنحدّثها صراحةً
+        const ref = this.fieldRefs[check.fix.field];
+        if (ref && ref.el) {
+            ref.el.value = check.fix.value;
+        }
+        await this.save(false);
+        this.notification.add("صُحّح: " + check.fix.label, { type: "success" });
+    }
+
+    get blockingChecks() {
+        return this.entry ? this.entry.checks.filter((check) => check.level === "danger") : [];
+    }
+
+    get warningChecks() {
+        return this.entry ? this.entry.checks.filter((check) => check.level !== "danger") : [];
     }
 
     setLine(line, field, value) {

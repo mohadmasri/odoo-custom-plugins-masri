@@ -131,6 +131,7 @@
                 <field name="total_credit" sum="الدائن"/>
                 <field name="is_balanced" widget="boolean_toggle" readonly="1"/>
                 <field name="uncertain_count"/>
+                <field name="issue_count" string="ملاحظات الفحص" decoration-danger="issue_count > 0"/>
                 <field name="provider"/>
                 <field name="read_count"/>
                 <field name="read_attempts" optional="show"/>

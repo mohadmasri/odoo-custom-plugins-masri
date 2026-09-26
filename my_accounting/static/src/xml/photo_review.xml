@@ -51,28 +51,38 @@
 
                 <!-- البيانات -->
                 <div class="col">
+                    <!-- الفحوصات التلقائية: ما يمنع الترحيل أولاً ثم ما ينبّه -->
+                    <div t-if="entry.checks.length" class="o_photo_review_checks mb-2">
+                        <div t-foreach="entry.checks" t-as="check" t-key="check_index"
+                             t-attf-class="alert py-1 px-2 mb-1 small d-flex align-items-center {{ check.level === 'danger' ? 'alert-danger' : 'alert-warning' }}"
+                             style="gap: 8px;">
+                            <i t-attf-class="fa {{ check.level === 'danger' ? 'fa-exclamation-circle' : 'fa-exclamation-triangle' }}"/>
+                            <span class="flex-grow-1" t-esc="check.text"/>
+                            <button t-if="check.fix" class="btn btn-sm btn-light py-0"
+                                    t-att-disabled="state.saving"
+                                    t-on-click="() => this.applyFix(check)" t-esc="check.fix.label"/>
+                        </div>
+                    </div>
+
                     <div t-if="entry.notes" class="alert alert-warning py-2 small mb-2">
                         <b>ملاحظات القراءة:</b> <t t-esc="entry.notes"/>
                     </div>
-                    <div t-if="entry.existing_move" class="alert alert-danger py-2 small mb-2">
-                        <i class="fa fa-exclamation-triangle me-1"/>
-                        يوجد قيد بنفس الرقم: <b t-esc="entry.existing_move"/> — عند الترحيل يأخذ الرقم التالي.
-                    </div>
-
-                    <div class="row g-2 mb-2">
+                    <div class="row g-2 mb-2" t-key="entry.id">
                         <div class="col-6 col-md-3">
                             <label class="form-label small mb-1">رقم القيد</label>
                             <input type="text" class="form-control form-control-sm" t-att-value="entry.name"
+                                   t-ref="f_name"
                                    t-on-input="(ev) => this.setHeader('name', ev.target.value)"/>
                         </div>
                         <div class="col-6 col-md-3">
                             <label class="form-label small mb-1">التاريخ</label>
                             <input type="date" class="form-control form-control-sm" t-att-value="entry.date"
+                                   t-ref="f_date"
                                    t-on-change="(ev) => this.setHeader('date', ev.target.value)"/>
                         </div>
                         <div class="col-6 col-md-3">
                             <label class="form-label small mb-1">شهر دفتر الأستاذ</label>
-                            <select class="form-select form-select-sm"
+                            <select class="form-select form-select-sm" t-ref="f_ledger_month"
                                     t-on-change="(ev) => this.setHeader('ledger_month', ev.target.value)">
                                 <t t-foreach="months" t-as="month" t-key="month[0]">
                                     <option t-att-value="month[0]" t-att-selected="month[0] === entry.ledger_month"
@@ -83,6 +93,7 @@
                         <div class="col-6 col-md-3">
                             <label class="form-label small mb-1">سنة دفتر الأستاذ</label>
                             <input type="number" class="form-control form-control-sm" t-att-value="entry.ledger_year"
+                                   t-ref="f_ledger_year"
                                    t-on-input="(ev) => this.setHeader('ledger_year', ev.target.value)"/>
                         </div>
                         <div class="col-12 col-md-8">

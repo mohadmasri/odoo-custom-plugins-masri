@@ -190,6 +190,111 @@ class MyAccountingPhotoEntry(models.Model):
     # شاشة المراجعة السريعة: طابور القيود المقروءة، قيد تلو الآخر
     # ------------------------------------------------------------------
 
+    issue_count = fields.Integer(string='ملاحظات الفحص', compute='_compute_issue_count')
+
+    def _compute_issue_count(self):
+        for entry in self:
+            entry.issue_count = len(entry._review_checks()) if entry.state == 'review' else 0
+
+    def _review_checks(self):
+        """فحوصات تلقائية قبل المراجعة: الأخطاء التي تتكرر في القراءة.
+
+        كل فحص: مستواه (danger يمنع الترحيل عملياً، warning للانتباه)، نصه،
+        و fix اختياري يصحّح الحقل بضغطة.
+        """
+        self.ensure_one()
+        Move = self.env['myaccounting.move']
+        checks = []
+        year = self.ledger_year or (self.date.year if self.date else 0)
+
+        # 1) التاريخ وسنة/شهر دفتر الأستاذ
+        if not self.date:
+            checks.append({'level': 'danger', 'text': 'لا يوجد تاريخ للقيد.'})
+        else:
+            if self.ledger_year and self.ledger_year != self.date.year:
+                checks.append({
+                    'level': 'danger',
+                    'text': f'سنة دفتر الأستاذ {self.ledger_year} لا تطابق سنة التاريخ {self.date.year}.',
+                    'fix': {'field': 'ledger_year', 'value': self.date.year,
+                            'label': f'اجعلها {self.date.year}'},
+                })
+            if self.ledger_month and int(self.ledger_month) != self.date.month:
+                checks.append({
+                    'level': 'warning',
+                    'text': f'شهر دفتر الأستاذ {int(self.ledger_month)} لا يطابق شهر التاريخ {self.date.month}.',
+                    'fix': {'field': 'ledger_month', 'value': str(self.date.month),
+                            'label': f'اجعله {self.date.month}'},
+                })
+            # تاريخ بعيد عن مدى قيودك الفعلية غالباً خطأ قراءة (2022 / 2025...)
+            newest = Move.search([], order='sort_key desc', limit=1)
+            if newest and newest.ledger_year and abs(self.date.year - newest.ledger_year) > 1:
+                checks.append({
+                    'level': 'danger',
+                    'text': f'سنة التاريخ {self.date.year} بعيدة عن سنوات قيودك ({newest.ledger_year}) — تأكد من قراءة التاريخ.',
+                })
+
+        # 2) رقم القيد
+        if not self.name:
+            checks.append({'level': 'warning', 'text': 'لا يوجد رقم للقيد؛ سيأخذ الرقم التالي تلقائياً عند الترحيل.'})
+        else:
+            parts = re.fullmatch(r'\s*(\d+)\s*/\s*(\d+)\s*', self.name)
+            month_in_name = int(parts.group(2)) if parts else 0
+            if month_in_name and not 1 <= month_in_name <= 12:
+                # مثل "6/22": الجزء الثاني ليس شهراً، غالباً خطأ قراءة
+                checks.append({
+                    'level': 'warning',
+                    'text': f'رقم القيد "{self.name}" غير مألوف: الجزء الثاني ({month_in_name}) ليس شهراً.',
+                })
+            elif month_in_name and self.ledger_month and month_in_name != int(self.ledger_month):
+                checks.append({
+                    'level': 'warning',
+                    'text': f'رقم القيد "{self.name}" يشير إلى الشهر {month_in_name} '
+                            f'بينما شهر دفتر الأستاذ {int(self.ledger_month)}.',
+                    'fix': {'field': 'ledger_month', 'value': str(month_in_name),
+                            'label': f'اجعل الشهر {month_in_name}'},
+                })
+            twin = Move.search([('name', '=', self.name), ('ledger_year', '=', year)], limit=1)
+            if twin:
+                candidate = self.name
+                for _ in range(200):
+                    candidate = Move._increment_name(candidate)
+                    if not Move.search_count([('name', '=', candidate), ('ledger_year', '=', year)]):
+                        break
+                checks.append({
+                    'level': 'danger',
+                    'text': f'الرقم {self.name} مستخدم في القيد {twin.display_name} لسنة {year}.',
+                    'fix': {'field': 'name', 'value': candidate, 'label': f'استخدم {candidate}'},
+                })
+            other = self.search([('id', '!=', self.id), ('state', '=', 'review'),
+                                 ('name', '=', self.name)], limit=1)
+            if other:
+                checks.append({
+                    'level': 'warning',
+                    'text': f'صورة أخرى بانتظار التأكيد تحمل الرقم نفسه ({other.display_name}).',
+                })
+
+        # 3) التوازن والحسابات
+        if not self.is_balanced:
+            difference = abs(self.total_debit - self.total_credit)
+            checks.append({
+                'level': 'danger',
+                'text': f'القيد غير متوازن بفرق {difference:,.3f} — راجع المبالغ في الصورة.',
+            })
+        missing = self.line_ids.filtered(lambda line: not line.account_id)
+        if missing:
+            checks.append({
+                'level': 'danger',
+                'text': f'{len(missing)} بند بلا حساب: ' +
+                        '، '.join(line.account_text or line.name or '—' for line in missing[:3]),
+            })
+        uncertain = self.line_ids.filtered('uncertain')
+        if uncertain:
+            checks.append({
+                'level': 'warning',
+                'text': f'{len(uncertain)} بند علّمه النموذج للمراجعة.',
+            })
+        return checks
+
     def _review_payload(self):
         """بيانات قيد واحد كما تحتاجها شاشة المراجعة."""
         self.ensure_one()
@@ -209,6 +314,7 @@ class MyAccountingPhotoEntry(models.Model):
             'total_credit': self.total_credit,
             'is_balanced': self.is_balanced,
             'existing_move': self.existing_move_id.display_name if self.existing_move_id else '',
+            'checks': self._review_checks(),
             'lines': [{
                 'id': line.id,
                 'name': line.name or '',
