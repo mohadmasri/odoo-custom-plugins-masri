@@ -251,12 +251,12 @@ class MyAccountingPhotoEntry(models.Model):
         if values:
             self.write(values)
 
+        # البنود كما هي على الشاشة: ما اختفى منها يُحذف، وما أُضيف يُنشأ
         by_id = {line.id: line for line in self.line_ids}
-        for data in lines or []:
-            line = by_id.get(data.get('id'))
-            if not line:
-                continue
-            line.write({
+        kept = self.env['myaccounting.photo.entry.line']
+        for index, data in enumerate(lines or [], start=1):
+            values = {
+                'sequence': index * 10,
                 'name': (data.get('name') or '').strip() or False,
                 'account_id': data.get('account_id') or False,
                 'debit': data.get('debit') or 0.0,
@@ -264,7 +264,14 @@ class MyAccountingPhotoEntry(models.Model):
                 'debit_zero_entered': bool(data.get('debit_zero_entered')),
                 'credit_zero_entered': bool(data.get('credit_zero_entered')),
                 'uncertain': bool(data.get('uncertain')),
-            })
+            }
+            line = by_id.get(data.get('id'))
+            if line:
+                line.write(values)
+            else:
+                line = kept.create(dict(values, entry_id=self.id))
+            kept |= line
+        (self.line_ids - kept).unlink()
         return self._review_payload()
 
     def post_review(self, header, lines):

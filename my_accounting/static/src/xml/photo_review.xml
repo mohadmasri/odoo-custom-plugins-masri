@@ -108,6 +108,7 @@
                                 <th style="width:26%;">الحساب</th>
                                 <th style="width:110px;" class="text-end">المدين</th>
                                 <th style="width:110px;" class="text-end">الدائن</th>
+                                <th style="width:38px;"/>
                             </tr>
                         </thead>
                         <tbody>
@@ -139,6 +140,12 @@
                                            t-att-value="line.credit or ''"
                                            t-on-input="(ev) => this.onAmount(line, 'credit', ev)"/>
                                 </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0" title="حذف البند"
+                                            t-on-click="() => this.removeLine(line)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
+                                </td>
                             </tr>
                         </tbody>
                         <tfoot>
@@ -146,9 +153,16 @@
                                 <td colspan="2" class="text-end">الإجمالي</td>
                                 <td class="text-end" t-esc="totals.debit.toFixed(3)"/>
                                 <td class="text-end" t-esc="totals.credit.toFixed(3)"/>
+                                <td/>
                             </tr>
                         </tfoot>
                     </table>
+
+                    <div class="mb-2">
+                        <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.addLine()">
+                            <i class="fa fa-plus me-1"/>إضافة بند
+                        </button>
+                    </div>
 
                     <div class="d-flex align-items-center flex-wrap mb-2" style="gap: 10px;">
                         <span t-if="totals.difference" class="text-danger">

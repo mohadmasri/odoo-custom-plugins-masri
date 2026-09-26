@@ -118,6 +118,27 @@ export class PhotoReview extends Component {
         line[`${field}_zero_entered`] = raw === "0" || raw === "0.000";
     }
 
+    removeLine(line) {
+        const lines = this.entry.lines;
+        lines.splice(lines.indexOf(line), 1);
+    }
+
+    addLine() {
+        this.entry.lines.push({
+            id: false,
+            name: "",
+            account_text: "",
+            account_id: false,
+            account_label: "",
+            debit: 0,
+            credit: 0,
+            debit_zero_entered: false,
+            credit_zero_entered: false,
+            uncertain: false,
+            uncertain_reason: "",
+        });
+    }
+
     onAccountInput(line, ev) {
         const label = ev.target.value;
         const account = this.state.accounts.find((acc) => acc.label === label);
@@ -150,7 +171,7 @@ export class PhotoReview extends Component {
                 ledger_year: entry.ledger_year,
             },
             entry.lines.map((line) => ({
-                id: line.id,
+                id: line.id || false,
                 name: line.name,
                 account_id: line.account_id,
                 debit: parseFloat(line.debit) || 0,
