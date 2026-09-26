@@ -83,6 +83,9 @@ export class AccountTree extends Component {
             selected: {},
             search: "",
             moveNames: [],
+            // فلتر "التي عليها حركة فقط" + الحسابات التي عليها حركة فعلاً
+            onlyMoved: false,
+            movedIds: [],
             // السنة المختارة من القائمة قبل الضغط على شهر (لا فلتر بعد)
             yearHint: "",
             // قيم حقول الفلتر كما يكتبها المستخدم
@@ -102,12 +105,16 @@ export class AccountTree extends Component {
     }
 
     async loadData() {
-        const records = await this.orm.searchRead(
-            "myaccounting.account",
-            [],
-            ["code", "name", "balance", "reviewed", "parent_id"],
-            { order: "code_path" }
-        );
+        const [records, movedIds] = await Promise.all([
+            this.orm.searchRead(
+                "myaccounting.account",
+                [],
+                ["code", "name", "balance", "reviewed", "parent_id"],
+                { order: "code_path" }
+            ),
+            this.orm.call("myaccounting.account", "get_moved_account_ids", []),
+        ]);
+        this.state.movedIds = movedIds;
         const byId = {};
         records.forEach((r) => {
             byId[r.id] = { ...r, children: [], searchKey: normalizeSearchText(`${r.code} ${r.name}`) };
@@ -254,6 +261,7 @@ export class AccountTree extends Component {
     get displayRoots() {
         const filter = this.state.filter;
         const searching = this.searchTokens.length > 0;
+        const moved = new Set(this.state.movedIds);
         const build = (node, ancestorMatched) => {
             const matched = searching && this.matchesSearch(node);
             const children = node.children
@@ -261,6 +269,11 @@ export class AccountTree extends Component {
                 .filter(Boolean);
             const movement = filter ? filter.accounts[node.id] : null;
             if (filter && !movement && !children.length) {
+                return null;
+            }
+            // "التي عليها حركة فقط": يبقى الحساب إن كان عليه حركة أو كان تحته
+            // حساب عليه حركة (ليظهر التسلسل)
+            if (this.state.onlyMoved && !moved.has(node.id) && !children.length) {
                 return null;
             }
             if (searching && !matched && !ancestorMatched && !children.length) {
@@ -279,7 +292,21 @@ export class AccountTree extends Component {
     }
 
     get isNarrowed() {
-        return !!this.state.filter || this.searchTokens.length > 0;
+        return !!this.state.filter || this.state.onlyMoved || this.searchTokens.length > 0;
+    }
+
+    // عدد الحسابات المخفية لأنه لا حركة عليها
+    get hiddenWithoutMovement() {
+        const shown = this.visibleIds.length;
+        const total = [];
+        const walk = (nodes) => nodes.forEach((n) => { total.push(n.id); walk(n.children); });
+        walk(this.state.roots);
+        return total.length - shown;
+    }
+
+    toggleOnlyMoved() {
+        this.state.onlyMoved = !this.state.onlyMoved;
+        this.expandToVisible();
     }
 
     get visibleIds() {

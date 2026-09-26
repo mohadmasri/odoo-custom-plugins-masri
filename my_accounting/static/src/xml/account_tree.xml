@@ -31,6 +31,19 @@
                 <PeriodFilter year="filterYear" month="filterMonth" allowAllYears="true"
                                   onChange.bind="onPeriodChange"/>
 
+                <div class="mb-2">
+                    <button type="button"
+                            t-attf-class="btn btn-sm {{ state.onlyMoved ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.toggleOnlyMoved()"
+                            title="إخفاء الحسابات التي لم تدخل في أي قيد">
+                        <i t-attf-class="fa {{ state.onlyMoved ? 'fa-check-square-o' : 'fa-square-o' }} me-1"/>
+                        فقط التي عليها حركة
+                    </button>
+                    <span t-if="state.onlyMoved and hiddenWithoutMovement" class="text-muted small ms-2">
+                        أُخفي <t t-esc="hiddenWithoutMovement"/> حساباً بلا حركة
+                    </span>
+                </div>
+
                 <div class="d-flex flex-wrap align-items-end" style="gap: 10px;">
                     <div>
                         <label class="form-label small mb-1">من تاريخ</label>

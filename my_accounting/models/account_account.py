@@ -273,6 +273,14 @@ class MyAccountingAccount(models.Model):
         return domain
 
     @api.model
+    def get_moved_account_ids(self):
+        """الحسابات التي عليها حركة فعلاً: لها بند واحد على الأقل في أي قيد
+        (مرحّل أو مسودة). تُستخدم لفلتر "التي عليها حركة فقط" في الشجرة."""
+        groups = self.env['myaccounting.move.line']._read_group(
+            [('account_id', '!=', False)], ['account_id'])
+        return [account.id for (account,) in groups]
+
+    @api.model
     def get_tree_filter_data(self, date_from=False, date_to=False, move_from=False, move_to=False,
                              ledger_from=False, ledger_to=False):
         """حركة كل حساب ضمن الفلتر (بنوده المباشرة فقط، مثل عمود الرصيد في الشجرة)."""
