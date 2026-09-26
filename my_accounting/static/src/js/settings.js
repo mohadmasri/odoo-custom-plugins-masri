@@ -57,8 +57,8 @@ export class MyAccountingSettings extends Component {
         this.state.printIndex[key] = !this.state.printIndex[key];
     }
 
-    onIndexTitle(ev) {
-        this.state.printIndex.title = ev.target.value;
+    onIndexTitle(key, ev) {
+        this.state.printIndex[key] = ev.target.value;
     }
 
     async savePrintIndex() {

@@ -127,7 +127,71 @@
                     .o_move_print_page { break-after: page; page-break-after: always; }
                     .o_move_print_page:last-child { break-after: auto; page-break-after: auto; }
                 }
+
+                /* شريط السؤال قبل الطباعة + صفحة الفهرس وأرقام الصفحات */
+                .o_mv_bar {
+                    display: flex; align-items: center; gap: 10px;
+                    padding: 10px 14px; margin-bottom: 10px;
+                    background: #f6f6f6; border: 1px solid #ddd; border-radius: 6px;
+                }
+                .o_mv_bar b { margin-inline-end: 6px; }
+                .o_mv_index { width: 194mm; margin: 0 auto; font-size: 12px; }
+                .o_mv_index h2 { font-size: 18px; margin-bottom: 8px; }
+                .o_mv_index table { width: 100%; }
+                .o_mv_index th { background-color: #f2f2f2; }
+                .o_mv_index .o_mv_page_col { width: 70px; text-align: center; }
+                .o_mv_stamp { text-align: end; font-size: 10px; color: #666; }
+                @media print {
+                    .o_mv_bar { display: none !important; }
+                    .o_mv_index { break-after: page; page-break-after: always; }
+                }
             </style>
+            <t t-set="cfg" t-value="env['myaccounting.print.index'].get_settings()"/>
+
+            <!-- السؤال قبل الطباعة (حسب الإعدادات). زر "بلا فهرس" يطبع مباشرة
+                 حتى لو تعطّل أي كود آخر. -->
+            <div class="o_mv_bar" t-if="cfg['mode'] == 'ask'">
+                <b>الطباعة:</b>
+                <button type="button" class="btn btn-primary btn-sm" id="o_mv_with">
+                    طباعة مع فهرس
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
+                    طباعة بلا فهرس
+                </button>
+                <span class="text-muted small">الفهرس صفحة أولى تسرد القيود المطبوعة وأرقام صفحاتها.</span>
+            </div>
+
+            <!-- الفهرس مبنيّ هنا ومخفي، ولا يظهر إلا إذا اختير -->
+            <div class="o_mv_index" id="o_mv_index" style="display:none;"
+                 t-att-data-stamp="cfg['stamp_pages'] and '1' or '0'"
+                 t-att-data-auto="cfg['mode']">
+                <h2><t t-esc="cfg['move_title']"/></h2>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th t-if="cfg['move_show_seq']" style="width:60px;">#</th>
+                            <th t-if="cfg['move_show_name']" style="width:110px;">رقم القيد</th>
+                            <th t-if="cfg['move_show_date']" style="width:110px;">التاريخ</th>
+                            <th t-if="cfg['move_show_ref']">المرجع</th>
+                            <th t-if="cfg['move_show_total']" style="width:120px;" class="text-end">الإجمالي</th>
+                            <th class="o_mv_page_col">الصفحة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="docs" t-as="o">
+                            <td t-if="cfg['move_show_seq']"><t t-esc="o_index + 1"/></td>
+                            <td t-if="cfg['move_show_name']"><t t-esc="o.name or '—'"/></td>
+                            <td t-if="cfg['move_show_date']"><t t-esc="o.date"/></td>
+                            <td t-if="cfg['move_show_ref']"><t t-esc="o.ref or '—'"/></td>
+                            <td t-if="cfg['move_show_total']" class="text-end">
+                                <t t-esc="'%.3f' % o.total_debit"/>
+                            </td>
+                            <td class="o_mv_page_col"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <t t-foreach="docs" t-as="o">
                 <div class="o_move_print_page">
                     <t t-call="my_accounting.report_myaccounting_move_document"/>
@@ -172,8 +236,58 @@
                             apply(zoom);
                         }
                     });
-                    window.print();
+                    maAfterFit();
                 });
+
+                // الفهرس: صفحة أولى تسرد القيود وأرقام صفحاتها
+                function maBuildIndex() {
+                    try {
+                        var MM_TO_PX = 96 / 25.4;
+                        var pageH = (297 - 16) * MM_TO_PX;
+                        var index = document.getElementById('o_mv_index');
+                        index.style.display = '';
+                        var stamping = index.getAttribute('data-stamp') === '1';
+                        var pages = document.querySelectorAll('.o_move_print_page');
+                        var cells = index.querySelectorAll('tbody .o_mv_page_col');
+                        var page = 1 + Math.max(1, Math.ceil(
+                            index.getBoundingClientRect().height / pageH - 0.02));
+                        for (var i = 0; i &lt; pages.length; i++) {
+                            if (cells[i]) {
+                                cells[i].textContent = page;
+                            }
+                            if (stamping) {
+                                var stamp = document.createElement('div');
+                                stamp.className = 'o_mv_stamp';
+                                stamp.textContent = 'صفحة ' + page;
+                                pages[i].insertBefore(stamp, pages[i].firstChild);
+                            }
+                            page += Math.max(1, Math.ceil(
+                                pages[i].getBoundingClientRect().height / pageH - 0.02));
+                        }
+                    } catch (error) {
+                        // أي خلل في الترقيم لا يمنع الطباعة
+                    }
+                    var bar = document.querySelector('.o_mv_bar');
+                    if (bar) {
+                        bar.style.display = 'none';
+                    }
+                }
+
+                // بعد ضبط المقاس: إما ننتظر اختيار المستخدم أو نطبع مباشرة
+                function maAfterFit() {
+                    var button = document.getElementById('o_mv_with');
+                    if (button) {
+                        button.addEventListener('click', function () {
+                            maBuildIndex();
+                            window.print();
+                        });
+                        return;
+                    }
+                    if (document.getElementById('o_mv_index').getAttribute('data-auto') === 'always') {
+                        maBuildIndex();
+                    }
+                    window.print();
+                }
             </script>
         </t>
     </template>

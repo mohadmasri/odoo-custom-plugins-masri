@@ -11,13 +11,25 @@ PARAM = 'my_accounting.print_index'
 DEFAULTS = {
     # 'ask' يسأل قبل كل طباعة، وإلا يُطبَّق الاختيار مباشرة
     'mode': 'ask',                      # ask | always | never
+    'stamp_pages': True,                # طباعة رقم الصفحة على كل مستند
+    # كشوف الحسابات
     'title': 'فهرس كشوف الحسابات',
     'show_seq': True,                   # الرقم التسلسلي
     'show_code': False,                 # رمز الحساب
     'show_name': True,                  # اسم الحساب
     'show_balance': True,               # الرصيد
-    'stamp_pages': True,                # طباعة رقم الصفحة على كل كشف
+    # القيود
+    'move_title': 'فهرس القيود',
+    'move_show_seq': True,              # الرقم التسلسلي
+    'move_show_name': True,             # رقم القيد
+    'move_show_date': True,             # التاريخ
+    'move_show_ref': True,              # المرجع
+    'move_show_total': True,            # الإجمالي
 }
+
+STATEMENT_COLUMNS = ('show_seq', 'show_code', 'show_name', 'show_balance')
+MOVE_COLUMNS = ('move_show_seq', 'move_show_name', 'move_show_date',
+                'move_show_ref', 'move_show_total')
 
 MODES = ('ask', 'always', 'never')
 
@@ -41,10 +53,13 @@ class MyAccountingPrintIndex(models.AbstractModel):
                     settings[key] = value
         if settings['mode'] not in MODES:
             settings['mode'] = DEFAULTS['mode']
-        settings['title'] = (settings['title'] or '').strip() or DEFAULTS['title']
+        for key in ('title', 'move_title'):
+            settings[key] = (settings[key] or '').strip() or DEFAULTS[key]
         # لا يجوز أن تخلو أسطر الفهرس من كل شيء
-        if not any(settings[key] for key in ('show_seq', 'show_code', 'show_name', 'show_balance')):
+        if not any(settings[key] for key in STATEMENT_COLUMNS):
             settings['show_name'] = True
+        if not any(settings[key] for key in MOVE_COLUMNS):
+            settings['move_show_name'] = True
         return settings
 
     @api.model
