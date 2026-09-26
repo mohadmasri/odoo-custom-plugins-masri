@@ -186,6 +186,94 @@ class MyAccountingPhotoEntry(models.Model):
     # خدمة القراءة ومفاتيحها (يُدخلها المدير بنفسه من صفحة التصوير)
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # شاشة المراجعة السريعة: طابور القيود المقروءة، قيد تلو الآخر
+    # ------------------------------------------------------------------
+
+    def _review_payload(self):
+        """بيانات قيد واحد كما تحتاجها شاشة المراجعة."""
+        self.ensure_one()
+        return {
+            'id': self.id,
+            'label': self.display_name,
+            'name': self.name or '',
+            'date': self.date and fields.Date.to_string(self.date) or '',
+            'ref': self.ref or '',
+            'journal': self.journal or '',
+            'ledger_month': self.ledger_month or '',
+            'ledger_year': self.ledger_year or 0,
+            'notes': self.notes or '',
+            'provider': self.provider or '',
+            'read_count': self.read_count,
+            'total_debit': self.total_debit,
+            'total_credit': self.total_credit,
+            'is_balanced': self.is_balanced,
+            'existing_move': self.existing_move_id.display_name if self.existing_move_id else '',
+            'lines': [{
+                'id': line.id,
+                'name': line.name or '',
+                'account_text': line.account_text or '',
+                'account_id': line.account_id.id or False,
+                'account_label': line.account_id.display_name if line.account_id else '',
+                'debit': line.debit,
+                'credit': line.credit,
+                'debit_zero_entered': line.debit_zero_entered,
+                'credit_zero_entered': line.credit_zero_entered,
+                'uncertain': line.uncertain,
+                'uncertain_reason': line.uncertain_reason or '',
+            } for line in self.line_ids],
+        }
+
+    @api.model
+    def get_review_queue(self):
+        """كل القيود المقروءة بانتظار التأكيد، بترتيب التصوير، مع شجرة الحسابات."""
+        entries = self.search([('state', '=', 'review')], order='id asc')
+        accounts = self.env['myaccounting.account'].search([], order='code_path')
+        return {
+            'entries': [entry._review_payload() for entry in entries],
+            'accounts': [{'id': acc.id, 'code': acc.code or '', 'name': acc.name,
+                          'label': f'{acc.code} - {acc.name}' if acc.code else acc.name}
+                         for acc in accounts],
+        }
+
+    def save_review(self, header, lines):
+        """يحفظ تعديلات المراجعة (الترويسة والبنود) ويعيد القيد محدّثاً."""
+        self.ensure_one()
+        allowed = ('name', 'date', 'ref', 'journal', 'ledger_month', 'ledger_year')
+        values = {key: header[key] for key in allowed if key in header}
+        for key in ('name', 'ref', 'journal'):
+            if key in values:
+                values[key] = (values[key] or '').strip() or False
+        if 'date' in values:
+            values['date'] = values['date'] or False
+        if 'ledger_year' in values:
+            values['ledger_year'] = int(values['ledger_year'] or 0) or False
+        if values:
+            self.write(values)
+
+        by_id = {line.id: line for line in self.line_ids}
+        for data in lines or []:
+            line = by_id.get(data.get('id'))
+            if not line:
+                continue
+            line.write({
+                'name': (data.get('name') or '').strip() or False,
+                'account_id': data.get('account_id') or False,
+                'debit': data.get('debit') or 0.0,
+                'credit': data.get('credit') or 0.0,
+                'debit_zero_entered': bool(data.get('debit_zero_entered')),
+                'credit_zero_entered': bool(data.get('credit_zero_entered')),
+                'uncertain': bool(data.get('uncertain')),
+            })
+        return self._review_payload()
+
+    def post_review(self, header, lines):
+        """يحفظ ثم يرحّل: يعيد رقم القيد المُنشأ ليُعرض في الشاشة."""
+        self.ensure_one()
+        self.save_review(header, lines)
+        self.action_post()
+        return {'move': self.move_id.display_name if self.move_id else ''}
+
     @api.model
     def get_photo_page_info(self):
         params = self.env['ir.config_parameter'].sudo()

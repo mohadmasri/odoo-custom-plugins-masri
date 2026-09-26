@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.PhotoReview">
+        <div class="o_photo_review p-3" style="overflow:auto; height:100%;" dir="rtl">
+            <div class="d-flex justify-content-between align-items-center flex-wrap mb-2" style="gap: 10px;">
+                <div>
+                    <h3 class="m-0">مراجعة قيود الصور</h3>
+                    <div class="text-muted small">
+                        <t t-if="remaining">
+                            القيد <b t-esc="position"/> من <b t-esc="remaining"/> بانتظار التأكيد
+                        </t>
+                        <t t-else="">لا توجد قيود بانتظار التأكيد</t>
+                        <t t-if="state.posted"> · رُحّل في هذه الجلسة: <b t-esc="state.posted"/></t>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center" style="gap: 8px;">
+                    <button class="btn btn-outline-secondary btn-sm" t-att-disabled="state.index === 0"
+                            t-on-click="() => this.go(-1)" title="السابق (Alt + سهم)">
+                        <i class="fa fa-chevron-right"/>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm"
+                            t-att-disabled="state.index >= remaining - 1"
+                            t-on-click="() => this.go(1)" title="التالي (Alt + سهم)">
+                        <i class="fa fa-chevron-left"/>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" t-on-click="() => this.openList()">
+                        <i class="fa fa-list me-1"/>كل الصور
+                    </button>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
+
+            <div t-elif="!entry" class="o_photo_review_done text-center py-5">
+                <i class="fa fa-check-circle fa-3x text-success d-block mb-3"/>
+                <h4>لا يوجد قيد بانتظار التأكيد</h4>
+                <div class="text-muted">صوّر مستندات جديدة أو اقرأ الصور التي لم تُقرأ بعد.</div>
+                <button class="btn btn-primary mt-3" t-on-click="() => this.openList()">صور القيود</button>
+            </div>
+
+            <div t-else="" class="row g-3">
+                <!-- الصورة -->
+                <div t-attf-class="{{ state.zoom ? 'col-12' : 'col-lg-5' }}">
+                    <div class="o_photo_review_img_box">
+                        <img t-att-src="imageUrl" class="o_photo_review_img" alt="صورة المستند"
+                             t-on-click="() => this.state.zoom = !state.zoom"/>
+                        <div class="small text-muted mt-1">اضغط الصورة للتكبير أو التصغير.</div>
+                    </div>
+                </div>
+
+                <!-- البيانات -->
+                <div class="col">
+                    <div t-if="entry.notes" class="alert alert-warning py-2 small mb-2">
+                        <b>ملاحظات القراءة:</b> <t t-esc="entry.notes"/>
+                    </div>
+                    <div t-if="entry.existing_move" class="alert alert-danger py-2 small mb-2">
+                        <i class="fa fa-exclamation-triangle me-1"/>
+                        يوجد قيد بنفس الرقم: <b t-esc="entry.existing_move"/> — عند الترحيل يأخذ الرقم التالي.
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1">رقم القيد</label>
+                            <input type="text" class="form-control form-control-sm" t-att-value="entry.name"
+                                   t-on-input="(ev) => this.setHeader('name', ev.target.value)"/>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1">التاريخ</label>
+                            <input type="date" class="form-control form-control-sm" t-att-value="entry.date"
+                                   t-on-change="(ev) => this.setHeader('date', ev.target.value)"/>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1">شهر دفتر الأستاذ</label>
+                            <select class="form-select form-select-sm"
+                                    t-on-change="(ev) => this.setHeader('ledger_month', ev.target.value)">
+                                <t t-foreach="months" t-as="month" t-key="month[0]">
+                                    <option t-att-value="month[0]" t-att-selected="month[0] === entry.ledger_month"
+                                            t-esc="month[1]"/>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1">سنة دفتر الأستاذ</label>
+                            <input type="number" class="form-control form-control-sm" t-att-value="entry.ledger_year"
+                                   t-on-input="(ev) => this.setHeader('ledger_year', ev.target.value)"/>
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <label class="form-label small mb-1">المرجع</label>
+                            <input type="text" class="form-control form-control-sm" t-att-value="entry.ref"
+                                   t-on-input="(ev) => this.setHeader('ref', ev.target.value)"/>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small mb-1">اليومية</label>
+                            <input type="text" class="form-control form-control-sm" t-att-value="entry.journal"
+                                   t-on-input="(ev) => this.setHeader('journal', ev.target.value)"/>
+                        </div>
+                    </div>
+
+                    <datalist id="o_photo_review_accounts">
+                        <option t-foreach="state.accounts" t-as="acc" t-key="acc.id" t-att-value="acc.label"/>
+                    </datalist>
+
+                    <table class="table table-sm table-bordered o_photo_review_lines">
+                        <thead>
+                            <tr>
+                                <th>البيان</th>
+                                <th style="width:26%;">الحساب</th>
+                                <th style="width:110px;" class="text-end">المدين</th>
+                                <th style="width:110px;" class="text-end">الدائن</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="entry.lines" t-as="line" t-key="line.id"
+                                t-attf-class="{{ line.uncertain ? 'o_photo_review_uncertain' : '' }}">
+                                <td>
+                                    <input type="text" class="form-control form-control-sm" t-att-value="line.name"
+                                           t-on-input="(ev) => this.setLine(line, 'name', ev.target.value)"/>
+                                    <div t-if="line.uncertain_reason" class="small text-warning"
+                                         t-esc="line.uncertain_reason"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           list="o_photo_review_accounts"
+                                           t-att-value="line.account_id ? accountLabel(line.account_id) : ''"
+                                           t-att-placeholder="line.account_text or 'اختر الحساب'"
+                                           t-on-change="(ev) => this.onAccountInput(line, ev)"/>
+                                    <div t-if="line.account_text" class="small text-muted">
+                                        كما قُرئ: <t t-esc="line.account_text"/>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.001" class="form-control form-control-sm text-end"
+                                           t-att-value="line.debit or ''"
+                                           t-on-input="(ev) => this.onAmount(line, 'debit', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.001" class="form-control form-control-sm text-end"
+                                           t-att-value="line.credit or ''"
+                                           t-on-input="(ev) => this.onAmount(line, 'credit', ev)"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="2" class="text-end">الإجمالي</td>
+                                <td class="text-end" t-esc="totals.debit.toFixed(3)"/>
+                                <td class="text-end" t-esc="totals.credit.toFixed(3)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="d-flex align-items-center flex-wrap mb-2" style="gap: 10px;">
+                        <span t-if="totals.difference" class="text-danger">
+                            <i class="fa fa-exclamation-circle me-1"/>
+                            غير متوازن: الفرق <t t-esc="differenceText"/>
+                        </span>
+                        <span t-else="" class="text-success"><i class="fa fa-check me-1"/>متوازن</span>
+                        <span t-if="missingAccounts" class="text-warning">
+                            <i class="fa fa-question-circle me-1"/>
+                            <t t-esc="missingAccounts"/> بند بلا حساب
+                        </span>
+                        <span class="text-muted small">
+                            قرأه <t t-esc="entry.provider"/>
+                            <t t-if="entry.read_count > 1"> (<t t-esc="entry.read_count"/> مرات)</t>
+                        </span>
+                    </div>
+
+                    <div class="d-flex flex-wrap" style="gap: 8px;">
+                        <button class="btn btn-success" t-att-disabled="state.saving or !canPost"
+                                t-on-click="() => this.postAndNext()"
+                                title="تأكيد وترحيل ثم الانتقال إلى التالي (Ctrl + Enter)">
+                            <i class="fa fa-check me-1"/>تأكيد وترحيل ثم التالي
+                        </button>
+                        <button class="btn btn-outline-primary" t-att-disabled="state.saving"
+                                t-on-click="() => this.save()" title="حفظ بلا ترحيل (Ctrl + S)">
+                            <i class="fa fa-save me-1"/>حفظ فقط
+                        </button>
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.go(1)"
+                                t-att-disabled="state.index >= remaining - 1">
+                            تخطٍ إلى التالي
+                        </button>
+                        <button class="btn btn-link" t-on-click="() => this.openForm()">
+                            فتح النموذج الكامل (إعادة قراءة، لف الصورة...)
+                        </button>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        اختصارات: Ctrl + Enter للترحيل والانتقال · Ctrl + S للحفظ · Alt + سهم للتنقل.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+</templates>

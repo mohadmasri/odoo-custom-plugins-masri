@@ -1,0 +1,26 @@
+/* المراجعة السريعة لقيود الصور */
+.o_photo_review_img_box {
+    position: sticky;
+    top: 8px;
+}
+
+.o_photo_review_img {
+    width: 100%;
+    border: 1px solid var(--o-surface-border, rgba(0, 0, 0, 0.15));
+    border-radius: 8px;
+    cursor: zoom-in;
+    background: #fff;
+}
+
+.o_photo_review_lines input {
+    min-width: 0;
+}
+
+.o_photo_review_uncertain td {
+    background-color: rgba(255, 193, 7, 0.14);
+}
+
+.o_photo_review_done {
+    max-width: 520px;
+    margin: 0 auto;
+}

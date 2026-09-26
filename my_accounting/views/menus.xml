@@ -58,6 +58,10 @@
               parent="menu_myaccounting_settings_root" sequence="25"
               action="action_myaccounting_photo_batch"/>
 
+    <menuitem id="menu_myaccounting_photo_review" name="مراجعة قيود الصور"
+              parent="menu_myaccounting_settings_root" sequence="15"
+              action="action_myaccounting_photo_review"/>
+
     <menuitem id="menu_myaccounting_photo_entries" name="صور القيود (قراءة وتأكيد)"
               parent="menu_myaccounting_settings_root" sequence="20"
               action="action_myaccounting_photo_entries"/>

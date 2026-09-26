@@ -193,6 +193,11 @@
         <field name="code">records.action_stop_read()</field>
     </record>
 
+    <record id="action_myaccounting_photo_review" model="ir.actions.client">
+        <field name="name">مراجعة قيود الصور</field>
+        <field name="tag">my_accounting.photo_review</field>
+    </record>
+
     <record id="action_myaccounting_photo_batch" model="ir.actions.client">
         <field name="name">القراءة الجماعية</field>
         <field name="tag">my_accounting.photo_batch</field>
