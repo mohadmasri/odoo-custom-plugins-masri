@@ -127,13 +127,96 @@
                     .o_statement_page { break-after: page; page-break-after: always; }
                     .o_statement_page:last-child { break-after: auto; page-break-after: auto; }
                 }
+
+                /* شريط السؤال قبل الطباعة + صفحة الفهرس وأرقام الصفحات */
+                .o_st_bar {
+                    display: flex; align-items: center; gap: 10px;
+                    padding: 10px 14px; margin-bottom: 10px;
+                    background: #f6f6f6; border: 1px solid #ddd; border-radius: 6px;
+                }
+                .o_st_bar b { margin-inline-end: 6px; }
+                .o_st_index { width: 190mm; margin: 0 auto; font-size: 12px; }
+                .o_st_index h2 { font-size: 18px; margin-bottom: 8px; }
+                .o_st_index table { width: 100%; }
+                .o_st_index th { background-color: #f2f2f2; }
+                .o_st_index .o_st_page_col { width: 70px; text-align: center; }
+                .o_st_stamp { text-align: end; font-size: 10px; color: #666; }
+                @media print {
+                    .o_st_bar { display: none !important; }
+                    .o_st_index { break-after: page; page-break-after: always; }
+                }
             </style>
+            <!-- السؤال قبل الطباعة. زر "بلا فهرس" يطبع مباشرة حتى لو تعطّل أي كود آخر. -->
+            <div class="o_st_bar">
+                <b>الطباعة:</b>
+                <button type="button" class="btn btn-primary btn-sm" id="o_st_with">
+                    طباعة مع فهرس
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
+                    طباعة بلا فهرس
+                </button>
+                <span class="text-muted small">الفهرس صفحة أولى تسرد الحسابات المطبوعة وأرقام صفحاتها.</span>
+            </div>
+
+            <!-- الفهرس مبنيّ هنا ومخفي، ولا يظهر إلا إذا اخترته -->
+            <div class="o_st_index" id="o_st_index" style="display:none;">
+                <h2>فهرس كشوف الحسابات</h2>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th style="width:60px;">#</th>
+                            <th style="width:90px;">رمز الحساب</th>
+                            <th>اسم الحساب</th>
+                            <th class="o_st_page_col">الصفحة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="docs" t-as="o">
+                            <td><t t-esc="o_index + 1"/></td>
+                            <td><t t-esc="o.code or '—'"/></td>
+                            <td><t t-esc="o.name"/></td>
+                            <td class="o_st_page_col"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <t t-foreach="docs" t-as="o">
                 <div class="o_statement_page">
                     <t t-call="my_accounting.report_myaccounting_account_statement_document"/>
                 </div>
             </t>
-            <script>window.addEventListener('load', function () { window.print(); });</script>
+
+            <script>
+                document.getElementById('o_st_with').addEventListener('click', function () {
+                    try {
+                        var MM_TO_PX = 96 / 25.4;
+                        var pageHeight = (297 - 20) * MM_TO_PX; // A4 عمودي ناقص الهوامش
+                        var index = document.getElementById('o_st_index');
+                        index.style.display = '';
+                        var pages = document.querySelectorAll('.o_statement_page');
+                        var cells = index.querySelectorAll('tbody .o_st_page_col');
+                        // الفهرس أولاً، ثم كل حساب بعدد الصفحات التي يشغلها فعلاً
+                        var page = 1 + Math.max(1, Math.ceil(
+                            index.getBoundingClientRect().height / pageHeight - 0.02));
+                        for (var i = 0; i &lt; pages.length; i++) {
+                            if (cells[i]) {
+                                cells[i].textContent = page;
+                            }
+                            var stamp = document.createElement('div');
+                            stamp.className = 'o_st_stamp';
+                            stamp.textContent = 'صفحة ' + page;
+                            pages[i].insertBefore(stamp, pages[i].firstChild);
+                            page += Math.max(1, Math.ceil(
+                                pages[i].getBoundingClientRect().height / pageHeight - 0.02));
+                        }
+                    } catch (error) {
+                        // أي خلل في الترقيم لا يمنع الطباعة
+                    }
+                    document.querySelector('.o_st_bar').style.display = 'none';
+                    window.print();
+                });
+            </script>
         </t>
     </template>
 
