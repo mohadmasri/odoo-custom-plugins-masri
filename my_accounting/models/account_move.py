@@ -44,6 +44,9 @@ MOVE_TYPES = [
     ('receipt', 'سند قبض'),
 ]
 
+DEFAULT_JOURNAL = 'القيود اليدوية'
+RECEIPT_JOURNAL = 'قبض'
+
 # تفقيط المبالغ بالعربية
 ARABIC_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
                'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر',
@@ -136,7 +139,7 @@ class MyAccountingMove(models.Model):
                        default=lambda self: self._get_default_date())
     ref = fields.Char(string='المرجع')
     journal = fields.Char(
-        string='اليومية', default='القيود اليدوية',
+        string='اليومية', default=lambda self: self._get_default_journal(),
         help='يمكن اختيار أكثر من يومية للقيد الواحد (مثل: ايرادات، رواتب).')
 
     ledger_month = fields.Selection(
@@ -445,6 +448,12 @@ class MyAccountingMove(models.Model):
             text += (f' و{arabic_number_to_words(subunits)} '
                      f'{arabic_currency_label(subunits, sub_one, sub_many)}')
         return f'{text} فقط لا غير'
+
+    @api.model
+    def _get_default_journal(self):
+        """يومية السجل الجديد: "قبض" لسند القبض، و"القيود اليدوية" لغيره."""
+        move_type = self.env.context.get('default_move_type') or 'entry'
+        return RECEIPT_JOURNAL if move_type == 'receipt' else DEFAULT_JOURNAL
 
     @api.model
     def _get_default_date(self):
