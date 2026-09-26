@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
-    <t t-name="my_accounting.JournalInput">
+    <t t-name="my_accounting.JournalPicker">
         <span t-if="props.readonly" t-esc="value"/>
         <div t-else="" class="o_myaccounting_journal_combo">
             <div class="o_myaccounting_journal_box">
@@ -38,6 +38,10 @@
                 </li>
             </ul>
         </div>
+    </t>
+
+    <t t-name="my_accounting.JournalInput">
+        <JournalPicker value="value" readonly="props.readonly" onChange.bind="update"/>
     </t>
 
 </templates>

@@ -92,8 +92,8 @@
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label small mb-1">اليومية</label>
-                            <input type="text" class="form-control form-control-sm" t-att-value="entry.journal"
-                                   t-on-input="(ev) => this.setHeader('journal', ev.target.value)"/>
+                            <JournalPicker value="entry.journal"
+                                           onChange="(value) => this.setHeader('journal', value)"/>
                         </div>
                     </div>
 

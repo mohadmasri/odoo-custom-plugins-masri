@@ -13,9 +13,13 @@ const SPLIT_RE = /[،,+]/;
  * مع إمكانية اختيار أكثر من يومية للقيد الواحد (مثل: ايرادات + رواتب) أو كتابة اسم
  * جديد. تُحفظ الأسماء في الحقل نفسه مفصولة بفاصلة، وتُحتسب في كل يومية منها.
  */
-export class JournalInput extends Component {
-    static template = "my_accounting.JournalInput";
-    static props = { ...standardFieldProps };
+export class JournalPicker extends Component {
+    static template = "my_accounting.JournalPicker";
+    static props = {
+        value: { type: String, optional: true },
+        readonly: { type: Boolean, optional: true },
+        onChange: Function,
+    };
 
     setup() {
         this.orm = useService("orm");
@@ -27,7 +31,7 @@ export class JournalInput extends Component {
     }
 
     get value() {
-        return this.props.record.data[this.props.name] || "";
+        return this.props.value || "";
     }
 
     // اليوميات المختارة للقيد
@@ -48,7 +52,7 @@ export class JournalInput extends Component {
     }
 
     write(names) {
-        this.props.record.update({ [this.props.name]: names.join(SEPARATOR) });
+        this.props.onChange(names.join(SEPARATOR));
     }
 
     add(name) {
@@ -114,6 +118,21 @@ export class JournalInput extends Component {
             this.state.text = "";
             this.close();
         }
+    }
+}
+
+/** نفس الحقل داخل نماذج أودو: يقرأ القيمة من السجل ويكتب فيها */
+export class JournalInput extends Component {
+    static template = "my_accounting.JournalInput";
+    static components = { JournalPicker };
+    static props = { ...standardFieldProps };
+
+    get value() {
+        return this.props.record.data[this.props.name] || "";
+    }
+
+    update(value) {
+        this.props.record.update({ [this.props.name]: value });
     }
 }
 
