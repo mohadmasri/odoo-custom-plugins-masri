@@ -24,6 +24,21 @@
                             t-on-click="() => this.go(1)" title="التالي (Alt + سهم)">
                         <i class="fa fa-chevron-left"/>
                     </button>
+                    <button t-if="remaining > 1" class="btn btn-success btn-sm"
+                            t-att-disabled="state.saving" t-on-click="() => this.postReady()"
+                            title="ترحيل كل قيد اجتاز الفحوصات، وترك ما فيه ملاحظة حمراء">
+                        <i class="fa fa-check-square-o me-1"/>رحّل كل السليم
+                    </button>
+                    <div t-if="state.pendingRead" class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" t-att-disabled="state.saving"
+                                t-on-click="() => this.readAllNew('gemini')">
+                            <i class="fa fa-magic me-1"/>اقرأ <t t-esc="state.pendingRead"/> صورة بـ <t t-esc="'Gemini'"/>
+                        </button>
+                        <button class="btn btn-outline-primary" t-att-disabled="state.saving"
+                                t-on-click="() => this.readAllNew('claude')" title="دفعة Claude بنصف السعر">
+                            Claude
+                        </button>
+                    </div>
                     <button class="btn btn-secondary btn-sm" t-on-click="() => this.openList()">
                         <i class="fa fa-list me-1"/>كل الصور
                     </button>
@@ -36,7 +51,13 @@
                 <i class="fa fa-check-circle fa-3x text-success d-block mb-3"/>
                 <h4>لا يوجد قيد بانتظار التأكيد</h4>
                 <div class="text-muted">صوّر مستندات جديدة أو اقرأ الصور التي لم تُقرأ بعد.</div>
-                <button class="btn btn-primary mt-3" t-on-click="() => this.openList()">صور القيود</button>
+                <div t-if="state.pendingRead" class="mt-3">
+                    <button class="btn btn-primary" t-att-disabled="state.saving"
+                            t-on-click="() => this.readAllNew('gemini')">
+                        <i class="fa fa-magic me-1"/>اقرأ <t t-esc="state.pendingRead"/> صورة بانتظار القراءة
+                    </button>
+                </div>
+                <button class="btn btn-secondary mt-3" t-on-click="() => this.openList()">صور القيود</button>
             </div>
 
             <div t-else="" class="row g-3">
@@ -172,6 +193,11 @@
                     <div class="mb-2">
                         <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.addLine()">
                             <i class="fa fa-plus me-1"/>إضافة بند
+                        </button>
+                        <button t-if="missingAccounts" class="btn btn-sm btn-outline-primary ms-2"
+                                t-att-disabled="state.saving" t-on-click="() => this.suggestAccounts()"
+                                title="ملء الحسابات الناقصة من قيودك المرحّلة السابقة">
+                            <i class="fa fa-lightbulb-o me-1"/>اقترح الحسابات من قيودي السابقة
                         </button>
                     </div>
 

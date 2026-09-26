@@ -20,6 +20,8 @@
                     <button name="action_read_gemini" type="object" string="إعادة القراءة بـ Gemini" icon="fa-refresh"
                             invisible="state != 'review' or not image or read_state in ('queued', 'running', 'batch')"
                             confirm="ستحل القراءة الجديدة محل البنود الحالية وأي تعديل أجريته عليها. متابعة؟"/>
+                    <button name="action_suggest_accounts" type="object" string="اقترح الحسابات" icon="fa-lightbulb-o"
+                            invisible="state != 'review'"/>
                     <button name="action_post" type="object" string="تأكيد وترحيل القيد" class="btn-success"
                             invisible="state != 'review'"
                             confirm="سيُنشأ قيد محاسبي مرحّل بهذه البنود، وتُحذف الصورة من النظام. متابعة؟"/>

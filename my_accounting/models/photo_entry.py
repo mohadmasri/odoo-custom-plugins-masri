@@ -28,6 +28,7 @@ _logger = logging.getLogger(__name__)
 API_KEY_PARAM = 'my_accounting.anthropic_api_key'
 GEMINI_KEY_PARAM = 'my_accounting.gemini_api_key'
 GEMINI_MODEL_PARAM = 'my_accounting.gemini_model'
+AUTO_READ_PARAM = 'my_accounting.photo_auto_read'  # off | gemini | claude
 CLAUDE_MODEL = 'claude-opus-5'
 GEMINI_DEFAULT_MODEL = 'gemini-3.8-flash'
 GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
@@ -195,6 +196,128 @@ class MyAccountingPhotoEntry(models.Model):
     def _compute_issue_count(self):
         for entry in self:
             entry.issue_count = len(entry._review_checks()) if entry.state == 'review' else 0
+
+    # ------------------------------------------------------------------
+    # الترحيل الجماعي وقراءة كل الجديد
+    # ------------------------------------------------------------------
+
+    @api.model
+    def ready_to_post(self):
+        """القيود التي اجتازت كل الفحوصات الحاسمة، فتصلح للترحيل بلا مراجعة."""
+        return self.search([('state', '=', 'review')]).filtered(
+            lambda entry: not any(check['level'] == 'danger' for check in entry._review_checks()))
+
+    @api.model
+    def post_ready(self):
+        """يرحّل كل قيد سليم، ويتخطّى ما فيه ملاحظة حاسمة."""
+        posted, failed = [], []
+        for entry in self.ready_to_post():
+            try:
+                with self.env.cr.savepoint():
+                    entry.action_post()
+                posted.append(entry.move_id.display_name or entry.display_name)
+            except UserError as error:
+                failed.append(f'{entry.display_name}: {error.args[0]}')
+        return {'posted': posted, 'failed': failed}
+
+    @api.model
+    def pending_read_count(self):
+        """عدد الصور التي لم تُقرأ بعد ولا توجد قراءة جارية لها."""
+        return self.search_count([('state', '=', 'new'), ('image', '!=', False),
+                                  ('read_state', 'not in', ('queued', 'running', 'batch'))])
+
+    @api.model
+    def read_all_new(self, provider):
+        """قراءة كل الصور التي لم تُقرأ بعد دفعة واحدة."""
+        entries = self.search([('state', '=', 'new'), ('image', '!=', False),
+                               ('read_state', 'not in', ('queued', 'running', 'batch'))])
+        if not entries:
+            raise UserError('لا توجد صور بانتظار القراءة.')
+        if provider == 'claude':
+            entries.action_batch_read_claude()
+        else:
+            entries.action_batch_read_gemini()
+        return len(entries)
+
+    # ------------------------------------------------------------------
+    # اقتراح الحسابات من أرشيف القيود المرحّلة
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _normalize_key(self, text):
+        """توحيد النص للمقارنة: بلا تشكيل ولا مسافات زائدة ولا اختلاف همزات."""
+        text = (text or '').strip().lower()
+        text = re.sub(r'[ً-ْـ]', '', text)     # تشكيل وتطويل
+        text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+        text = text.replace('ة', 'ه').replace('ى', 'ي')
+        text = re.sub(r'[^\w؀-ۿ]+', ' ', text)
+        return ' '.join(text.split())
+
+    @api.model
+    def _account_memory(self):
+        """ذاكرة من قيودك المرحّلة: البيان → الحساب الأكثر استخداماً معه،
+        واسم الحساب كما يُكتب → الحساب نفسه."""
+        by_label = {}
+        by_account_name = {}
+        lines = self.env['myaccounting.move.line'].search(
+            [('account_id', '!=', False), ('move_id.state', '=', 'posted')])
+        for line in lines:
+            key = self._normalize_key(line.name)
+            if key:
+                counts = by_label.setdefault(key, {})
+                counts[line.account_id.id] = counts.get(line.account_id.id, 0) + 1
+        for account in self.env['myaccounting.account'].search([]):
+            for text in (account.name, f'{account.code} {account.name}'):
+                key = self._normalize_key(text)
+                if key:
+                    by_account_name.setdefault(key, account.id)
+        return by_label, by_account_name
+
+    def suggest_accounts(self):
+        """يملأ الحسابات الفارغة من ذاكرة القيود السابقة، ويعيد عدد ما مُلئ."""
+        by_label, by_account_name = self._account_memory()
+        filled = 0
+        for entry in self:
+            for line in entry.line_ids.filtered(lambda item: not item.account_id):
+                account_id = False
+                # 1) اسم الحساب كما قرأه النموذج
+                key = self._normalize_key(line.account_text)
+                if key:
+                    account_id = by_account_name.get(key)
+                    if not account_id:
+                        matches = [value for name, value in by_account_name.items()
+                                   if key and (key in name or name in key)]
+                        if len(set(matches)) == 1:
+                            account_id = matches[0]
+                # 2) البيان نفسه كما ورد في قيود سابقة
+                if not account_id:
+                    counts = by_label.get(self._normalize_key(line.name))
+                    if counts:
+                        account_id = max(counts, key=counts.get)
+                if account_id:
+                    line.write({
+                        'account_id': account_id,
+                        'uncertain': False,
+                        'uncertain_reason': 'اقتُرح الحساب من قيودك السابقة',
+                    })
+                    filled += 1
+        return filled
+
+    def action_suggest_accounts(self):
+        """زر النموذج: اقتراح الحسابات الناقصة."""
+        filled = self.suggest_accounts()
+        message = f'اقتُرح الحساب لـ {filled} بند من قيودك السابقة.' if filled             else 'لم يُعثر على حساب مطابق في قيودك السابقة.'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {'message': message, 'type': 'success' if filled else 'warning'},
+        }
+
+    def suggest_accounts_review(self):
+        """من شاشة المراجعة: يقترح ثم يعيد القيد محدّثاً."""
+        self.ensure_one()
+        filled = self.suggest_accounts()
+        return dict(self._review_payload(), filled=filled)
 
     def _review_checks(self):
         """فحوصات تلقائية قبل المراجعة: الأخطاء التي تتكرر في القراءة.
@@ -388,10 +511,20 @@ class MyAccountingPhotoEntry(models.Model):
         return {'move': self.move_id.display_name if self.move_id else ''}
 
     @api.model
+    def set_auto_read(self, mode):
+        """القراءة التلقائية بعد الرفع: off أو gemini أو claude."""
+        if mode not in ('off', 'gemini', 'claude'):
+            mode = 'off'
+        self.env['ir.config_parameter'].sudo().set_param(AUTO_READ_PARAM, mode)
+        return mode
+
+    @api.model
     def get_photo_page_info(self):
         params = self.env['ir.config_parameter'].sudo()
         waiting = self.search([('state', 'in', ('new', 'review'))])
         return {
+            'auto_read': params.get_param(AUTO_READ_PARAM) or 'off',
+            'pending_read': self.pending_read_count(),
             'has_claude_key': bool(params.get_param(API_KEY_PARAM)),
             'has_gemini_key': bool(params.get_param(GEMINI_KEY_PARAM)),
             'gemini_model': params.get_param(GEMINI_MODEL_PARAM) or GEMINI_DEFAULT_MODEL,
@@ -640,7 +773,14 @@ class MyAccountingPhotoEntry(models.Model):
         if len(base64.b64decode(image_b64)) > MAX_IMAGE_BYTES:
             raise UserError('الصورة كبيرة جداً (الحد 5 ميغابايت).')
         entry = self.create({'image': image_b64, 'image_mimetype': media_type, 'state': 'new'})
-        return {'id': entry.id, 'label': entry.display_name}
+        # القراءة التلقائية بعد الرفع (إن فُعّلت): تبدأ في الخلفية فوراً
+        auto = self.env['ir.config_parameter'].sudo().get_param(AUTO_READ_PARAM) or 'off'
+        if auto in ('gemini', 'claude'):
+            try:
+                entry._request_read(auto)
+            except UserError as error:
+                _logger.warning('Photo entry %s: auto read failed to start: %s', entry.id, error.args[0])
+        return {'id': entry.id, 'label': entry.display_name, 'auto_read': auto}
 
     # ------------------------------------------------------------------
     # القراءة في الخلفية: الزر يضع الصورة في طابور، والمهمة المجدولة تقرؤها
@@ -900,6 +1040,8 @@ class MyAccountingPhotoEntry(models.Model):
         self.write(dict(vals, provider=provider, state='review', read_count=self.read_count + 1,
                         read_state='done', read_step=5, read_finished=fields.Datetime.now(),
                         read_error=False, read_auto_retry=False))
+        # ما لم يحدّده النموذج من حسابات: نقترحه من قيودك السابقة
+        self.suggest_accounts()
 
     def _run_read(self):
         self.ensure_one()

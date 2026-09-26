@@ -41,6 +41,7 @@ export class PhotoReview extends Component {
             index: 0,
             saving: false,
             posted: 0,       // كم قيداً رُحّل في هذه الجلسة
+            pendingRead: 0,  // صور لم تُقرأ بعد
             zoom: false,     // تكبير الصورة
         });
         onWillStart(() => this.load());
@@ -49,7 +50,11 @@ export class PhotoReview extends Component {
 
     async load() {
         this.state.loading = true;
-        const data = await this.orm.call("myaccounting.photo.entry", "get_review_queue", []);
+        const [data, pending] = await Promise.all([
+            this.orm.call("myaccounting.photo.entry", "get_review_queue", []),
+            this.orm.call("myaccounting.photo.entry", "pending_read_count", []),
+        ]);
+        this.state.pendingRead = pending;
         this.state.entries = data.entries;
         this.state.accounts = data.accounts;
         this.state.index = Math.min(this.state.index, Math.max(0, data.entries.length - 1));
@@ -246,6 +251,67 @@ export class PhotoReview extends Component {
         } catch (error) {
             this.notification.add(
                 error.data?.message || error.message || "تعذّر ترحيل القيد.", { type: "danger" });
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    /** اقتراح الحسابات الناقصة من القيود السابقة */
+    async suggestAccounts() {
+        if (!this.entry || this.state.saving) {
+            return;
+        }
+        this.state.saving = true;
+        try {
+            await this.save(false); // نحفظ تعديلاتك أولاً حتى لا تضيع
+            const updated = await this.orm.call(
+                "myaccounting.photo.entry", "suggest_accounts_review", [[this.entry.id]]);
+            Object.assign(this.entry, updated);
+            this.notification.add(
+                updated.filled
+                    ? `اقتُرح الحساب لـ ${updated.filled} بند من قيودك السابقة.`
+                    : "لم يُعثر على حساب مطابق في قيودك السابقة.",
+                { type: updated.filled ? "success" : "warning" });
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    /** ترحيل كل قيد اجتاز الفحوصات، وترك ما فيه ملاحظة حاسمة */
+    async postReady() {
+        if (this.state.saving) {
+            return;
+        }
+        this.state.saving = true;
+        try {
+            const result = await this.orm.call("myaccounting.photo.entry", "post_ready", []);
+            this.notification.add(
+                result.posted.length
+                    ? `رُحّل ${result.posted.length} قيداً: ${result.posted.join("، ")}`
+                    : "لا يوجد قيد سليم جاهز للترحيل.",
+                { type: result.posted.length ? "success" : "warning" });
+            if (result.failed.length) {
+                this.notification.add(`تعذّر ترحيل ${result.failed.length}: ${result.failed[0]}`,
+                    { type: "danger" });
+            }
+            this.state.posted += result.posted.length;
+            await this.load();
+        } finally {
+            this.state.saving = false;
+        }
+    }
+
+    /** قراءة كل الصور التي لم تُقرأ بعد */
+    async readAllNew(provider) {
+        this.state.saving = true;
+        try {
+            const count = await this.orm.call(
+                "myaccounting.photo.entry", "read_all_new", [provider]);
+            this.notification.add(`أُرسلت ${count} صورة للقراءة. ستظهر هنا فور انتهائها.`,
+                { type: "success" });
+            await this.load();
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر بدء القراءة.", { type: "danger" });
         } finally {
             this.state.saving = false;
         }

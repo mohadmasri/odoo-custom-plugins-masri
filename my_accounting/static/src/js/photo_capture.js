@@ -61,6 +61,14 @@ export class PhotoCapturePage extends Component {
         await this.loadInfo();
     }
 
+    async setAutoRead(mode) {
+        await this.orm.call("myaccounting.photo.entry", "set_auto_read", [mode]);
+        this.notification.add(
+            mode === "off" ? "أُوقفت القراءة التلقائية." : "ستُقرأ الصور تلقائياً بعد الرفع.",
+            { type: "success" });
+        await this.loadInfo();
+    }
+
     async saveGeminiModel() {
         await this.orm.call("myaccounting.photo.entry", "set_gemini_model", [this.state.geminiModel]);
         this.notification.add("تم حفظ نموذج Gemini.", { type: "success" });

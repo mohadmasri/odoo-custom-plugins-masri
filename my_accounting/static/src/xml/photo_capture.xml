@@ -136,6 +136,22 @@
                     </div>
                 </div>
 
+                <!-- القراءة التلقائية بعد الرفع -->
+                <div t-if="state.info" class="o_photo_card small mb-3">
+                    <div class="fw-bold mb-1"><i class="fa fa-magic me-1"/>القراءة بعد الرفع</div>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <t t-foreach="[['off', 'يدوياً'], ['gemini', 'تلقائياً بـ Gemini'],
+                                       ['claude', 'تلقائياً بـ Claude']]" t-as="mode" t-key="mode[0]">
+                            <button type="button"
+                                    t-attf-class="btn {{ state.info.auto_read === mode[0] ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                    t-on-click="() => this.setAutoRead(mode[0])" t-esc="mode[1]"/>
+                        </t>
+                    </div>
+                    <div class="text-muted mt-1">
+                        عند التفعيل تبدأ قراءة كل صورة فور رفعها، فتجدها جاهزة للمراجعة على الحاسوب.
+                    </div>
+                </div>
+
                 <!-- مفاتيح خدمات القراءة (مدير النظام) -->
                 <details t-if="state.info and state.info.is_admin" class="o_photo_card small"
                          t-att-open="!state.info.has_claude_key and !state.info.has_gemini_key">
