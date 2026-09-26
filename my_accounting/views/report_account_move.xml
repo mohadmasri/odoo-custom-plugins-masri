@@ -158,7 +158,9 @@
                 <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">
                     طباعة بلا فهرس
                 </button>
-                <span class="text-muted small">الفهرس صفحة أولى تسرد القيود المطبوعة وأرقام صفحاتها.</span>
+                <label class="mb-0 small text-muted" for="o_mv_title">عنوان الفهرس:</label>
+                <input type="text" id="o_mv_title" class="form-control form-control-sm" style="max-width:280px;"
+                       t-att-value="cfg['move_title']" placeholder="عنوان صفحة الفهرس"/>
             </div>
 
             <!-- الفهرس مبنيّ هنا ومخفي، ولا يظهر إلا إذا اختير -->
@@ -246,6 +248,11 @@
                         var pageH = (297 - 16) * MM_TO_PX;
                         var index = document.getElementById('o_mv_index');
                         index.style.display = '';
+                        // عنوان الفهرس كما كُتب قبل الطباعة (إن تُرك فارغاً يبقى الافتراضي)
+                        var titleInput = document.getElementById('o_mv_title');
+                        if (titleInput &amp;&amp; titleInput.value.trim()) {
+                            index.querySelector('h2').textContent = titleInput.value.trim();
+                        }
                         var stamping = index.getAttribute('data-stamp') === '1';
                         var pages = document.querySelectorAll('.o_move_print_page');
                         var cells = index.querySelectorAll('tbody .o_mv_page_col');
