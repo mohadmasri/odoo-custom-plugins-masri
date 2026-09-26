@@ -295,6 +295,11 @@ export class AccountTree extends Component {
         return !!this.state.filter || this.state.onlyMoved || this.searchTokens.length > 0;
     }
 
+    // الفتح التلقائي للفروع يخص فلتر الفترة والبحث فقط
+    get autoExpands() {
+        return !!this.state.filter || this.searchTokens.length > 0;
+    }
+
     // عدد الحسابات المخفية لأنه لا حركة عليها
     get hiddenWithoutMovement() {
         const shown = this.visibleIds.length;
@@ -304,9 +309,9 @@ export class AccountTree extends Component {
         return total.length - shown;
     }
 
+    // الفلتر يُخفي الحسابات بلا حركة فقط، ولا يفتح الفروع: تبقى الشجرة كما تركتها
     toggleOnlyMoved() {
         this.state.onlyMoved = !this.state.onlyMoved;
-        this.expandToVisible();
     }
 
     get visibleIds() {
@@ -318,7 +323,7 @@ export class AccountTree extends Component {
 
     // عند تطبيق فلتر أو بحث نفتح الفروع تلقائياً حتى تظهر النتائج مباشرة
     expandToVisible() {
-        if (!this.isNarrowed) {
+        if (!this.autoExpands) {
             return;
         }
         const expanded = { ...this.state.expanded };
