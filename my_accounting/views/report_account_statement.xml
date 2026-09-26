@@ -146,8 +146,11 @@
                     .o_st_index { break-after: page; page-break-after: always; }
                 }
             </style>
-            <!-- السؤال قبل الطباعة. زر "بلا فهرس" يطبع مباشرة حتى لو تعطّل أي كود آخر. -->
-            <div class="o_st_bar">
+            <t t-set="cfg" t-value="env['myaccounting.print.index'].get_settings()"/>
+
+            <!-- السؤال قبل الطباعة (حسب الإعدادات). زر "بلا فهرس" يطبع مباشرة
+                 حتى لو تعطّل أي كود آخر. -->
+            <div class="o_st_bar" t-if="cfg['mode'] == 'ask'">
                 <b>الطباعة:</b>
                 <button type="button" class="btn btn-primary btn-sm" id="o_st_with">
                     طباعة مع فهرس
@@ -158,23 +161,29 @@
                 <span class="text-muted small">الفهرس صفحة أولى تسرد الحسابات المطبوعة وأرقام صفحاتها.</span>
             </div>
 
-            <!-- الفهرس مبنيّ هنا ومخفي، ولا يظهر إلا إذا اخترته -->
-            <div class="o_st_index" id="o_st_index" style="display:none;">
-                <h2>فهرس كشوف الحسابات</h2>
+            <!-- الفهرس مبنيّ هنا ومخفي، ولا يظهر إلا إذا اختير -->
+            <div class="o_st_index" id="o_st_index" style="display:none;"
+                 t-att-data-stamp="cfg['stamp_pages'] and '1' or '0'"
+                 t-att-data-auto="cfg['mode']">
+                <h2><t t-esc="cfg['title']"/></h2>
                 <table class="table table-bordered">
                     <thead>
                         <tr>
-                            <th style="width:60px;">#</th>
-                            <th style="width:90px;">رمز الحساب</th>
-                            <th>اسم الحساب</th>
+                            <th t-if="cfg['show_seq']" style="width:60px;">#</th>
+                            <th t-if="cfg['show_code']" style="width:90px;">رمز الحساب</th>
+                            <th t-if="cfg['show_name']">اسم الحساب</th>
+                            <th t-if="cfg['show_balance']" style="width:120px;" class="text-end">الرصيد</th>
                             <th class="o_st_page_col">الصفحة</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr t-foreach="docs" t-as="o">
-                            <td><t t-esc="o_index + 1"/></td>
-                            <td><t t-esc="o.code or '—'"/></td>
-                            <td><t t-esc="o.name"/></td>
+                            <td t-if="cfg['show_seq']"><t t-esc="o_index + 1"/></td>
+                            <td t-if="cfg['show_code']"><t t-esc="o.code or '—'"/></td>
+                            <td t-if="cfg['show_name']"><t t-esc="o.name"/></td>
+                            <td t-if="cfg['show_balance']" class="text-end">
+                                <t t-esc="'%.3f' % o.balance"/>
+                            </td>
                             <td class="o_st_page_col"/>
                         </tr>
                     </tbody>
@@ -188,12 +197,13 @@
             </t>
 
             <script>
-                document.getElementById('o_st_with').addEventListener('click', function () {
+                function maBuildIndex() {
                     try {
                         var MM_TO_PX = 96 / 25.4;
                         var pageHeight = (297 - 20) * MM_TO_PX; // A4 عمودي ناقص الهوامش
                         var index = document.getElementById('o_st_index');
                         index.style.display = '';
+                        var stamping = index.getAttribute('data-stamp') === '1';
                         var pages = document.querySelectorAll('.o_statement_page');
                         var cells = index.querySelectorAll('tbody .o_st_page_col');
                         // الفهرس أولاً، ثم كل حساب بعدد الصفحات التي يشغلها فعلاً
@@ -203,19 +213,39 @@
                             if (cells[i]) {
                                 cells[i].textContent = page;
                             }
-                            var stamp = document.createElement('div');
-                            stamp.className = 'o_st_stamp';
-                            stamp.textContent = 'صفحة ' + page;
-                            pages[i].insertBefore(stamp, pages[i].firstChild);
+                            if (stamping) {
+                                var stamp = document.createElement('div');
+                                stamp.className = 'o_st_stamp';
+                                stamp.textContent = 'صفحة ' + page;
+                                pages[i].insertBefore(stamp, pages[i].firstChild);
+                            }
                             page += Math.max(1, Math.ceil(
                                 pages[i].getBoundingClientRect().height / pageHeight - 0.02));
                         }
                     } catch (error) {
                         // أي خلل في الترقيم لا يمنع الطباعة
                     }
-                    document.querySelector('.o_st_bar').style.display = 'none';
-                    window.print();
-                });
+                    var bar = document.querySelector('.o_st_bar');
+                    if (bar) {
+                        bar.style.display = 'none';
+                    }
+                }
+
+                var maAskButton = document.getElementById('o_st_with');
+                if (maAskButton) {
+                    maAskButton.addEventListener('click', function () {
+                        maBuildIndex();
+                        window.print();
+                    });
+                } else {
+                    // الإعدادات تقرّر بلا سؤال: مع فهرس دائماً أو بلا فهرس دائماً
+                    window.addEventListener('load', function () {
+                        if (document.getElementById('o_st_index').getAttribute('data-auto') === 'always') {
+                            maBuildIndex();
+                        }
+                        window.print();
+                    });
+                }
             </script>
         </t>
     </template>

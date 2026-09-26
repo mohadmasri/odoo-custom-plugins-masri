@@ -28,12 +28,76 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'printIndex' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('printIndex')">
+                        <i class="fa fa-list-ol me-1"/> الفهرس
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.activeTab === 'system' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('system')">
                         <i class="fa fa-power-off me-1"/> النظام
                     </a>
                 </li>
             </ul>
+
+            <t t-if="state.activeTab === 'printIndex' and state.printIndex">
+                <div class="mb-4" style="max-width: 720px;">
+                    <h5 class="mb-1">فهرس الطباعة</h5>
+                    <div class="text-muted small mb-3">
+                        صفحة أولى تُطبع قبل كشوف الحسابات، تسرد ما تطبعه ورقم صفحة كل كشف.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">عند الطباعة</label>
+                        <div class="btn-group d-block" role="group">
+                            <t t-foreach="[['ask', 'اسألني في كل مرة'], ['always', 'مع فهرس دائماً'],
+                                           ['never', 'بلا فهرس دائماً']]" t-as="mode" t-key="mode[0]">
+                                <button type="button"
+                                        t-attf-class="btn btn-sm {{ state.printIndex.mode === mode[0] ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        t-on-click="() => this.setIndexMode(mode[0])" t-esc="mode[1]"/>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">عنوان صفحة الفهرس</label>
+                        <input type="text" class="form-control form-control-sm" style="max-width:360px;"
+                               t-att-value="state.printIndex.title" t-on-input="(ev) => this.onIndexTitle(ev)"/>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">أعمدة الفهرس</label>
+                        <t t-foreach="[['show_seq', 'الرقم التسلسلي'], ['show_code', 'رمز الحساب'],
+                                       ['show_name', 'اسم الحساب'], ['show_balance', 'الرصيد']]"
+                           t-as="col" t-key="col[0]">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" t-att-id="'o_ma_idx_' + col[0]"
+                                       t-att-checked="state.printIndex[col[0]]"
+                                       t-on-change="() => this.toggleIndexColumn(col[0])"/>
+                                <label class="form-check-label" t-att-for="'o_ma_idx_' + col[0]" t-esc="col[1]"/>
+                            </div>
+                        </t>
+                        <div class="form-text">عمود "الصفحة" يظهر دائماً.</div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="o_ma_idx_stamp"
+                               t-att-checked="state.printIndex.stamp_pages"
+                               t-on-change="() => this.toggleIndexColumn('stamp_pages')"/>
+                        <label class="form-check-label" for="o_ma_idx_stamp">
+                            طباعة رقم الصفحة أعلى كل كشف حساب
+                        </label>
+                    </div>
+
+                    <button class="btn btn-primary" t-att-disabled="state.savingPrintIndex"
+                            t-on-click="() => this.savePrintIndex()">
+                        <i class="fa fa-save me-1"/>
+                        <t t-if="state.savingPrintIndex">جارِ الحفظ...</t>
+                        <t t-else="">حفظ</t>
+                    </button>
+                </div>
+            </t>
 
             <t t-if="state.activeTab === 'theme'">
                 <div class="mb-4">

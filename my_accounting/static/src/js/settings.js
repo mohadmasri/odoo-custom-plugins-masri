@@ -29,12 +29,47 @@ export class MyAccountingSettings extends Component {
             runningBackup: false,
             theme: "odoo",
             themes: [],
+            // فهرس الطباعة
+            printIndex: null,
+            savingPrintIndex: false,
         });
-        onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig(), this.loadTheme()]));
+        onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig(), this.loadTheme(),
+                                       this.loadPrintIndex()]));
     }
 
     setTab(tab) {
         this.state.activeTab = tab;
+    }
+
+    // ------------------------------------------------------------------
+    // فهرس الطباعة: صفحة أولى تسرد المطبوع وأرقام صفحاته
+    // ------------------------------------------------------------------
+
+    async loadPrintIndex() {
+        this.state.printIndex = await this.orm.call("myaccounting.print.index", "get_settings", []);
+    }
+
+    setIndexMode(mode) {
+        this.state.printIndex.mode = mode;
+    }
+
+    toggleIndexColumn(key) {
+        this.state.printIndex[key] = !this.state.printIndex[key];
+    }
+
+    onIndexTitle(ev) {
+        this.state.printIndex.title = ev.target.value;
+    }
+
+    async savePrintIndex() {
+        this.state.savingPrintIndex = true;
+        try {
+            this.state.printIndex = await this.orm.call(
+                "myaccounting.print.index", "set_settings", [{ ...this.state.printIndex }]);
+            this.notification.add("حُفظت إعدادات الفهرس.", { type: "success" });
+        } finally {
+            this.state.savingPrintIndex = false;
+        }
     }
 
     // ------------------------------------------------------------------
