@@ -128,8 +128,11 @@
                     .o_move_print_page:last-child { break-after: auto; page-break-after: auto; }
                 }
             </style>
+            <div data-ma-print="1" data-ma-title="فهرس القيود المطبوعة"
+                 data-ma-headers="رقم القيد|التاريخ|المرجع|الإجمالي" data-ma-orientation="portrait"/>
             <t t-foreach="docs" t-as="o">
-                <div class="o_move_print_page">
+                <div class="o_move_print_page" data-ma-doc="1"
+                     t-attf-data-ma-info="{{ o.name or '—' }}|{{ o.date or '' }}|{{ o.ref or '—' }}|{{ '%.3f' % o.total_debit }}">
                     <t t-call="my_accounting.report_myaccounting_move_document"/>
                 </div>
             </t>
@@ -172,7 +175,6 @@
                             apply(zoom);
                         }
                     });
-                    window.print();
                 });
             </script>
         </t>

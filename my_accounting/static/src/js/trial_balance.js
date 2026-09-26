@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
+import { askPrintIndex, addSinglePageIndex } from "./print_index_dialog";
 import { openRecord } from "./open_record";
 
 const STATE_FILTERS = [
@@ -25,6 +26,7 @@ export class TrialBalance extends Component {
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
+        this.dialogService = useService("dialog");
         const today = new Date();
         this.state = useState({
             data: null,
@@ -131,7 +133,20 @@ export class TrialBalance extends Component {
     }
 
     // الطباعة في صفحة A4 عمودية واحدة، مع تصغير محسوب إن طال الجدول
+    // نص الفترة كما يظهر في ترويسة الميزان (يُستخدم في الفهرس)
+    get periodText() {
+        if (this.state.dateFrom || this.state.dateTo) {
+            return `من ${this.state.dateFrom || "البداية"} إلى ${this.state.data?.date_to || ""}`;
+        }
+        return `من شهر ${this.state.ledgerFrom} إلى ${this.state.data?.ledger_to || this.state.ledgerTo}`;
+    }
+
+    // السؤال عن الفهرس قبل الطباعة، ثم الطباعة نفسها
     printReport() {
+        askPrintIndex(this.dialogService, (withIndex) => this._printReport(withIndex));
+    }
+
+    _printReport(withIndex) {
         const page = document.querySelector(".o_trial_balance");
         const printable = page && page.querySelector(".o_tb_printable");
         if (printable) {
@@ -146,7 +161,23 @@ export class TrialBalance extends Component {
                 page.style.setProperty("--tb-print-scale", zoom.toFixed(4));
             }
         }
-        window.print();
+        let removeIndex = null;
+        if (withIndex && page) {
+            const scale = parseFloat(page.style.getPropertyValue("--tb-print-scale")) || 1;
+            removeIndex = addSinglePageIndex(page, {
+                title: "فهرس الطباعة",
+                headers: ["التقرير", "الفترة"],
+                rows: [["ميزان المراجعة", this.periodText]],
+                scale,
+            });
+        }
+        try {
+            window.print();
+        } finally {
+            if (removeIndex) {
+                removeIndex();
+            }
+        }
     }
 
     exportExcel() {

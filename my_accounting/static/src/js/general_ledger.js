@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
+import { askPrintIndex, addSinglePageIndex } from "./print_index_dialog";
 import { openRecord } from "./open_record";
 
 const STATE_FILTERS = [
@@ -30,6 +31,7 @@ export class GeneralLedger extends Component {
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
+        this.dialogService = useService("dialog");
         // عند الفتح من شاشة قيد: نبدأ على شهر ذلك القيد وبحالته، ليظهر سطره مباشرة
         const context = (this.props.action && this.props.action.context) || {};
         const states = (context.ledger_states || []).filter(
@@ -138,7 +140,12 @@ export class GeneralLedger extends Component {
      *  3) إن بقي فراغ رأسي، تُزاد المسافات داخل الصفوف لملء الصفحة.
      * كل ذلك يُطبَّق لحظة الطباعة فقط ثم يُلغى.
      */
+    // السؤال عن الفهرس قبل الطباعة، ثم الطباعة نفسها
     printLedger() {
+        askPrintIndex(this.dialogService, (withIndex) => this._printLedger(withIndex));
+    }
+
+    _printLedger(withIndex) {
         const page = document.querySelector(".o_general_ledger");
         const printable = page && page.querySelector(".o_gl_printable");
         const table = printable && printable.querySelector(".o_gl_table");
@@ -154,6 +161,7 @@ export class GeneralLedger extends Component {
 
         page.classList.add("o_gl_print_fit");
         this.printPage.enable();
+        let removeIndex = null;
         try {
             // 1) أقل عرض يكفي الأرقام = أطول رقم + الحشو الداخلي للخلية
             const valueCells = [...table.querySelectorAll("tbody .o_gl_num, tfoot .o_gl_num")]
@@ -185,8 +193,19 @@ export class GeneralLedger extends Component {
                 ) * 0.985;
             }
             page.style.setProperty("--gl-print-scale", scale.toFixed(4));
+            if (withIndex) {
+                removeIndex = addSinglePageIndex(page, {
+                    title: "فهرس الطباعة",
+                    headers: ["التقرير", "الشهر"],
+                    rows: [["دفتر الأستاذ العام", this.state.month]],
+                    scale,
+                });
+            }
             window.print();
         } finally {
+            if (removeIndex) {
+                removeIndex();
+            }
             this.printPage.disable();
             page.classList.remove("o_gl_print_fit");
             page.style.removeProperty("--gl-num-w");

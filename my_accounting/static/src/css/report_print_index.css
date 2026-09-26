@@ -1,0 +1,57 @@
+/* شريط السؤال قبل الطباعة + صفحة الفهرس وترقيم الصفحات */
+.o_ma_print_bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    background: #f6f6f6;
+    border-bottom: 1px solid #ddd;
+    font-family: inherit;
+}
+
+.o_ma_print_question {
+    font-weight: 600;
+}
+
+.o_ma_index_page {
+    width: 194mm;
+    margin: 0 auto;
+}
+
+.o_ma_index_title {
+    margin-bottom: 8px;
+}
+
+.o_ma_index_table {
+    width: 100%;
+}
+
+.o_ma_index_table th {
+    background-color: #f2f2f2;
+}
+
+.o_ma_index_page_col {
+    width: 70px;
+    text-align: center;
+}
+
+.o_ma_page_stamp {
+    text-align: end;
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+@media print {
+    .o_ma_print_bar {
+        display: none !important;
+    }
+    .o_ma_index_page {
+        break-after: page;
+        page-break-after: always;
+    }
+}

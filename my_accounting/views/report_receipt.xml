@@ -98,8 +98,11 @@
                     .o_receipt_print_page:last-child { break-after: auto; page-break-after: auto; }
                 }
             </style>
+            <div data-ma-print="1" data-ma-title="فهرس سندات القبض المطبوعة"
+                 data-ma-headers="رقم السند|التاريخ|المرجع|المبلغ" data-ma-orientation="portrait"/>
             <t t-foreach="docs" t-as="o">
-                <div class="o_receipt_print_page">
+                <div class="o_receipt_print_page" data-ma-doc="1"
+                     t-attf-data-ma-info="{{ o.name or '—' }}|{{ o.date or '' }}|{{ o.ref or '—' }}|{{ '%.3f' % o.total_debit }}">
                     <t t-call="my_accounting.report_myaccounting_receipt_document"/>
                 </div>
             </t>
@@ -122,7 +125,6 @@
                             }
                         }
                     });
-                    window.print();
                 });
             </script>
         </t>
