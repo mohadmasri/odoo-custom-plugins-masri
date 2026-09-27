@@ -13,15 +13,13 @@
                     </div>
                     <div>
                         <label class="d-block small text-muted mb-1">من تاريخ</label>
-                        <input type="date" class="form-control form-control-sm" style="width:150px;"
-                               t-att-value="state.filter.dateFrom"
-                               t-on-change="(ev) => this.onFilterChange('dateFrom', ev)"/>
+                        <DateInput width="'150px'" value="state.filter.dateFrom"
+                                   onChange="(value) => this.onFilterDate('dateFrom', value)"/>
                     </div>
                     <div>
                         <label class="d-block small text-muted mb-1">إلى تاريخ</label>
-                        <input type="date" class="form-control form-control-sm" style="width:150px;"
-                               t-att-value="state.filter.dateTo"
-                               t-on-change="(ev) => this.onFilterChange('dateTo', ev)"/>
+                        <DateInput width="'150px'" value="state.filter.dateTo"
+                                   onChange="(value) => this.onFilterDate('dateTo', value)"/>
                     </div>
                     <div>
                         <label class="d-block small text-muted mb-1">من قيد</label>

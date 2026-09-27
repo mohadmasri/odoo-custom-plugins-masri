@@ -34,15 +34,13 @@
                 </div>
                 <div>
                     <label class="d-block small text-muted mb-1">من تاريخ</label>
-                    <input type="date" class="form-control form-control-sm" style="width:160px;"
-                           t-att-value="state.dateFrom"
-                           t-on-change="(ev) => this.onDateInput('dateFrom', ev)"/>
+                    <DateInput width="'160px'" value="state.dateFrom"
+                               onChange="(value) => this.onDateChange('dateFrom', value)"/>
                 </div>
                 <div>
                     <label class="d-block small text-muted mb-1">إلى تاريخ</label>
-                    <input type="date" class="form-control form-control-sm" style="width:160px;"
-                           t-att-value="state.dateTo"
-                           t-on-change="(ev) => this.onDateInput('dateTo', ev)"/>
+                    <DateInput width="'160px'" value="state.dateTo"
+                               onChange="(value) => this.onDateChange('dateTo', value)"/>
                 </div>
                 <div>
                     <label class="d-block small text-muted mb-1">المرجع</label>

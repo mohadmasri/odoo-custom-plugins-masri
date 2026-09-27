@@ -22,6 +22,7 @@
         'security/app_groups.xml',
         'security/ir.model.access.csv',
         'data/account_data.xml',
+        'data/lang_date_format.xml',
         'data/auto_backup_cron.xml',
         'views/report_account_statement.xml',
         'views/account_account_views.xml',
@@ -37,6 +38,9 @@
     'installable': True,
     'assets': {
         'web.assets_backend': [
+            'my_accounting/static/src/js/date_input.js',
+            'my_accounting/static/src/xml/date_input.xml',
+            'my_accounting/static/src/css/date_input.css',
             'my_accounting/static/src/js/app_launcher.js',
             'my_accounting/static/src/xml/app_launcher.xml',
             'my_accounting/static/src/js/account_bulk_dialog.js',

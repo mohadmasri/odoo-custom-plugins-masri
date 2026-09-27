@@ -6,6 +6,7 @@ import { useService } from "@web/core/utils/hooks";
 import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
 import { openRecord } from "./open_record";
+import { DateInput } from "./date_input";
 
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
@@ -19,7 +20,7 @@ function pad(n) {
 
 export class TrialBalance extends Component {
     static template = "my_accounting.TrialBalance";
-    static components = { PeriodFilter };
+    static components = { PeriodFilter, DateInput };
     static props = ["*"];
 
     setup() {
@@ -84,6 +85,11 @@ export class TrialBalance extends Component {
             show_empty: this.state.showEmpty,
         });
         this.state.loading = false;
+    }
+
+    onDateChange(field, value) {
+        this.state[field] = value;
+        this.loadData();
     }
 
     onFieldChange(field, ev) {

@@ -7,6 +7,7 @@ import { PeriodFilter } from "./period_filter";
 import { openRecord } from "./open_record";
 import { user } from "@web/core/user";
 import { BulkAccountDialog } from "./account_bulk_dialog";
+import { DateInput } from "./date_input";
 import {
     emptyMovementFilter,
     loadMovementFilter,
@@ -70,7 +71,7 @@ AccountTreeNode.components = { AccountTreeNode };
 export class AccountTree extends Component {
     static template = "my_accounting.AccountTree";
     static props = ["*"];
-    static components = { AccountTreeNode, PeriodFilter };
+    static components = { AccountTreeNode, PeriodFilter, DateInput };
 
     setup() {
         this.orm = useService("orm");
@@ -214,6 +215,10 @@ export class AccountTree extends Component {
         this.state.filterForm = emptyMovementFilter();
         this.state.filter = null;
         saveMovementFilter(null);
+    }
+
+    onFilterDate(field, value) {
+        this.state.filterForm[field] = value;
     }
 
     onFilterKeydown(ev) {

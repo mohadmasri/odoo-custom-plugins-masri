@@ -38,15 +38,13 @@
                     <div class="o_tb_sep"/>
                     <div>
                         <label class="form-label small mb-1">من تاريخ</label>
-                        <input type="date" class="form-control form-control-sm"
-                               t-att-value="state.dateFrom"
-                               t-on-change="(ev) => this.onFieldChange('dateFrom', ev)"/>
+                        <DateInput width="'150px'" value="state.dateFrom"
+                                   onChange="(value) => this.onDateChange('dateFrom', value)"/>
                     </div>
                     <div>
                         <label class="form-label small mb-1">إلى تاريخ</label>
-                        <input type="date" class="form-control form-control-sm"
-                               t-att-value="state.dateTo"
-                               t-on-change="(ev) => this.onFieldChange('dateTo', ev)"/>
+                        <DateInput width="'150px'" value="state.dateTo"
+                                   onChange="(value) => this.onDateChange('dateTo', value)"/>
                     </div>
                     <div>
                         <label class="form-label small mb-1">الحالة</label>

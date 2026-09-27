@@ -1,0 +1,42 @@
+/* خانة التاريخ بصيغة يوم/شهر/سنة */
+.o_ma_date {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.o_ma_date_text {
+    padding-inline-end: 26px;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+.o_ma_date_btn {
+    position: absolute;
+    inset-inline-end: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    color: #6c757d;
+    padding: 2px 5px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.o_ma_date_btn:hover {
+    color: #0d6efd;
+}
+
+/* النتيجة الأصلية مخفية بصرياً فقط: showPicker يرفض العنصر المخفي بـ display:none */
+.o_ma_date_native {
+    position: absolute;
+    inset-inline-end: 6px;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}

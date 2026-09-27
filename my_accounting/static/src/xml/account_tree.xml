@@ -47,13 +47,15 @@
                 <div class="d-flex flex-wrap align-items-end" style="gap: 10px;">
                     <div>
                         <label class="form-label small mb-1">من تاريخ</label>
-                        <input type="date" class="form-control form-control-sm" t-model="state.filterForm.dateFrom"
-                               t-on-keydown="(ev) => this.onFilterKeydown(ev)"/>
+                        <DateInput width="'150px'" value="state.filterForm.dateFrom"
+                                   onChange="(value) => this.onFilterDate('dateFrom', value)"
+                                   onKeydown="(ev) => this.onFilterKeydown(ev)"/>
                     </div>
                     <div>
                         <label class="form-label small mb-1">إلى تاريخ <span class="text-muted">(افتراضياً اليوم)</span></label>
-                        <input type="date" class="form-control form-control-sm" t-model="state.filterForm.dateTo"
-                               t-on-keydown="(ev) => this.onFilterKeydown(ev)"/>
+                        <DateInput width="'150px'" value="state.filterForm.dateTo"
+                                   onChange="(value) => this.onFilterDate('dateTo', value)"
+                                   onKeydown="(ev) => this.onFilterKeydown(ev)"/>
                     </div>
                     <div class="o_account_tree_filter_sep"/>
                     <div>

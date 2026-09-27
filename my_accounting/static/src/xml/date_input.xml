@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.DateInput">
+        <div class="o_ma_date" t-att-style="style">
+            <input type="text" t-ref="input" inputmode="numeric" autocomplete="off"
+                   dir="ltr" maxlength="10" placeholder="يوم/شهر/سنة"
+                   t-attf-class="form-control form-control-sm o_ma_date_text {{ props.inputClass or '' }}"
+                   t-att-value="display"
+                   t-on-input="(ev) => this.onInput(ev)"
+                   t-on-change="(ev) => this.commit(ev)"
+                   t-on-blur="(ev) => this.commit(ev)"
+                   t-on-keydown="(ev) => this.onKeydown(ev)"/>
+            <button type="button" class="o_ma_date_btn" tabindex="-1" title="اختر من النتيجة"
+                    t-on-click="() => this.openPicker()">
+                <i class="fa fa-calendar"/>
+            </button>
+            <!-- نتيجة المتصفّح: مرسومة ولكن غير مرئية، لأن showPicker يحتاج عنصراً مرسوماً -->
+            <input type="date" class="o_ma_date_native" tabindex="-1" aria-hidden="true"
+                   t-ref="picker" t-on-change="(ev) => this.onPicked(ev)"/>
+        </div>
+    </t>
+
+</templates>

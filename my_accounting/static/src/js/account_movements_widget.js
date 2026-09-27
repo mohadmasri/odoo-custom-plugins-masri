@@ -6,6 +6,7 @@ import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
 import { user } from "@web/core/user";
 import { openRecord } from "./open_record";
+import { DateInput } from "./date_input";
 import {
     emptyMovementFilter,
     hasMovementFilter,
@@ -18,6 +19,7 @@ const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", pos
 
 export class AccountMovementsPanel extends Component {
     static template = "my_accounting.AccountMovementsPanel";
+    static components = { DateInput };
     static props = { ...standardWidgetProps };
 
     setup() {
@@ -124,6 +126,12 @@ export class AccountMovementsPanel extends Component {
     }
 
     // تغيير أحد حقول فلتر الحركة (تاريخ / قيد / شهر أستاذ)
+    onFilterDate(field, value) {
+        this.state.filter[field] = value;
+        this.persistFilter();
+        this.loadData();
+    }
+
     onFilterChange(field, ev) {
         const value = ev.target.value.trim();
         if ((field === "moveFrom" || field === "moveTo") && value && !this.state.moveNames.includes(value)) {

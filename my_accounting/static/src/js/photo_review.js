@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useExternalListener } from "@odoo/owl";
 import { JournalPicker } from "./journal_input";
+import { DateInput } from "./date_input";
 
 const MONTHS = [
     ["1", "1 - كانون الثاني"], ["2", "2 - شباط"], ["3", "3 - آذار"], ["4", "4 - نيسان"],
@@ -19,7 +20,7 @@ const MONTHS = [
  */
 export class PhotoReview extends Component {
     static template = "my_accounting.PhotoReview";
-    static components = { JournalPicker };
+    static components = { JournalPicker, DateInput };
     static props = ["*"];
 
     setup() {
@@ -30,7 +31,6 @@ export class PhotoReview extends Component {
         // مراجع خانات الترويسة: التصحيح بضغطة يحدّث ما تراه في الخانة أيضاً
         this.fieldRefs = {
             name: useRef("f_name"),
-            date: useRef("f_date"),
             ledger_month: useRef("f_ledger_month"),
             ledger_year: useRef("f_ledger_year"),
         };

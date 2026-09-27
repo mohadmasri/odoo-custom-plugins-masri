@@ -8,6 +8,7 @@ import { openRecord } from "./open_record";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useSetupAction } from "@web/search/action_hook";
 import { JournalImportDialog } from "./journal_import_dialog";
+import { DateInput } from "./date_input";
 
 const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
 
@@ -72,7 +73,7 @@ const LEDGER_MONTH_OPTIONS = [
 
 export class MoveList extends Component {
     static template = "my_accounting.MoveList";
-    static components = { PeriodFilter };
+    static components = { PeriodFilter, DateInput };
     static props = ["*"];
 
     setup() {
@@ -285,8 +286,8 @@ export class MoveList extends Component {
         this._debounceTimer = setTimeout(() => this.loadData(), 350);
     }
 
-    onDateInput(field, ev) {
-        this.state[field] = ev.target.value;
+    onDateChange(field, value) {
+        this.state[field] = value;
         this.loadData();
     }
 

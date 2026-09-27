@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- التواريخ في كل النظام يوم/شهر/سنة، حتى لو كانت جلسة المستخدم بالإنجليزية -->
+    <record id="base.lang_en" model="res.lang">
+        <field name="date_format">%d/%m/%Y</field>
+    </record>
+</odoo>
