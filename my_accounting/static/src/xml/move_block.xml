@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.MoveBlockBar">
+      <div class="o_move_block_wrap">
+        <div t-if="!readonly" class="o_move_block_bar">
+            <span class="o_move_block_label">كتلة جاهزة:</span>
+            <button t-foreach="blocks" t-as="block" t-key="block.kind"
+                    type="button" class="btn btn-sm btn-outline-primary"
+                    t-att-title="block.hint"
+                    t-on-click="() => this.open(block.kind)">
+                <i t-attf-class="fa {{ block.icon }} me-1"/>
+                <t t-esc="block.title"/>
+            </button>
+            <span class="o_move_block_note">تملأ بنود القيد المتكررة من صف واحد.</span>
+        </div>
+      </div>
+    </t>
+
+    <t t-name="my_accounting.MoveBlockDialog">
+        <Dialog title="'كتلة ' + block.title" size="'lg'">
+            <div class="o_move_block_dialog" t-on-keydown="(ev) => this.onKeydown(ev)">
+                <div class="text-muted small mb-3" t-esc="block.hint"/>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-7">
+                        <label class="form-label small mb-1">
+                            <t t-if="isInvoice">البيان (رقم الفاتورة)</t>
+                            <t t-elif="isGuarantee">البيان (رقم الكفالة والجهة)</t>
+                            <t t-else="">البيان</t>
+                        </label>
+                        <input type="text" class="form-control form-control-sm" t-ref="first"
+                               t-att-placeholder="isInvoice ? 'فاتورة رقم 301' : (isGuarantee ? 'كفالة رقم 95/26 دخول عطاء ...' : 'تسديد ذمم')"
+                               t-model="state.text"/>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1">
+                            <t t-if="isReceipt">المبلغ الإجمالي</t>
+                            <t t-else="">المبلغ</t>
+                        </label>
+                        <input type="number" step="0.001" class="form-control form-control-sm text-end"
+                               t-att-value="state.amount"
+                               t-on-input="(ev) => this.onNumber('amount', ev)"/>
+                    </div>
+                    <div class="col-6 col-md-2" t-if="isGuarantee">
+                        <label class="form-label small mb-1">العمولة</label>
+                        <input type="number" step="0.001" class="form-control form-control-sm text-end"
+                               t-att-value="state.commission"
+                               t-on-input="(ev) => this.onNumber('commission', ev)"/>
+                    </div>
+                    <div class="col-6 col-md-2" t-if="isReceipt">
+                        <label class="form-label small mb-1">الطوابع</label>
+                        <input type="number" step="0.001" class="form-control form-control-sm text-end"
+                               t-att-value="state.fee"
+                               t-on-input="(ev) => this.onNumber('fee', ev)"/>
+                    </div>
+                    <div class="col-6 col-md-2" t-if="isInvoice">
+                        <label class="form-label small mb-1">الضريبة %</label>
+                        <input type="number" step="0.1" class="form-control form-control-sm text-end"
+                               t-att-value="state.taxRate" t-att-disabled="state.exempt"
+                               t-on-input="(ev) => this.onNumber('taxRate', ev)"/>
+                    </div>
+                </div>
+
+                <div t-if="isInvoice" class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button"
+                                t-attf-class="btn btn-outline-secondary {{ state.includesTax ? '' : 'active' }}"
+                                t-on-click="() => { state.includesTax = false; }">المبلغ قبل الضريبة</button>
+                        <button type="button"
+                                t-attf-class="btn btn-outline-secondary {{ state.includesTax ? 'active' : '' }}"
+                                t-on-click="() => { state.includesTax = true; }">المبلغ شامل الضريبة</button>
+                    </div>
+                    <div class="form-check m-0">
+                        <input type="checkbox" class="form-check-input" id="o_move_block_exempt"
+                               t-att-checked="state.exempt"
+                               t-on-change="(ev) => { state.exempt = ev.target.checked; }"/>
+                        <label class="form-check-label small" for="o_move_block_exempt">
+                            معفي من الضريبة (يبقى البند بصفر)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-12 col-md-4" t-if="isInvoice or isReceipt">
+                        <label class="form-label small mb-1">حساب الجهة (الذمم)</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               placeholder="اختر الحساب"
+                               t-att-value="accountLabel(state.partyId)"
+                               t-on-change="(ev) => this.onAccountInput('partyId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isInvoice">
+                        <label class="form-label small mb-1">حساب الإيرادات</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.incomeId)"
+                               t-on-change="(ev) => this.onAccountInput('incomeId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isInvoice">
+                        <label class="form-label small mb-1">حساب الضريبة</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.taxId)"
+                               t-on-change="(ev) => this.onAccountInput('taxId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isGuarantee">
+                        <label class="form-label small mb-1">حساب الكفالات</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.guaranteeId)"
+                               t-on-change="(ev) => this.onAccountInput('guaranteeId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isGuarantee">
+                        <label class="form-label small mb-1">حساب العمولة</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.commissionId)"
+                               t-on-change="(ev) => this.onAccountInput('commissionId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isGuarantee or isReceipt">
+                        <label class="form-label small mb-1">حساب البنك</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.bankId)"
+                               t-on-change="(ev) => this.onAccountInput('bankId', ev)"/>
+                    </div>
+                    <div class="col-12 col-md-4" t-if="isReceipt">
+                        <label class="form-label small mb-1">حساب الطوابع</label>
+                        <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                               t-att-value="accountLabel(state.feeId)"
+                               t-on-change="(ev) => this.onAccountInput('feeId', ev)"/>
+                    </div>
+                </div>
+
+                <datalist t-att-id="listId">
+                    <option t-foreach="props.accounts" t-as="acc" t-key="acc.id" t-att-value="acc.label"/>
+                </datalist>
+
+                <!-- البنود كما ستُضاف تماماً، ليراها قبل الضغط -->
+                <table class="table table-sm o_move_block_preview mb-2">
+                    <thead>
+                        <tr>
+                            <th>البيان</th>
+                            <th>الحساب</th>
+                            <th class="text-end">المدين</th>
+                            <th class="text-end">الدائن</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="lines" t-as="line" t-key="line_index">
+                            <td t-esc="line.name"/>
+                            <td t-esc="accountLabel(line.account_id) or '—'"
+                                t-att-class="line.account_id ? '' : 'text-danger'"/>
+                            <td class="text-end" t-esc="line.debit ? line.debit.toFixed(3) : (line.debit_zero_entered ? '0.000' : '')"/>
+                            <td class="text-end" t-esc="line.credit ? line.credit.toFixed(3) : (line.credit_zero_entered ? '0.000' : '')"/>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div t-if="problem" class="alert alert-warning py-1 px-2 small mb-0" t-esc="problem"/>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-att-disabled="problem"
+                        t-on-click="() => this.confirm()">أضف البنود</button>
+                <button class="btn btn-secondary" t-on-click="() => this.props.close()">إلغاء</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

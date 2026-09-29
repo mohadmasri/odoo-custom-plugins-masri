@@ -77,6 +77,7 @@
                     </group>
                     <notebook>
                         <page string="بنود القيد">
+                            <widget name="my_accounting.move_block"/>
                             <field name="line_ids" readonly="state == 'posted'">
                                 <!-- الواجهة من اليسار لليمين، فالترتيب هنا معكوس ليظهر من اليمين:
                                      المدين (من) | الدائن (الى) | الحساب المدين | الحساب الدائن | البيان.

@@ -1,0 +1,30 @@
+/* شريط الكتل الجاهزة فوق بنود القيد */
+.o_move_block_bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.o_move_block_label {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.o_move_block_note {
+    font-size: 0.78rem;
+    color: #adb5bd;
+    margin-inline-start: 4px;
+}
+
+.o_move_block_preview th {
+    font-size: 0.78rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.o_move_block_preview td {
+    font-size: 0.85rem;
+    vertical-align: middle;
+}
