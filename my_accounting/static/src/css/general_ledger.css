@@ -49,6 +49,11 @@
 /* الطباعة: صفحة A4 أفقية واحدة، بتصغير محسوب قبل الطباعة (--gl-print-scale).
    اتجاه الصفحة (أفقي) يُحقن لحظة الطباعة من هذه الشاشة وحدها، انظر print_page_size.js */
 @media print {
+    /* ورقة الطباعة تُحمّل أنماط LTR، فتخرج أعمدة الجدول من اليسار بعكس
+       الشاشة. نثبّت اتجاه الجدول هنا ليُقرأ من اليمين كما يظهر أمامك. */
+    .o_general_ledger .o_gl_table {
+        direction: rtl;
+    }
     .o_general_ledger {
         overflow: visible !important;
         height: auto !important;
