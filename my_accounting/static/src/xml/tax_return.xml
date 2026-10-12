@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.TaxReturn">
+        <div class="o_tax_return p-3">
+
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <h2 class="m-0">الإقرار الضريبي</h2>
+                <button class="btn btn-secondary btn-sm" t-on-click="() => this.print()">
+                    <i class="fa fa-print me-1"/> طباعة
+                </button>
+            </div>
+
+            <!-- اختيار الفترة -->
+            <div class="o_tr_filter no-print">
+                <div>
+                    <label class="form-label small mb-1">السنة</label>
+                    <select class="form-select form-select-sm" style="width:110px;"
+                            t-on-change="(ev) => this.onYear(ev)">
+                        <option t-foreach="state.years" t-as="y" t-key="y"
+                                t-att-value="y" t-att-selected="String(y) === state.year"
+                                t-esc="y"/>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1">من شهر</label>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onMonth('monthFrom', ev)">
+                        <option t-foreach="months" t-as="name" t-key="name_index"
+                                t-att-value="name_index + 1"
+                                t-att-selected="state.monthFrom === name_index + 1">
+                            <t t-esc="name_index + 1"/> - <t t-esc="name"/>
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1">إلى شهر</label>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onMonth('monthTo', ev)">
+                        <option t-foreach="months" t-as="name" t-key="name_index"
+                                t-att-value="name_index + 1"
+                                t-att-selected="state.monthTo === name_index + 1">
+                            <t t-esc="name_index + 1"/> - <t t-esc="name"/>
+                        </option>
+                    </select>
+                </div>
+                <div class="o_tr_sep"/>
+                <div>
+                    <label class="form-label small mb-1 d-block">الفترات المعتادة</label>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button t-foreach="pairs" t-as="pair" t-key="pair[0]" type="button"
+                                t-attf-class="btn {{ isPair(pair) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.setPair(pair)">
+                            <t t-esc="pair[0] === pair[1] ? pair[0] : pair[0] + ' + ' + pair[1]"/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-muted py-5 text-center">يُحسب الإقرار...</div>
+
+            <t t-elif="data">
+                <div class="o_tr_head">
+                    <h3 class="m-0">إقرار ضريبة المبيعات — <t t-esc="data.period.label"/></h3>
+                    <div class="small text-muted">
+                        من <t t-esc="data.moves"/> قيد مرحّل · نسبة الضريبة <t t-esc="data.rate"/>%
+                        · حساب الضريبة: <t t-esc="data.tax_account"/>
+                    </div>
+                </div>
+
+                <!-- الخلاصة أولاً، والتفاصيل تحتها -->
+                <table class="table table-bordered table-sm o_tr_summary">
+                    <tbody>
+                        <tr>
+                            <td>المبيعات الخاضعة (بعد المرتجعات)</td>
+                            <td class="text-end" t-esc="fmt(totals.taxable_base)"/>
+                        </tr>
+                        <tr>
+                            <td>المبيعات المعفاة</td>
+                            <td class="text-end" t-esc="fmt(totals.exempt_base)"/>
+                        </tr>
+                        <tr>
+                            <td>ضريبة المخرجات على المبيعات</td>
+                            <td class="text-end" t-esc="fmt(totals.output)"/>
+                        </tr>
+                        <tr>
+                            <td>ناقص: ضريبة مرتجعات المبيعات</td>
+                            <td class="text-end" t-esc="'(' + fmt(totals.returns) + ')'"/>
+                        </tr>
+                        <tr class="o_tr_subtotal">
+                            <td>صافي ضريبة المخرجات</td>
+                            <td class="text-end" t-esc="fmt(totals.net_output)"/>
+                        </tr>
+                        <tr>
+                            <td>ناقص: ضريبة المدخلات</td>
+                            <td class="text-end" t-esc="'(' + fmt(totals.input) + ')'"/>
+                        </tr>
+                        <tr class="o_tr_due">
+                            <td>المستحق للفترة</td>
+                            <td class="text-end" t-esc="fmt(totals.due)"/>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div t-foreach="data.warnings" t-as="warning" t-key="warning_index"
+                     class="alert alert-warning py-1 px-2 small" t-esc="warning"/>
+
+                <!-- التفاصيل -->
+                <t t-call="my_accounting.TaxReturnSection">
+                    <t t-set="title" t-value="'المبيعات الخاضعة'"/>
+                    <t t-set="rows" t-value="data.sales"/>
+                    <t t-set="withBase" t-value="true"/>
+                </t>
+                <t t-call="my_accounting.TaxReturnSection">
+                    <t t-set="title" t-value="'مرتجعات المبيعات الخاضعة'"/>
+                    <t t-set="rows" t-value="data.sale_returns"/>
+                    <t t-set="withBase" t-value="true"/>
+                </t>
+                <t t-call="my_accounting.TaxReturnSection">
+                    <t t-set="title" t-value="'المبيعات المعفاة (بلا ضريبة)'"/>
+                    <t t-set="rows" t-value="data.exempt"/>
+                    <t t-set="withBase" t-value="true"/>
+                    <t t-set="hideTax" t-value="true"/>
+                </t>
+                <t t-call="my_accounting.TaxReturnSection">
+                    <t t-set="title" t-value="'ضريبة المدخلات (المشتريات)'"/>
+                    <t t-set="rows" t-value="data.inputs"/>
+                    <t t-set="withBase" t-value="true"/>
+                </t>
+                <t t-call="my_accounting.TaxReturnSection">
+                    <t t-set="title" t-value="'مستبعد من الحساب'"/>
+                    <t t-set="rows" t-value="data.excluded"/>
+                    <t t-set="withReason" t-value="true"/>
+                </t>
+            </t>
+        </div>
+    </t>
+
+    <!-- جدول قسم واحد من أقسام الإقرار -->
+    <t t-name="my_accounting.TaxReturnSection">
+        <div t-if="rows.length" class="o_tr_section">
+            <h4 class="o_tr_section_title"><t t-esc="title"/></h4>
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th style="width:90px;">القيد</th>
+                        <th style="width:110px;">التاريخ</th>
+                        <th>البيان</th>
+                        <th t-if="withReason">السبب</th>
+                        <th t-if="withBase" class="text-end" style="width:130px;">الأساس</th>
+                        <th t-if="!hideTax" class="text-end" style="width:130px;">الضريبة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="rows" t-as="row" t-key="row_index"
+                        style="cursor:pointer;"
+                        t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
+                        <td><strong t-esc="row.move"/></td>
+                        <td t-esc="row.date"/>
+                        <td>
+                            <t t-esc="row.label"/>
+                            <span t-if="row.estimated" class="badge text-bg-light ms-1"
+                                  title="لا يوجد بند مقابل بنفس البيان، فقُدِّر الأساس من النسبة">مُقدَّر</span>
+                        </td>
+                        <td t-if="withReason" class="text-muted small" t-esc="row.reason"/>
+                        <td t-if="withBase" class="text-end" t-esc="fmt(row.base)"/>
+                        <td t-if="!hideTax" class="text-end" t-esc="fmt(row.tax)"/>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td t-att-colspan="withReason ? 4 : 3" class="text-end">المجموع</td>
+                        <td t-if="withBase" class="text-end"
+                            t-esc="fmt(rows.reduce((sum, row) => sum + row.base, 0))"/>
+                        <td t-if="!hideTax" class="text-end"
+                            t-esc="fmt(rows.reduce((sum, row) => sum + row.tax, 0))"/>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </t>
+
+</templates>

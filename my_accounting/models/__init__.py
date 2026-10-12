@@ -7,6 +7,7 @@ from . import reports
 from . import theme
 from . import print_index
 from . import move_block
+from . import tax_return
 from . import photo_entry
 from . import account_move
 from . import backup

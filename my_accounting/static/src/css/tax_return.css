@@ -1,0 +1,82 @@
+/* صفحة الإقرار الضريبي */
+.o_tax_return {
+    overflow: auto;
+    height: 100%;
+}
+
+.o_tr_filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.o_tr_sep {
+    width: 1px;
+    align-self: stretch;
+    background: var(--border-color, #dee2e6);
+    margin: 0 4px;
+}
+
+.o_tr_head {
+    margin-bottom: 10px;
+}
+
+/* خلاصة الإقرار: عمودان، الرقم إلى اليسار */
+.o_tr_summary {
+    max-width: 520px;
+}
+
+.o_tr_summary td {
+    padding: 4px 8px;
+}
+
+.o_tr_summary .o_tr_subtotal td {
+    border-top: 2px solid var(--border-color, #dee2e6);
+    font-weight: 600;
+}
+
+.o_tr_summary .o_tr_due td {
+    border-top: 2px solid var(--border-color, #dee2e6);
+    font-weight: 700;
+    background: var(--o-surface-2, #f2f2f2);
+}
+
+.o_tr_section {
+    margin-top: 18px;
+}
+
+.o_tr_section_title {
+    font-size: 1rem;
+    margin-bottom: 6px;
+}
+
+.o_tr_section table {
+    font-size: 0.86rem;
+}
+
+.o_tr_section th {
+    background: var(--o-surface-2, #f2f2f2);
+    font-weight: 500;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    .o_tax_return {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+    .o_tr_section,
+    .o_tr_summary {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .o_tax_return td,
+    .o_tax_return th {
+        color: #000 !important;
+    }
+}
