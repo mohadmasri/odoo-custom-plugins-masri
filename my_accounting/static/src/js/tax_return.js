@@ -79,6 +79,15 @@ export class TaxReturn extends Component {
         });
     }
 
+    isYear(year) {
+        return `${year}` === this.state.year;
+    }
+
+    /** مجموع عمود في قسم من أقسام الإقرار */
+    sectionTotal(rows, field) {
+        return rows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
+    }
+
     monthName(number) {
         return MONTHS[Number(number) - 1] || "";
     }

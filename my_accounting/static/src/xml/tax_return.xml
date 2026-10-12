@@ -18,7 +18,7 @@
                     <select class="form-select form-select-sm" style="width:110px;"
                             t-on-change="(ev) => this.onYear(ev)">
                         <option t-foreach="state.years" t-as="y" t-key="y"
-                                t-att-value="y" t-att-selected="String(y) === state.year"
+                                t-att-value="y" t-att-selected="isYear(y)"
                                 t-esc="y"/>
                     </select>
                 </div>
@@ -171,9 +171,9 @@
                     <tr class="fw-bold">
                         <td t-att-colspan="withReason ? 4 : 3" class="text-end">المجموع</td>
                         <td t-if="withBase" class="text-end"
-                            t-esc="fmt(rows.reduce((sum, row) => sum + row.base, 0))"/>
+                            t-esc="fmt(sectionTotal(rows, 'base'))"/>
                         <td t-if="!hideTax" class="text-end"
-                            t-esc="fmt(rows.reduce((sum, row) => sum + row.tax, 0))"/>
+                            t-esc="fmt(sectionTotal(rows, 'tax'))"/>
                     </tr>
                 </tfoot>
             </table>
