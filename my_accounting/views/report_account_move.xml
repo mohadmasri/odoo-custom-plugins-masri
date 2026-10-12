@@ -24,12 +24,14 @@
                          (الصفحة من اليسار لليمين، لذلك الترتيب في الكود معكوس) -->
                     <thead style="background-color:#f2f2f2;">
                         <tr>
-                            <th class="text-center">البيان</th>
-                            <th class="text-center" style="width:22%;">الحساب الدائن</th>
-                            <th class="text-center" style="width:22%;">الحساب المدين</th>
-                            <!-- بلا عرض ثابت: العمود يأخذ عرض أكبر رقم فيه، فلا ينكسر ولا يفيض -->
-                            <th class="text-center">الدائن (الى)</th>
-                            <th class="text-center">المدين (من)</th>
+                            <!-- البيان يأخذ نصيب الأسد لأنه أطول ما في السطر،
+                                 وبقية الأعمدة تأخذ عرض محتواها فقط -->
+                            <th class="text-center" style="width:34%;">البيان</th>
+                            <th class="text-center">الحساب الدائن</th>
+                            <th class="text-center">الحساب المدين</th>
+                            <!-- عرض يكفي أكبر رقم بخط عريض، فلا ينكسر ولا يفيض -->
+                            <th class="text-center" style="width:16%;">الدائن (الى)</th>
+                            <th class="text-center" style="width:16%;">المدين (من)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -38,7 +40,7 @@
                                 <t t-if="line.account_id"><span t-esc="line.account_label"/></t>
                                 <t t-elif="line.pending_account_name"><span t-esc="line.pending_account_name"/> (من الملف)</t>
                             </t>
-                            <td><span t-field="line.name">—</span></td>
+                            <td class="o_move_line_name"><span t-field="line.name">—</span></td>
                             <td><t t-if="line.is_credit_line" t-out="account_text"/></td>
                             <td><t t-if="not line.is_credit_line" t-out="account_text"/></td>
                             <td class="text-end">
@@ -215,6 +217,61 @@
                         // التكبير يوسّع الصفحة أيضاً، فنضيّق عرضها بنفس النسبة
                         // حتى يبقى العرض المطبوع 194 مم مهما كبر القيد أو صغر،
                         // فلا يخرج أي عمود خارج الورقة.
+                        // البيان يأخذ كل العرض الذي لا تحتاجه الأعمدة الأخرى.
+                        // نقيس حاجة كل عمود بتحرير الجدول مؤقتاً بلا التفاف،
+                        // ثم نثبّت الأعمدة الأخرى على حاجتها ونترك الباقي للبيان.
+                        // إن لم يتّسع الجدول لذلك عادت النسب الأصلية كما هي.
+                        var table = page.querySelector('table.table-bordered');
+                        var headRow = table &amp;&amp; table.querySelector('thead tr');
+                        var original = [];
+                        if (headRow) {
+                            for (var h = 0; h &lt; headRow.children.length; h++) {
+                                original.push(headRow.children[h].style.width);
+                            }
+                        }
+                        var fitColumns = function () {
+                            if (!headRow || headRow.children.length &lt; 2) {
+                                return;
+                            }
+                            var ths = headRow.children;
+                            var count = ths.length;
+                            var k;
+                            var savedTable = table.style.width;
+                            for (k = 0; k &lt; count; k++) {
+                                ths[k].style.width = 'auto';
+                            }
+                            var tableWidth = table.clientWidth;
+                            table.style.width = 'auto';
+                            table.style.whiteSpace = 'nowrap';
+                            var natural = [];
+                            for (k = 0; k &lt; count; k++) {
+                                natural.push(ths[k].getBoundingClientRect().width);
+                            }
+                            table.style.whiteSpace = '';
+                            table.style.width = savedTable;
+                            var others = 0;
+                            for (k = 1; k &lt; count; k++) {
+                                others += natural[k] + 3;
+                            }
+                            if (tableWidth - others >= Math.min(natural[0], 130)) {
+                                for (k = 1; k &lt; count; k++) {
+                                    // هامش صغير يكفي الخط العريض في صف الإجمالي
+                                    ths[k].style.width = (Math.ceil(natural[k]) + 3) + 'px';
+                                }
+                                ths[0].style.width = '';   // البيان يأخذ ما بقي
+                            } else {
+                                for (k = 0; k &lt; count; k++) {
+                                    ths[k].style.width = original[k];
+                                }
+                            }
+                            // كم ينقص الجدول ليتّسع لكل بيان على سطر واحد
+                            return tableWidth / (natural[0] + others);
+                        };
+
+                        // التكبير يوسّع الصفحة أيضاً، فنضيّق عرضها بنفس النسبة
+                        // حتى يبقى العرض المطبوع 194 مم مهما كبر القيد أو صغر،
+                        // فلا يخرج أي عمود خارج الورقة. وبعد كل تغيير نعيد
+                        // توزيع الأعمدة لأن العرض المتاح تغيّر معه.
                         var apply = function (zoom) {
                             page.style.width = (pageWidthMm / zoom).toFixed(3) + 'mm';
                             page.style.zoom = zoom.toFixed(4);
@@ -236,8 +293,10 @@
                             zoom = target;
                             apply(zoom);
                         }
-                        // سطر دفتر الأستاذ: الأرقام لا تُقسم، فإن ضاق العرض
-                        // صغّرنا خطه حتى يتّسع بدل أن ينكسر الرقم على سطرين.
+                        // بعد استقرار التكبير: البيان يأخذ المساحة التي لا
+                        // تحتاجها الأعمدة الأخرى، فيبقى على سطر واحد ما أمكن.
+                        fitColumns();
+
                         var ledger = page.querySelector('.o_move_ledger_print');
                         if (ledger) {
                             // الجدول بعرض 100%، فاتساعه لا يكشف ضيق الخانات:
