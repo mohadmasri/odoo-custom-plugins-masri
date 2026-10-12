@@ -52,16 +52,17 @@
                             <th>القيد</th>
                             <th>الحساب</th>
                             <th>البيان</th>
-                            <th class="text-end" style="width:13%;">مدين</th>
+                            <!-- معكوس في الكود ليظهر من اليمين: مدين ثم دائن -->
                             <th class="text-end" style="width:13%;">دائن</th>
+                            <th class="text-end" style="width:13%;">مدين</th>
                             <th class="text-end" style="width:15%;">الرصيد</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr t-if="opening" style="background-color:#fbfbfb; font-weight:bold;">
                             <td colspan="4">رصيد سابق</td>
-                            <td class="text-end"><span t-esc="'%.3f' % opening if opening > 0 else ''"/></td>
                             <td class="text-end"><span t-esc="'%.3f' % -opening if opening &lt; 0 else ''"/></td>
+                            <td class="text-end"><span t-esc="'%.3f' % opening if opening > 0 else ''"/></td>
                             <td class="text-end"><span t-esc="'%.3f' % opening"/></td>
                         </tr>
                         <tr t-foreach="lines" t-as="line">
@@ -71,12 +72,12 @@
                             <td><span t-esc="line.account_id.name"/></td>
                             <td><span t-field="line.name">—</span></td>
                             <td class="text-end">
-                                <span t-if="line.debit or line.debit_zero_entered"
-                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
-                            </td>
-                            <td class="text-end">
                                 <span t-if="line.credit or line.credit_zero_entered"
                                       t-field="line.credit" t-options="{'widget': 'float', 'precision': 3}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-if="line.debit or line.debit_zero_entered"
+                                      t-field="line.debit" t-options="{'widget': 'float', 'precision': 3}"/>
                             </td>
                             <td class="text-end">
                                 <span t-esc="'%.3f' % running"/>
@@ -90,10 +91,10 @@
                         <tr style="background-color:#f2f2f2; font-weight:bold;">
                             <td colspan="4" class="text-end">الإجمالي (متضمناً الرصيد السابق)</td>
                             <td class="text-end">
-                                <span t-esc="'%.3f' % sum(lines.mapped('debit'))"/>
+                                <span t-esc="'%.3f' % sum(lines.mapped('credit'))"/>
                             </td>
                             <td class="text-end">
-                                <span t-esc="'%.3f' % sum(lines.mapped('credit'))"/>
+                                <span t-esc="'%.3f' % sum(lines.mapped('debit'))"/>
                             </td>
                             <td class="text-end">
                                 <span t-esc="'%.3f' % (running if running is not None else opening)"/>
@@ -116,6 +117,8 @@
                     margin: 0 auto;
                     font-size: 11px;
                 }
+                /* ترويسة الشركة (الاسم والبلد والرقم الضريبي) لا تلزم في الكشف */
+                .o_statement_page .header { display: none !important; }
                 .o_statement_page h2 { font-size: 18px; margin-bottom: 2px; }
                 .o_statement_page h3 { font-size: 13px; }
                 .o_statement_page table { font-size: 11px; }
