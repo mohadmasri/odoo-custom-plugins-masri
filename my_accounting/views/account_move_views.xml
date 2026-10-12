@@ -104,9 +104,17 @@
                                            widget="myaccounting_amount" options="{'zero_flag': 'debit_zero_entered'}"/>
                                 </list>
                             </field>
+                            <!-- الفرق بين الجانبين: يظهر وحده حين لا يتوازن القيد -->
+                            <div class="alert alert-danger py-1 px-2 mb-2 d-inline-block"
+                                 role="alert" invisible="is_balanced">
+                                <i class="fa fa-exclamation-triangle me-1" title="غير متوازن"/>
+                                <field name="balance_note" readonly="1" nolabel="1" class="d-inline"/>
+                            </div>
                             <group class="oe_subtotal_footer oe_right">
                                 <field name="total_debit"/>
                                 <field name="total_credit"/>
+                                <field name="balance_difference" digits="[16,3]"
+                                       invisible="is_balanced" class="text-danger fw-bold"/>
                                 <field name="is_balanced" widget="boolean_toggle" readonly="1"/>
                             </group>
                         </page>

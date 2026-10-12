@@ -173,6 +173,10 @@ class MyAccountingMove(models.Model):
     total_debit = fields.Float(string='إجمالي المدين', compute='_compute_totals', store=True, digits=(16, 3))
     total_credit = fields.Float(string='إجمالي الدائن', compute='_compute_totals', store=True, digits=(16, 3))
     is_balanced = fields.Boolean(string='متوازن', compute='_compute_totals', store=True)
+    # الفرق بين الجانبين: يظهر في القيد غير المتوازن ليُعرف المبلغ الناقص وجهته
+    balance_difference = fields.Float(
+        string='الفرق', compute='_compute_totals', store=True, digits=(16, 3))
+    balance_note = fields.Char(string='ملاحظة التوازن', compute='_compute_balance_note')
     currency_id = fields.Many2one('res.currency', string='العملة',
                                    default=lambda self: self.env.company.currency_id)
     company_id = fields.Many2one('res.company', string='الشركة', default=lambda self: self.env.company)
@@ -490,7 +494,21 @@ class MyAccountingMove(models.Model):
         for move in self:
             move.total_debit = sum(move.line_ids.mapped('debit'))
             move.total_credit = sum(move.line_ids.mapped('credit'))
-            move.is_balanced = round(move.total_debit - move.total_credit, 3) == 0.0
+            difference = round(move.total_debit - move.total_credit, 3)
+            move.is_balanced = difference == 0.0
+            move.balance_difference = abs(difference)
+
+    @api.depends('total_debit', 'total_credit', 'is_balanced')
+    def _compute_balance_note(self):
+        """نصّ يقول المبلغ الناقص وفي أي جانب، فلا يُحسب الفرق يدوياً."""
+        for move in self:
+            if move.is_balanced:
+                move.balance_note = ''
+                continue
+            short = 'الدائن' if move.total_debit > move.total_credit else 'المدين'
+            move.balance_note = (
+                f'القيد غير متوازن — الفرق {move.balance_difference:,.3f} '
+                f'ناقص من {short}.')
 
     def _sync_state_from_lines(self):
         """يحدّث حالة القيد بين "مسودة" و"غير مكتمل" حسب وجود بنود بلا حساب.
