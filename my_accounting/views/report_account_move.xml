@@ -293,14 +293,13 @@
                             zoom = target;
                             apply(zoom);
                         }
-                        // بعد استقرار التكبير: البيان يأخذ المساحة التي لا
-                        // تحتاجها الأعمدة الأخرى، فيبقى على سطر واحد ما أمكن.
-                        fitColumns();
-
+                        // سطر دفتر الأستاذ: الأرقام لا تُقسم، فإن ضاق العرض
+                        // صغّرنا خطه حتى تتّسع كل خانة.
                         var ledger = page.querySelector('.o_move_ledger_print');
-                        if (ledger) {
-                            // الجدول بعرض 100%، فاتساعه لا يكشف ضيق الخانات:
-                            // نقيس كل خانة على حدة ونصغّر الخط حتى تتّسع كلها.
+                        var fitLedger = function () {
+                            if (!ledger) {
+                                return;
+                            }
                             var tight = function () {
                                 var cells = ledger.querySelectorAll('td, th');
                                 for (var c = 0; c &lt; cells.length; c++) {
@@ -316,6 +315,30 @@
                                 fontSize -= 0.5;
                                 ledger.style.fontSize = fontSize + 'px';
                             }
+                        };
+
+                        // بعد استقرار التكبير: البيان يأخذ المساحة التي لا
+                        // تحتاجها الأعمدة الأخرى، فيبقى على سطر واحد ما أمكن.
+                        fitColumns();
+                        fitLedger();
+
+                        // لا يجوز أن يفيض محتوى أي خانة عنها: القيد الصغير
+                        // يُكبَّر كثيراً ليملأ الورقة فتضيق أعمدته، فنتراجع
+                        // بالتكبير خطوة خطوة حتى يتّسع كل شيء.
+                        var cramped = function () {
+                            var cells = page.querySelectorAll('td, th');
+                            for (var c = 0; c &lt; cells.length; c++) {
+                                if (cells[c].scrollWidth > cells[c].clientWidth + 1) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        };
+                        for (var g = 0; g &lt; 20 &amp;&amp; zoom > 0.3 &amp;&amp; cramped(); g++) {
+                            zoom = zoom * 0.95;
+                            apply(zoom);
+                            fitColumns();
+                            fitLedger();
                         }
 
                         // ضمان أخير: لا يتجاوز المحتوى ارتفاع الصفحة
