@@ -94,7 +94,7 @@
                     <table t-if="state.data.rows.length" class="table table-bordered table-sm o_tb_table">
                         <thead>
                             <tr class="text-center">
-                                <th rowspan="2" style="width:70px;">الرمز</th>
+                                <th rowspan="2" style="width:70px;" class="o_print_no_code">الرمز</th>
                                 <th rowspan="2">الحساب</th>
                                 <th rowspan="2" style="width:110px;">رصيد افتتاحي</th>
                                 <th colspan="2" style="width:220px;">حركة الفترة</th>
@@ -108,7 +108,7 @@
                         <tbody>
                             <tr t-foreach="state.data.rows" t-as="row" t-key="row.id"
                                 style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openAccount(row.id, isMiddleClick)">
-                                <td class="text-muted" t-esc="row.code"/>
+                                <td class="text-muted o_print_no_code" t-esc="row.code"/>
                                 <td>
                                     <t t-esc="row.name"/>
                                     <span t-if="row.parent" class="text-muted small"> / <t t-esc="row.parent"/></span>

@@ -590,7 +590,7 @@ class MyAccountingMove(models.Model):
         }]
         for account in roots:
             if account.id in amounts:
-                cells.append(dict(amounts[account.id], title=f'{account.code} - {account.name}'))
+                cells.append(dict(amounts[account.id], title=account.name))
         cells.reverse()
         return {'cells': cells, 'missing': missing}
 

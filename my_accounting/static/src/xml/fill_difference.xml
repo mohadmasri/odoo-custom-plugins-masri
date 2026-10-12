@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.FillDifference">
+        <span class="o_fill_difference d-print-none">
+            <button t-if="!record.data.is_balanced" type="button"
+                    class="btn btn-sm btn-outline-danger o_fill_difference_btn"
+                    t-att-disabled="!canFill" t-att-title="hint"
+                    t-on-click="() => this.fill()">
+                <i class="fa fa-level-down me-1"/>املأ الفرق بالقيد
+            </button>
+        </span>
+    </t>
+
+</templates>

@@ -14,7 +14,7 @@
                     <div>
                         <h2 class="mb-0">كشف حساب</h2>
                         <h3 class="text-muted mt-0">
-                            <span t-esc="o.code"/><span> - </span><span t-esc="o.name"/>
+                            <span t-esc="o.name"/>
                         </h3>
                     </div>
                 </div>
@@ -68,7 +68,7 @@
                             <t t-set="running" t-value="(running if running is not None else opening) + line.debit - line.credit"/>
                             <td><span t-field="line.date"/></td>
                             <td><span t-esc="line.move_id.name"/></td>
-                            <td><span t-esc="line.account_id.code"/><span> - </span><span t-esc="line.account_id.name"/></td>
+                            <td><span t-esc="line.account_id.name"/></td>
                             <td><span t-field="line.name">—</span></td>
                             <td class="text-end">
                                 <span t-if="line.debit or line.debit_zero_entered"
@@ -172,7 +172,6 @@
                     <thead>
                         <tr>
                             <th t-if="cfg['show_seq']" style="width:60px;">#</th>
-                            <th t-if="cfg['show_code']" style="width:90px;">رمز الحساب</th>
                             <th t-if="cfg['show_name']">اسم الحساب</th>
                             <th t-if="cfg['show_balance']" style="width:120px;" class="text-end">الرصيد</th>
                             <th class="o_st_page_col">الصفحة</th>
@@ -181,7 +180,6 @@
                     <tbody>
                         <tr t-foreach="docs" t-as="o">
                             <td t-if="cfg['show_seq']"><t t-esc="o_index + 1"/></td>
-                            <td t-if="cfg['show_code']"><t t-esc="o.code or '—'"/></td>
                             <td t-if="cfg['show_name']"><t t-esc="o.name"/></td>
                             <td t-if="cfg['show_balance']" class="text-end">
                                 <t t-esc="'%.3f' % o.balance"/>

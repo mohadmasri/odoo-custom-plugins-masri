@@ -121,3 +121,8 @@
         position: static !important;
     }
 }
+
+/* رقم الحساب يظهر على الشاشة فقط، ولا يُطبع */
+@media print {
+    .o_print_no_code { display: none !important; }
+}

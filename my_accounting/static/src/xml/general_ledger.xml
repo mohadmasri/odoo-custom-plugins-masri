@@ -69,7 +69,7 @@
                                 <th rowspan="2" class="text-end o_gl_num">إجمالي دائن</th>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
                                     <th colspan="2" class="text-center">
-                                        <t t-esc="acc.code"/><t t-esc="' - '"/><t t-esc="acc.name"/>
+                                        <span class="o_print_no_code"><t t-esc="acc.code"/><t t-esc="' - '"/></span><t t-esc="acc.name"/>
                                     </th>
                                 </t>
                             </tr>

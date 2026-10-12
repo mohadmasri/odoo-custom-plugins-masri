@@ -1,0 +1,18 @@
+/* زر نقل الفرق إلى البند الفارغ، بجانب خانة الفرق */
+.o_fill_difference_btn {
+    white-space: nowrap;
+    padding: 1px 8px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.o_fill_difference_btn:disabled {
+    opacity: 0.45;
+}
+
+/* لا يظهر الفرق ولا زره في الطباعة */
+@media print {
+    .o_myaccounting_balance_gap {
+        display: none !important;
+    }
+}

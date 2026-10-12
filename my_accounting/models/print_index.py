@@ -15,7 +15,6 @@ DEFAULTS = {
     # كشوف الحسابات
     'title': 'فهرس كشوف الحسابات',
     'show_seq': True,                   # الرقم التسلسلي
-    'show_code': False,                 # رمز الحساب
     'show_name': True,                  # اسم الحساب
     'show_balance': True,               # الرصيد
     # القيود
@@ -27,7 +26,7 @@ DEFAULTS = {
     'move_show_total': True,            # الإجمالي
 }
 
-STATEMENT_COLUMNS = ('show_seq', 'show_code', 'show_name', 'show_balance')
+STATEMENT_COLUMNS = ('show_seq', 'show_name', 'show_balance')
 MOVE_COLUMNS = ('move_show_seq', 'move_show_name', 'move_show_date',
                 'move_show_ref', 'move_show_total')
 

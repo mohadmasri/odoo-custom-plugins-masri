@@ -77,7 +77,7 @@
                                    t-att-value="state.printIndex.title"
                                    t-on-input="(ev) => this.onIndexTitle('title', ev)"/>
                             <label class="form-label small mb-1">الأعمدة</label>
-                            <t t-foreach="[['show_seq', 'الرقم التسلسلي'], ['show_code', 'رمز الحساب'],
+                            <t t-foreach="[['show_seq', 'الرقم التسلسلي'],
                                            ['show_name', 'اسم الحساب'], ['show_balance', 'الرصيد']]"
                                t-as="col" t-key="col[0]">
                                 <div class="form-check">

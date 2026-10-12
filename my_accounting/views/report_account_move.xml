@@ -27,14 +27,15 @@
                             <th class="text-center">البيان</th>
                             <th class="text-center" style="width:22%;">الحساب الدائن</th>
                             <th class="text-center" style="width:22%;">الحساب المدين</th>
-                            <th class="text-center" style="width:13%;">الدائن (الى)</th>
-                            <th class="text-center" style="width:13%;">المدين (من)</th>
+                            <!-- بلا عرض ثابت: العمود يأخذ عرض أكبر رقم فيه، فلا ينكسر ولا يفيض -->
+                            <th class="text-center">الدائن (الى)</th>
+                            <th class="text-center">المدين (من)</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr t-foreach="o.line_ids" t-as="line">
                             <t t-set="account_text">
-                                <t t-if="line.account_id"><span t-esc="line.account_id.code"/> - <span t-esc="line.account_label"/></t>
+                                <t t-if="line.account_id"><span t-esc="line.account_label"/></t>
                                 <t t-elif="line.pending_account_name"><span t-esc="line.pending_account_name"/> (من الملف)</t>
                             </t>
                             <td><span t-field="line.name">—</span></td>
@@ -67,11 +68,11 @@
                 <t t-set="ledger" t-value="o.ledger_print_cells()"/>
                 <div t-if="ledger['cells']" class="mt-4">
                     <div style="font-weight:bold; margin-bottom:4px;">سطر القيد في دفتر الأستاذ العام</div>
-                    <table class="table table-bordered o_move_ledger_print" style="width:100%; table-layout:fixed;">
+                    <table class="table table-bordered o_move_ledger_print" style="width:100%;">
                         <thead style="background-color:#f2f2f2;">
                             <tr>
                                 <th t-foreach="ledger['cells']" t-as="cell" colspan="2" class="text-center"
-                                    style="word-break:break-word;">
+                                    style="word-break:break-word; white-space:normal;">
                                     <span t-esc="cell['title']"/>
                                 </th>
                             </tr>
@@ -119,6 +120,12 @@
                     margin: 0 auto;
                     transform-origin: top center;
                 }
+                /* ترويسة الشركة (الاسم والبلد والرقم الضريبي) لا تلزم في القيد */
+                .o_move_print_page .header { display: none !important; }
+                /* الأرقام لا تنقسم على سطرين أبداً */
+                .o_move_print_page .text-end,
+                .o_move_ledger_print th,
+                .o_move_ledger_print td { white-space: nowrap; }
                 /* سطر دفتر الأستاذ: يبقى ضمن عرض الصفحة مهما كثرت الحسابات */
                 .o_move_ledger_print { font-size: 11px; }
                 .o_move_ledger_print th,
@@ -229,6 +236,29 @@
                             zoom = target;
                             apply(zoom);
                         }
+                        // سطر دفتر الأستاذ: الأرقام لا تُقسم، فإن ضاق العرض
+                        // صغّرنا خطه حتى يتّسع بدل أن ينكسر الرقم على سطرين.
+                        var ledger = page.querySelector('.o_move_ledger_print');
+                        if (ledger) {
+                            // الجدول بعرض 100%، فاتساعه لا يكشف ضيق الخانات:
+                            // نقيس كل خانة على حدة ونصغّر الخط حتى تتّسع كلها.
+                            var tight = function () {
+                                var cells = ledger.querySelectorAll('td, th');
+                                for (var c = 0; c &lt; cells.length; c++) {
+                                    if (cells[c].scrollWidth > cells[c].clientWidth + 1) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
+                            var fontSize = 11;
+                            ledger.style.fontSize = fontSize + 'px';
+                            while (fontSize > 4 &amp;&amp; tight()) {
+                                fontSize -= 0.5;
+                                ledger.style.fontSize = fontSize + 'px';
+                            }
+                        }
+
                         // ضمان أخير: لا يتجاوز المحتوى ارتفاع الصفحة
                         for (var j = 0; j &lt; 20; j++) {
                             if (page.getBoundingClientRect().height &lt;= availableHeight || zoom &lt;= 0.05) {
