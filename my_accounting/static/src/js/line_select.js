@@ -57,21 +57,30 @@ export class CopyLinesDialog extends Component {
         close: Function,
         count: Number,
         currentMoveId: [Number, Boolean],
+        currentMoveName: { type: String, optional: true },
         onConfirm: Function,
     };
 
     setup() {
         this.orm = useService("orm");
         this.listId = "o_copy_lines_moves";
-        this.state = useState({ mode: "new", targetId: false, text: "", moves: [] });
+        // "same" ينسخ البنود مرة أخرى في القيد نفسه (تكرار بند متشابه)
+        this.state = useState({
+            mode: this.props.currentMoveId ? "same" : "new",
+            targetId: false,
+            text: "",
+            moves: [],
+        });
         onWillStart(async () => {
             this.state.moves = await this.orm.call(
                 "myaccounting.move", "get_copy_targets", []);
         });
     }
 
+    /** القيد الذي ستذهب إليه البنود فعلاً حسب الخيار المختار */
     get target() {
-        return this.state.moves.find((move) => move.id === this.state.targetId);
+        const id = this.state.mode === "same" ? this.props.currentMoveId : this.state.targetId;
+        return this.state.moves.find((move) => move.id === id);
     }
 
     onTargetInput(ev) {
@@ -84,14 +93,12 @@ export class CopyLinesDialog extends Component {
         if (this.state.mode === "new") {
             return "";
         }
-        if (!this.state.targetId) {
+        if (this.state.mode === "existing" && !this.state.targetId) {
             return "اختر القيد الذي تريد النسخ إليه.";
         }
-        if (this.target.id === this.props.currentMoveId) {
-            return "هذا هو القيد نفسه، اختر قيداً آخر.";
-        }
-        if (this.target.state === "posted") {
-            return `القيد ${this.target.name} مرحّل، فلا تُضاف إليه بنود. أعده إلى مسودة أولاً.`;
+        const target = this.target;
+        if (target && target.state === "posted") {
+            return `القيد ${target.name} مرحّل، فلا تُضاف إليه بنود. أعده إلى مسودة أولاً.`;
         }
         return "";
     }
@@ -100,7 +107,8 @@ export class CopyLinesDialog extends Component {
         if (this.problem) {
             return;
         }
-        this.props.onConfirm(this.state.mode === "new" ? false : this.state.targetId);
+        const target = this.state.mode === "new" ? false : this.target && this.target.id;
+        this.props.onConfirm(target || false);
         this.props.close();
     }
 }
@@ -142,6 +150,7 @@ export class LineCopyBar extends Component {
         this.dialog.add(CopyLinesDialog, {
             count: this.count,
             currentMoveId: this.props.record.resId,
+            currentMoveName: this.props.record.data.name || "",
             onConfirm: (targetId) => this.copy(targetId),
         });
     }
@@ -152,14 +161,25 @@ export class LineCopyBar extends Component {
             this.notification.add("البنود المؤشَّرة غير محفوظة بعد.", { type: "warning" });
             return;
         }
+        // النسخ في القيد المفتوح نفسه يتطلب إعادة تحميله بعدها، فنحفظ
+        // تعديلاته غير المحفوظة أولاً حتى لا تضيع عند التحميل.
+        const here = !!targetId && targetId === this.props.record.resId;
+        if (here && this.props.record.dirty && !(await this.props.record.save())) {
+            return;
+        }
         try {
             const result = await this.orm.call(
                 "myaccounting.move", "copy_lines_to", [ids, targetId || false]);
             this.clear();
+            if (here) {
+                await this.props.record.load();
+            }
             this.notification.add(
-                `نُسخ ${result.count} بند إلى القيد ${result.name || ""}`.trim()
-                + (result.created ? " (قيد جديد)" : ""),
-                {
+                here
+                    ? `نُسخ ${result.count} بند في هذا القيد.`
+                    : `نُسخ ${result.count} بند إلى القيد ${result.name || ""}`.trim()
+                      + (result.created ? " (قيد جديد)" : ""),
+                here ? { type: "success" } : {
                     type: "success",
                     buttons: [{
                         name: "افتح القيد",
