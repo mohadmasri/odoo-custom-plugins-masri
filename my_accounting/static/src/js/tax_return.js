@@ -12,12 +12,26 @@ const MONTHS = [
     "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول",
 ];
 
-// الفترات الضريبية المعتادة: شهران معاً
-const PAIRS = [[2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 12]];
+// الفترات الضريبية المعتادة: شهران معاً، وآخرها يعبر إلى السنة التالية
+const PAIRS = [[2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 1]];
+
+/** الفترة المعتادة التي يقع فيها شهر ما، وسنة بدايتها */
+function pairOf(year, month) {
+    for (const pair of PAIRS) {
+        if (pair[0] <= pair[1] && month >= pair[0] && month <= pair[1]) {
+            return { year, pair };
+        }
+        // الفترة العابرة (12 + 1): كانون الثاني يخصّ فترة السنة السابقة
+        if (pair[0] > pair[1] && (month === pair[0] || month === pair[1])) {
+            return { year: month === pair[1] ? year - 1 : year, pair };
+        }
+    }
+    return { year, pair: [month, month] };
+}
 
 /**
  * صفحة الإقرار الضريبي: تجمع ضريبة المبيعات من قيود الفترة المختارة،
- * وتعرض كل فاتورة وكل بند مدخلات على حدة ليُراجَع الرقم لا أن يُصدَّق.
+ * وتعرض كل فاتورة وكل فاتورة مشتريات على حدة ليُراجَع الرقم لا أن يُصدَّق.
  */
 export class TaxReturn extends Component {
     static template = "my_accounting.TaxReturn";
@@ -38,22 +52,34 @@ export class TaxReturn extends Component {
             data: null,
         });
         onWillStart(async () => {
-            this.state.years = await loadLedgerYears(this.orm);
-            this.state.year = String(this.state.years[0] || new Date().getFullYear());
-            const month = new Date().getMonth() + 1;
-            // الفترة الافتراضية: الزوج الذي يقع فيه الشهر الحالي
-            const pair = PAIRS.find(([from, to]) => month >= from && month <= to) || [month, month];
-            this.state.monthFrom = pair[0];
-            this.state.monthTo = pair[1];
+            const [years, latest] = await Promise.all([
+                loadLedgerYears(this.orm),
+                this.orm.call("myaccounting.move", "get_latest_ledger_period", []),
+            ]);
+            this.state.years = years;
+            // الفترة الافتراضية: التي يقع فيها آخر شهر فيه قيود، لا الشهر الحالي
+            const year = parseInt(latest.year, 10) || years[0] || new Date().getFullYear();
+            const month = parseInt(latest.month, 10) || new Date().getMonth() + 1;
+            const found = pairOf(year, month);
+            this.state.year = `${found.year}`;
+            this.state.monthFrom = found.pair[0];
+            this.state.monthTo = found.pair[1];
             await this.load();
         });
+    }
+
+    /** سنة نهاية الفترة: "إلى شهر" أصغر من "من شهر" يعني السنة التالية */
+    get yearTo() {
+        const year = parseInt(this.state.year, 10);
+        return this.state.monthTo < this.state.monthFrom ? year + 1 : year;
     }
 
     async load() {
         this.state.loading = true;
         try {
             this.state.data = await this.orm.call("myaccounting.tax.return", "get_return", [
-                this.state.year, this.state.monthFrom, this.state.monthTo,
+                parseInt(this.state.year, 10), this.state.monthFrom,
+                this.yearTo, this.state.monthTo,
             ]);
         } finally {
             this.state.loading = false;
@@ -107,16 +133,9 @@ export class TaxReturn extends Component {
         await this.load();
     }
 
+    // "إلى شهر" أصغر من "من شهر" مقصود: الفترة تعبر إلى السنة التالية
     async onMonth(field, ev) {
-        const value = parseInt(ev.target.value, 10);
-        this.state[field] = value;
-        // "من" بعد "إلى" لا معنى له، فنسحب الآخر معه
-        if (field === "monthFrom" && value > this.state.monthTo) {
-            this.state.monthTo = value;
-        }
-        if (field === "monthTo" && value < this.state.monthFrom) {
-            this.state.monthFrom = value;
-        }
+        this.state[field] = parseInt(ev.target.value, 10);
         await this.load();
     }
 

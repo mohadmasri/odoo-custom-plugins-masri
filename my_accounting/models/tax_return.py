@@ -2,13 +2,13 @@
 
 الحساب كله مبنيّ على قيودك كما هي: كل بند على حساب الضريبة يُنسب إلى
 مجموعته (نفس القيد ونفس البيان) ليُعرف هل هو ضريبة على مبيعات، أم مرتجع
-مبيعات، أم ضريبة مدخلات على مشتريات، أم تسديد إقرار سابق لا يخصّ الفترة.
+مبيعات، أم ضريبة على مشتريات، أم تسديد إقرار سابق لا يخصّ الفترة.
 """
 import re
 
 from odoo import api, fields, models
 
-# بند الضريبة الذي نصّه يذكر "إقرار" هو تسديد إقرار سابق، لا ضريبة مدخلات
+# بند الضريبة الذي نصّه يذكر "إقرار" هو تسديد إقرار سابق، لا ضريبة مشتريات
 SETTLEMENT_RE = re.compile(r'[اأإ]قرار')
 
 MONTH_NAMES = [
@@ -34,20 +34,33 @@ class MyAccountingTaxReturn(models.AbstractModel):
         }
 
     @api.model
-    def _period_moves(self, year, month_from, month_to):
-        months = [str(month) for month in range(int(month_from), int(month_to) + 1)]
-        return self.env['myaccounting.move'].search([
-            ('ledger_year', '=', int(year)),
-            ('ledger_month', 'in', months),
-        ], order='sort_key, id')
+    def _period_keys(self, year_from, month_from, year_to, month_to):
+        """كل (سنة، شهر) داخل الفترة، ولو عبرت نهاية السنة (12 ثم 1)."""
+        start = int(year_from) * 12 + int(month_from) - 1
+        end = int(year_to) * 12 + int(month_to) - 1
+        if end < start:
+            start, end = end, start
+        return [(key // 12, key % 12 + 1) for key in range(start, end + 1)]
 
     @api.model
-    def get_return(self, year, month_from, month_to):
+    def _period_moves(self, year_from, month_from, year_to, month_to):
+        keys = set(self._period_keys(year_from, month_from, year_to, month_to))
+        moves = self.env['myaccounting.move'].search([
+            ('ledger_year', 'in', sorted({year for year, _month in keys})),
+            ('ledger_month', '!=', False),
+        ], order='sort_key, id')
+        return moves.filtered(
+            lambda move: (move.ledger_year, int(move.ledger_month)) in keys)
+
+    @api.model
+    def get_return(self, year_from, month_from, year_to, month_to):
+        """الإقرار عن الفترة من (سنة، شهر) إلى (سنة، شهر)، ولو عبرت السنة."""
+        year_to, month_to = int(year_to), int(month_to)
         settings = self._settings()
         tax_account = settings['tax_account']
         income_account = settings['income_account']
         rate = settings['rate']
-        moves = self._period_moves(year, month_from, month_to)
+        moves = self._period_moves(year_from, month_from, year_to, month_to)
         posted = moves.filtered(lambda move: move.state == 'posted')
 
         sales, sale_returns, exempt, inputs, excluded = [], [], [], [], []
@@ -115,15 +128,16 @@ class MyAccountingTaxReturn(models.AbstractModel):
             share = taxable_base / (taxable_base + exempt_base) * 100 if (taxable_base + exempt_base) else 0
             warnings.append(
                 f'في الفترة مبيعات معفاة ({exempt_base:,.3f})، والخاضع منها {share:,.1f}% فقط. '
-                'إن كان القانون يوجب توزيع ضريبة المدخلات على الخاضع والمعفى، '
+                'إن كان القانون يوجب توزيع ضريبة المشتريات على الخاضع والمعفى، '
                 f'فالمخصوم يصير نحو {total_input * share / 100:,.3f} بدل {total_input:,.3f}.')
 
         return {
             'period': {
-                'year': int(year),
+                'year_from': int(year_from),
                 'month_from': int(month_from),
-                'month_to': int(month_to),
-                'label': self._period_label(year, month_from, month_to),
+                'year_to': year_to,
+                'month_to': month_to,
+                'label': self._period_label(year_from, month_from, year_to, month_to),
             },
             'rate': rate,
             'tax_account': tax_account.name or '',
@@ -147,9 +161,15 @@ class MyAccountingTaxReturn(models.AbstractModel):
         }
 
     @api.model
-    def _period_label(self, year, month_from, month_to):
-        first, last = int(month_from), int(month_to)
-        if first == last:
-            return f'{MONTH_NAMES[first]} {year}'
-        return f'{MONTH_NAMES[first]} + {MONTH_NAMES[last]} {year}' if last - first == 1 \
-            else f'{MONTH_NAMES[first]} حتى {MONTH_NAMES[last]} {year}'
+    def _period_label(self, year_from, month_from, year_to, month_to):
+        keys = self._period_keys(year_from, month_from, year_to, month_to)
+        (first_year, first_month), (last_year, last_month) = keys[0], keys[-1]
+        first = f'{MONTH_NAMES[first_month]} {first_year}'
+        last = f'{MONTH_NAMES[last_month]} {last_year}'
+        if len(keys) == 1:
+            return first
+        if len(keys) == 2:
+            # شهران من سنة واحدة: تُذكر السنة مرة واحدة
+            return (f'{MONTH_NAMES[first_month]} + {last}' if first_year == last_year
+                    else f'{first} + {last}')
+        return f'{first} حتى {last}'
