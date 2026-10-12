@@ -135,7 +135,7 @@ class MyAccountingMove(models.Model):
 
     name = fields.Char(string='رقم القيد', required=True, copy=False, tracking=True,
                         default=lambda self: self._get_default_name())
-    date = fields.Date(string='التاريخ', required=True, tracking=True,
+    date = fields.Date(string='التاريخ', required=True, tracking=True, index=True,
                        default=lambda self: self._get_default_date())
     ref = fields.Char(string='المرجع')
     journal = fields.Char(
@@ -216,6 +216,8 @@ class MyAccountingMove(models.Model):
         'unique(name, ledger_year, company_id)',
         'رقم القيد هذا مستخدم بالفعل في هذه السنة، الرجاء اختيار رقم آخر.',
     )
+    # السنة والشهر يُطلبان معاً في كل فلتر فترة، ففهرس واحد يغطيهما
+    _ledger_period_idx = models.Index('(ledger_year, ledger_month)')
 
     @api.model
     def _increment_name(self, name):
@@ -1281,10 +1283,12 @@ class MyAccountingMoveLine(models.Model):
 
     sequence = fields.Integer(string='الترتيب', default=10)
 
-    move_id = fields.Many2one('myaccounting.move', string='القيد', required=True, ondelete='cascade')
+    # مفهرسان: قراءة بنود قيد وقراءة حركات حساب هما أكثر استعلامين في النظام
+    move_id = fields.Many2one('myaccounting.move', string='القيد', required=True,
+                              ondelete='cascade', index=True)
     move_state = fields.Selection(related='move_id.state', string='حالة القيد', store=True)
     move_sort_key = fields.Char(related='move_id.sort_key', string='ترتيب القيد', store=True, index=True)
-    account_id = fields.Many2one('myaccounting.account', string='الحساب')
+    account_id = fields.Many2one('myaccounting.account', string='الحساب', index=True)
     pending_account_name = fields.Char(
         string='اسم الحساب في الملف', copy=False,
         help='اسم الحساب كما ورد في ملف Excel عندما تعذّر مطابقته مع شجرة الحسابات. '
@@ -1299,7 +1303,7 @@ class MyAccountingMoveLine(models.Model):
     debit_zero_entered = fields.Boolean(string='صفر مُدخل في المدين')
     credit_zero_entered = fields.Boolean(string='صفر مُدخل في الدائن')
     currency_id = fields.Many2one(related='move_id.currency_id', string='العملة', store=True)
-    date = fields.Date(related='move_id.date', string='التاريخ', store=True)
+    date = fields.Date(related='move_id.date', string='التاريخ', store=True, index=True)
 
     # عرض القيد بعمودين للحساب: يظهر الحساب تحت "الحساب المدين" أو "الحساب الدائن"
     # حسب القيمة المدخلة (قبل إدخال القيمة يظهر في المدين). الحقل الفعلي يبقى account_id.
