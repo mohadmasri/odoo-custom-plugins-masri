@@ -594,6 +594,64 @@ class MyAccountingMove(models.Model):
         cells.reverse()
         return {'cells': cells, 'missing': missing}
 
+    # ------------------------------------------------------------------
+    # نسخ بنود من قيد إلى آخر
+    # ------------------------------------------------------------------
+
+    @api.model
+    def get_copy_targets(self):
+        """القيود التي يمكن نسخ بنود إليها، الأحدث أولاً.
+
+        نعرض المرحّلة أيضاً لأن المستخدم يبحث عنها بالرقم، لكن الواجهة
+        تمنع النسخ إليها وتطلب إعادتها إلى مسودة أولاً.
+        """
+        moves = self.search([], order='sort_key desc, id desc', limit=400)
+        return [{
+            'id': move.id,
+            'name': move.name or '',
+            'date': move.date and fields.Date.to_string(move.date) or '',
+            'ref': move.ref or '',
+            'state': move.state,
+            'label': f"{move.name or '—'} — {move.date or ''}"
+                     + (f" — {move.ref}" if move.ref else ''),
+        } for move in moves]
+
+    @api.model
+    def copy_lines_to(self, line_ids, target_id=False):
+        """ينسخ البنود المحددة كما هي إلى قيد موجود أو إلى قيد جديد."""
+        lines = self.env['myaccounting.move.line'].browse(line_ids).exists()
+        if not lines:
+            raise UserError('لم يُحدَّد أي بند للنسخ.')
+        if target_id:
+            target = self.browse(int(target_id)).exists()
+            if not target:
+                raise UserError('القيد المختار لم يعد موجوداً.')
+            if target.state == 'posted':
+                raise UserError(
+                    f'القيد {target.name} مرحّل، فلا تُضاف إليه بنود. '
+                    'أعده إلى مسودة أولاً أو اختر قيداً آخر.')
+        else:
+            target = self.create({})
+        # الترتيب: البنود المنسوخة تأتي بعد بنود القيد الحالي
+        last = max(target.line_ids.mapped('sequence') or [0])
+        self.env['myaccounting.move.line'].create([{
+            'move_id': target.id,
+            'sequence': last + 10 * (index + 1),
+            'name': line.name,
+            'account_id': line.account_id.id,
+            'pending_account_name': line.pending_account_name,
+            'debit': line.debit,
+            'credit': line.credit,
+            'debit_zero_entered': line.debit_zero_entered,
+            'credit_zero_entered': line.credit_zero_entered,
+        } for index, line in enumerate(lines)])
+        return {
+            'id': target.id,
+            'name': target.name or '',
+            'count': len(lines),
+            'created': not target_id,
+        }
+
     @api.model
     def get_ledger_years(self):
         """السنوات التي فيها قيود فعلاً، الأحدث أولاً (قائمة السنة في صفحة القيود)."""

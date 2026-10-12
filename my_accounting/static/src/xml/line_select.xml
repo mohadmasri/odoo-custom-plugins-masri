@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.LineSelectBox">
+        <span class="o_line_select">
+            <!-- t-key: الخانة المرسومة لا تتبع الصفة وحدها، فنعيد إنشاءها
+                 عند تغيّر حالتها (مثلاً عند "إلغاء التأشير") -->
+            <input type="checkbox" class="form-check-input" title="أشّر لنسخ هذا البند"
+                   t-key="checked ? 'on' : 'off'"
+                   t-att-checked="checked"
+                   t-on-click.stop="() => {}"
+                   t-on-change="(ev) => this.toggle(ev)"/>
+        </span>
+    </t>
+
+    <t t-name="my_accounting.LineCopyBar">
+        <div class="o_line_copy_wrap">
+            <div t-if="count" class="o_line_copy_bar">
+                <span class="o_line_copy_count">
+                    <i class="fa fa-check-square-o me-1"/>
+                    مؤشَّر: <b t-esc="countLabel"/>
+                </span>
+                <button type="button" class="btn btn-sm btn-primary"
+                        t-on-click="() => this.open()">
+                    <i class="fa fa-files-o me-1"/>نسخ إلى قيد
+                </button>
+                <button type="button" class="btn btn-sm btn-link"
+                        t-on-click="() => this.clear()">إلغاء التأشير</button>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="my_accounting.CopyLinesDialog">
+        <Dialog title="'نسخ البنود إلى قيد'" size="'md'">
+            <div class="o_copy_lines_dialog">
+                <div class="mb-3">
+                    سيُنسخ <b t-esc="props.count"/> بند كما هو: البيان والحساب والمبلغ.
+                </div>
+                <div class="form-check mb-1">
+                    <input type="radio" class="form-check-input" id="o_copy_new"
+                           t-att-checked="state.mode === 'new'"
+                           t-on-change="() => { state.mode = 'new'; }"/>
+                    <label class="form-check-label" for="o_copy_new">إلى قيد جديد</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input type="radio" class="form-check-input" id="o_copy_existing"
+                           t-att-checked="state.mode === 'existing'"
+                           t-on-change="() => { state.mode = 'existing'; }"/>
+                    <label class="form-check-label" for="o_copy_existing">إلى قيد موجود</label>
+                </div>
+                <div t-if="state.mode === 'existing'" class="mb-2">
+                    <input type="text" class="form-control form-control-sm" t-att-list="listId"
+                           placeholder="اكتب رقم القيد أو مرجعه"
+                           t-att-value="state.text"
+                           t-on-change="(ev) => this.onTargetInput(ev)"
+                           t-on-input="(ev) => this.onTargetInput(ev)"/>
+                    <datalist t-att-id="listId">
+                        <option t-foreach="state.moves" t-as="move" t-key="move.id"
+                                t-att-value="move.label"/>
+                    </datalist>
+                </div>
+                <div t-if="problem" class="alert alert-warning py-1 px-2 small mb-0" t-esc="problem"/>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-att-disabled="problem"
+                        t-on-click="() => this.confirm()">انسخ</button>
+                <button class="btn btn-secondary" t-on-click="() => this.props.close()">إلغاء</button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>
