@@ -148,6 +148,10 @@ class MyAccountingTaxSheet(models.Model):
                     table, amount, tax_value = 'purchase', other_debit, -tax
                 else:
                     table, amount, tax_value = 'purchase_return', other_credit, tax
+                # شراء بلا ضريبة مبيعات لا يُسجَّل في الإقرار ولا يُحتسب.
+                # (أما المبيعات فتُسجَّل ولو كانت ضريبتها صفراً أو معفاة.)
+                if table.startswith('purchase') and not tax_value:
+                    continue
                 # القيمة غائبة حين يختلف بيان بند المصروف عن بند الضريبة،
                 # فنستنتجها من الضريبة ونسبتها ليراجعها المستخدم
                 if not amount and tax_value and rate:
@@ -165,7 +169,7 @@ class MyAccountingTaxSheet(models.Model):
             'sheet_id': self.id,
             'table': group['table'],
             'doc_number': doc_number_of(label),
-            'doc_type': 'فاتورة' if group['table'].startswith('sale') else '',
+            'doc_type': 'قبض' if move.move_type == 'receipt' else 'قيد',
             'date': move.date,
             'label': label,
             'amount': group['amount'],

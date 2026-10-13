@@ -158,9 +158,12 @@ class MyAccountingMove(models.Model):
 
     # النوع تحدّده اليومية: ما كانت يومياته "قبض" فهو سند قبض، وإلا قيد عادي.
     # هكذا يصير القيد اليدوي سند قبض بمجرد كتابة يوميته، بلا خانة أخرى يُنتبه لها.
+    # بلا default ولا required: القيمة الافتراضية تُعدّ قيمة مُعطاة فيُلغى
+    # الحساب عند الإنشاء، و NOT NULL يمنع الإدراج قبل أن يُحسب. الحساب
+    # يملؤه دائماً بعد الإدراج مباشرة.
     move_type = fields.Selection(
         MOVE_TYPES, string='النوع', compute='_compute_move_type', store=True,
-        readonly=False, default='entry', required=True, copy=True,
+        readonly=False, copy=True,
         help='سند القبض هو قيد محاسبي بترقيم مستقل وشكل طباعة مختلف. '
              'يتحدّد من اليومية: يومية "قبض" تجعل القيد سند قبض.')
 
