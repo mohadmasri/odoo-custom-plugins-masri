@@ -156,9 +156,13 @@ class MyAccountingMove(models.Model):
     # (11/8 قبل 12/8 مهما كان ترتيب الإدخال، والقيود القديمة المُدخلة لاحقاً تأخذ مكانها)
     sort_key = fields.Char(string='مفتاح الترتيب', compute='_compute_sort_key', store=True, index=True)
 
+    # النوع تحدّده اليومية: ما كانت يومياته "قبض" فهو سند قبض، وإلا قيد عادي.
+    # هكذا يصير القيد اليدوي سند قبض بمجرد كتابة يوميته، بلا خانة أخرى يُنتبه لها.
     move_type = fields.Selection(
-        MOVE_TYPES, string='النوع', default='entry', required=True, copy=True,
-        help='سند القبض هو قيد محاسبي بترقيم مستقل وشكل طباعة مختلف.')
+        MOVE_TYPES, string='النوع', compute='_compute_move_type', store=True,
+        readonly=False, default='entry', required=True, copy=True,
+        help='سند القبض هو قيد محاسبي بترقيم مستقل وشكل طباعة مختلف. '
+             'يتحدّد من اليومية: يومية "قبض" تجعل القيد سند قبض.')
 
     state = fields.Selection([
         ('draft', 'مسودة'),
@@ -299,6 +303,12 @@ class MyAccountingMove(models.Model):
     def split_journals(self, text):
         """اليومية قد تحوي أكثر من اسم: "ايرادات، رواتب" → ['ايرادات', 'رواتب']."""
         return [part.strip() for part in re.split(r'[،,+]', text or '') if part.strip()]
+
+    @api.depends('journal')
+    def _compute_move_type(self):
+        for move in self:
+            move.move_type = ('receipt' if RECEIPT_JOURNAL in self.split_journals(move.journal)
+                              else 'entry')
 
     def has_journal(self, name):
         self.ensure_one()
