@@ -9,18 +9,18 @@
 
 .o_move_block_label {
     font-size: 0.85rem;
-    color: #6c757d;
+    color: var(--gray-600, #6c757d);
 }
 
 .o_move_block_note {
     font-size: 0.78rem;
-    color: #adb5bd;
+    color: var(--gray-600, #adb5bd);
     margin-inline-start: 4px;
 }
 
 .o_move_block_preview th {
     font-size: 0.78rem;
-    color: #6c757d;
+    color: var(--gray-600, #6c757d);
     font-weight: 500;
 }
 

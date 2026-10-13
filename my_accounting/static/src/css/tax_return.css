@@ -15,7 +15,7 @@
 .o_tr_sep {
     width: 1px;
     align-self: stretch;
-    background: var(--border-color, #dee2e6);
+    background: var(--o-surface-border, #dee2e6);
     margin: 0 4px;
 }
 
@@ -33,12 +33,12 @@
 }
 
 .o_tr_summary .o_tr_subtotal td {
-    border-top: 2px solid var(--border-color, #dee2e6);
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
     font-weight: 600;
 }
 
 .o_tr_summary .o_tr_due td {
-    border-top: 2px solid var(--border-color, #dee2e6);
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
     font-weight: 700;
     background: var(--o-surface-2, #f2f2f2);
 }

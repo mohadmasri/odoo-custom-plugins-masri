@@ -159,7 +159,7 @@
                         <td t-esc="row.date"/>
                         <td>
                             <t t-esc="row.label"/>
-                            <span t-if="row.estimated" class="badge text-bg-light ms-1"
+                            <span t-if="row.estimated" class="badge text-bg-secondary ms-1"
                                   title="لا يوجد بند مقابل بنفس البيان، فقُدِّر الأساس من النسبة">مُقدَّر</span>
                         </td>
                         <td t-if="withReason" class="text-muted small" t-esc="row.reason"/>

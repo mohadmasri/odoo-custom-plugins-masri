@@ -17,14 +17,14 @@
     gap: 8px;
     margin-bottom: 6px;
     padding: 4px 8px;
-    background: #eef4ff;
-    border: 1px solid #cfe0ff;
+    background: var(--o-surface-2, #eef4ff);
+    border: 1px solid var(--o-surface-border, #cfe0ff);
     border-radius: 6px;
 }
 
 .o_line_copy_count {
     font-size: 0.85rem;
-    color: #27405f;
+    color: var(--body-color, #27405f);
 }
 
 /* لا يظهر التأشير ولا شريطه في الطباعة */

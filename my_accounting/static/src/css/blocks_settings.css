@@ -12,9 +12,9 @@
 .o_bs_editor {
     margin-top: 18px;
     padding: 14px;
-    border: 1px solid var(--border-color, #dee2e6);
+    border: 1px solid var(--o-surface-border, #dee2e6);
     border-radius: 8px;
-    background: var(--o-surface-1, #fbfbfb);
+    background: var(--o-surface, #fbfbfb);
 }
 
 .o_bs_title {
@@ -37,7 +37,7 @@
 .o_bs_fields th {
     font-size: 0.8rem;
     font-weight: 500;
-    color: #6c757d;
+    color: var(--gray-600, #6c757d);
 }
 
 .o_bs_order .btn {
@@ -58,7 +58,7 @@
 .o_bs_preview th {
     font-size: 0.8rem;
     font-weight: 500;
-    color: #6c757d;
+    color: var(--gray-600, #6c757d);
 }
 
 .o_bs_actions {
@@ -70,9 +70,9 @@
 /* زر إدارة الكتل في شريط القيد */
 .o_move_block_manage {
     padding: 0 4px;
-    color: #adb5bd;
+    color: var(--gray-600, #adb5bd);
 }
 
 .o_move_block_manage:hover {
-    color: #0d6efd;
+    color: var(--o-accent, #0d6efd);
 }
