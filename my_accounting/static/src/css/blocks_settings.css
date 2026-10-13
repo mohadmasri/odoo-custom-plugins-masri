@@ -44,6 +44,25 @@
     line-height: 1;
 }
 
+/* خانة الحساب: المربع وعنوانه في سطر واحد، والحقل تحتهما */
+.o_bs_lines .form-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+}
+
+.o_bs_lines .form-check .form-check-input {
+    margin: 0;
+    float: none;
+    flex: none;
+}
+
+.o_bs_lines .form-check-label {
+    white-space: nowrap;
+}
+
 .o_bs_trial {
     display: flex;
     flex-wrap: wrap;

@@ -156,10 +156,10 @@
                         <thead>
                             <tr>
                                 <th style="width:70px;"/>
-                                <th style="width:150px;">بيان البند</th>
-                                <th style="width:90px;">الجانب</th>
-                                <th>الحساب</th>
-                                <th style="width:200px;">الصيغة</th>
+                                <th style="width:130px;">بيان البند</th>
+                                <th style="width:80px;">الجانب</th>
+                                <th style="width:240px;">الحساب</th>
+                                <th style="width:190px;">الصيغة</th>
                                 <th class="text-center" style="width:80px;">يظهر بصفر</th>
                                 <th style="width:40px;"/>
                             </tr>
@@ -196,7 +196,7 @@
                                                    t-att-checked="line.ask_account"
                                                    t-on-change="(ev) => this.onLineChange(line, 'ask_account', ev)"/>
                                             <label class="form-check-label small"
-                                                   t-att-for="'o_bs_ask_' + line.id">يُسأل عنه عند الاستعمال</label>
+                                                   t-att-for="'o_bs_ask_' + line.id">يُسأل عنه</label>
                                         </div>
                                         <input t-if="line.ask_account" type="text"
                                                class="form-control form-control-sm"
