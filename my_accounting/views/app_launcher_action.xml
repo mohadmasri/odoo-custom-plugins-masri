@@ -32,6 +32,11 @@
         <field name="tag">my_accounting.reports</field>
     </record>
 
+    <record id="action_myaccounting_blocks" model="ir.actions.client">
+        <field name="name">الكتل الجاهزة</field>
+        <field name="tag">my_accounting.blocks_settings</field>
+    </record>
+
     <record id="action_myaccounting_tax_return" model="ir.actions.client">
         <field name="name">الاقرار الضريبي</field>
         <field name="tag">my_accounting.tax_return</field>

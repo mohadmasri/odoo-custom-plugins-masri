@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.BlocksSettings">
+        <div class="o_blocks_settings p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="m-0">الكتل الجاهزة</h2>
+                    <div class="small text-muted">
+                        الكتلة تحوّل صفاً واحداً من البيانات إلى بنود القيد المتكررة،
+                        وتظهر أزرارها فوق جدول البنود في شاشة القيد.
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm" t-on-click="() => this.create()">
+                    <i class="fa fa-plus me-1"/> كتلة جديدة
+                </button>
+            </div>
+
+            <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
+
+            <t t-else="">
+                <!-- قائمة الكتل -->
+                <table t-if="state.blocks.length" class="table table-bordered table-sm o_bs_list">
+                    <thead>
+                        <tr>
+                            <th style="width:50px;"/>
+                            <th>الكتلة</th>
+                            <th>الشرح</th>
+                            <th class="text-center" style="width:80px;">البنود</th>
+                            <th class="text-center" style="width:90px;">مفعّلة</th>
+                            <th style="width:160px;"/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.blocks" t-as="block" t-key="block.id">
+                            <td class="text-center"><i t-attf-class="fa {{ block.icon }}"/></td>
+                            <td><strong t-esc="block.name"/></td>
+                            <td class="small text-muted" t-esc="block.hint"/>
+                            <td class="text-center" t-esc="block.lines.length"/>
+                            <td class="text-center">
+                                <i t-attf-class="fa {{ block.active ? 'fa-check text-success' : 'fa-times text-muted' }}"/>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary me-1"
+                                        t-on-click="() => this.edit(block)">تعديل</button>
+                                <button class="btn btn-sm btn-outline-secondary me-1" title="نسخة منها"
+                                        t-on-click="() => this.duplicate(block)">
+                                    <i class="fa fa-files-o"/>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" title="حذف"
+                                        t-on-click="() => this.remove(block)">
+                                    <i class="fa fa-trash"/>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div t-else="" class="text-muted py-4">
+                    لا توجد كتل بعد. اضغط "كتلة جديدة" لبناء أول واحدة.
+                </div>
+
+                <!-- محرّر الكتلة -->
+                <div t-if="state.edited" class="o_bs_editor">
+                    <h3 class="o_bs_title">
+                        <t t-if="state.edited.id">تعديل: <t t-esc="state.edited.name"/></t>
+                        <t t-else="">كتلة جديدة</t>
+                    </h3>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-3">
+                            <label class="form-label small mb-1">اسم الكتلة</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   t-model="state.edited.name"/>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small mb-1">الشرح (يظهر عند تمرير المؤشر)</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   t-model="state.edited.hint"/>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small mb-1">الأيقونة</label>
+                            <select class="form-select form-select-sm" t-model="state.edited.icon">
+                                <option t-foreach="icons" t-as="icon" t-key="icon[0]"
+                                        t-att-value="icon[0]" t-esc="icon[1]"/>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small mb-1">الترتيب</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   t-model.number="state.edited.sequence"/>
+                        </div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="o_bs_active"
+                               t-model="state.edited.active"/>
+                        <label class="form-check-label small" for="o_bs_active">
+                            مفعّلة (تظهر في شاشة القيد)
+                        </label>
+                    </div>
+
+                    <!-- خانات المبالغ -->
+                    <h4 class="o_bs_section">خانات المبالغ</h4>
+                    <div class="small text-muted mb-2">
+                        ما يكتبه المستخدم عند استعمال الكتلة. المفتاح بالإنجليزية ويُستعمل في صيغ البنود.
+                    </div>
+                    <table class="table table-bordered table-sm o_bs_fields">
+                        <thead>
+                            <tr>
+                                <th style="width:170px;">المفتاح</th>
+                                <th>العنوان المعروض</th>
+                                <th class="text-end" style="width:150px;">قيمة افتراضية</th>
+                                <th style="width:50px;"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.edited.fields" t-as="field" t-key="field_index">
+                                <td>
+                                    <input type="text" class="form-control form-control-sm" dir="ltr"
+                                           placeholder="amount" t-att-value="field.key"
+                                           t-on-change="(ev) => this.onFieldChange(field, 'key', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           placeholder="المبلغ" t-att-value="field.label"
+                                           t-on-change="(ev) => this.onFieldChange(field, 'label', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.001"
+                                           class="form-control form-control-sm text-end"
+                                           t-att-value="field.default_value"
+                                           t-on-change="(ev) => this.onFieldChange(field, 'default_value', ev)"/>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0"
+                                            t-on-click="() => this.removeField(field_index)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button class="btn btn-sm btn-outline-secondary mb-3"
+                            t-on-click="() => this.addField()">
+                        <i class="fa fa-plus me-1"/> خانة
+                    </button>
+
+                    <!-- البنود -->
+                    <h4 class="o_bs_section">البنود</h4>
+                    <div class="small text-muted mb-2">
+                        الصيغة حساب بسيط على المفاتيح: <code>amount + commission</code> أو
+                        <code>amount * rate / 100</code>. البند الذي نتيجته صفر لا يُضاف،
+                        إلا إن أُشّر "يظهر بصفر".
+                    </div>
+                    <table class="table table-bordered table-sm o_bs_lines">
+                        <thead>
+                            <tr>
+                                <th style="width:70px;"/>
+                                <th style="width:150px;">بيان البند</th>
+                                <th style="width:90px;">الجانب</th>
+                                <th>الحساب</th>
+                                <th style="width:200px;">الصيغة</th>
+                                <th class="text-center" style="width:80px;">يظهر بصفر</th>
+                                <th style="width:40px;"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="state.edited.lines" t-as="line" t-key="line.id">
+                                <tr>
+                                    <td class="text-center o_bs_order">
+                                        <button class="btn btn-sm btn-link p-0" title="أعلى"
+                                                t-on-click="() => this.moveLine(line_index, -1)">
+                                            <i class="fa fa-arrow-up"/>
+                                        </button>
+                                        <button class="btn btn-sm btn-link p-0" title="أسفل"
+                                                t-on-click="() => this.moveLine(line_index, 1)">
+                                            <i class="fa fa-arrow-down"/>
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               placeholder="بيان الكتلة" t-att-value="line.label"
+                                               t-on-change="(ev) => this.onLineChange(line, 'label', ev)"/>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                t-on-change="(ev) => this.onLineChange(line, 'side', ev)">
+                                            <option value="debit" t-att-selected="line.side === 'debit'">مدين</option>
+                                            <option value="credit" t-att-selected="line.side === 'credit'">دائن</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="form-check mb-1">
+                                            <input type="checkbox" class="form-check-input"
+                                                   t-att-id="'o_bs_ask_' + line.id"
+                                                   t-att-checked="line.ask_account"
+                                                   t-on-change="(ev) => this.onLineChange(line, 'ask_account', ev)"/>
+                                            <label class="form-check-label small"
+                                                   t-att-for="'o_bs_ask_' + line.id">يُسأل عنه عند الاستعمال</label>
+                                        </div>
+                                        <input t-if="line.ask_account" type="text"
+                                               class="form-control form-control-sm"
+                                               placeholder="عنوان السؤال: حساب الجهة"
+                                               t-att-value="line.account_prompt"
+                                               t-on-change="(ev) => this.onLineChange(line, 'account_prompt', ev)"/>
+                                        <input t-else="" type="text" class="form-control form-control-sm"
+                                               t-att-list="listId" placeholder="اختر الحساب"
+                                               t-att-value="accountLabel(line.account_id)"
+                                               t-on-change="(ev) => this.onLineChange(line, 'account_id', ev)"/>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" dir="ltr"
+                                               t-att-value="line.formula"
+                                               t-on-change="(ev) => this.onLineChange(line, 'formula', ev)"/>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input"
+                                               t-att-checked="line.zero_visible"
+                                               t-on-change="(ev) => this.onLineChange(line, 'zero_visible', ev)"/>
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-link text-danger p-0"
+                                                t-on-click="() => this.removeLine(line_index)">
+                                            <i class="fa fa-trash"/>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr t-if="lineError(line)">
+                                    <td/>
+                                    <td colspan="6" class="text-danger small py-1"
+                                        t-esc="lineError(line)"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                    <button class="btn btn-sm btn-outline-secondary mb-3"
+                            t-on-click="() => this.addLine()">
+                        <i class="fa fa-plus me-1"/> بند
+                    </button>
+
+                    <datalist t-att-id="listId">
+                        <option t-foreach="state.accounts" t-as="acc" t-key="acc.id"
+                                t-att-value="acc.label"/>
+                    </datalist>
+
+                    <!-- التجربة -->
+                    <h4 class="o_bs_section">جرّبها</h4>
+                    <div class="o_bs_trial mb-2">
+                        <div t-foreach="state.edited.fields" t-as="field" t-key="field.key">
+                            <label class="form-label small mb-1"
+                                   t-esc="field.label or field.key"/>
+                            <input type="number" step="0.001"
+                                   class="form-control form-control-sm text-end"
+                                   style="width:130px;"
+                                   t-att-value="state.trying[field.key]"
+                                   t-on-input="(ev) => this.onTrial(field.key, ev)"/>
+                        </div>
+                    </div>
+                    <table class="table table-sm o_bs_preview">
+                        <thead>
+                            <tr>
+                                <th>البيان</th>
+                                <th>الحساب</th>
+                                <th class="text-end" style="width:120px;">الدائن</th>
+                                <th class="text-end" style="width:120px;">المدين</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="preview" t-as="line" t-key="line.key">
+                                <td t-esc="line.name"/>
+                                <td t-esc="accountLabel(line.account_id) or 'يُسأل عنه'"/>
+                                <td class="text-end"
+                                    t-esc="line.credit ? line.credit.toFixed(3) : (line.credit_zero_entered ? '0.000' : '')"/>
+                                <td class="text-end"
+                                    t-esc="line.debit ? line.debit.toFixed(3) : (line.debit_zero_entered ? '0.000' : '')"/>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="2" class="text-end">الإجمالي</td>
+                                <td class="text-end" t-esc="previewTotals.credit.toFixed(3)"/>
+                                <td class="text-end" t-esc="previewTotals.debit.toFixed(3)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div t-if="previewTotals.difference" class="alert alert-warning py-1 px-2 small">
+                        الكتلة غير متوازنة بهذه القيم — الفرق
+                        <t t-esc="Math.abs(previewTotals.difference).toFixed(3)"/>.
+                        هذا مقبول إن كانت الكتلة جزءاً من قيد أكبر.
+                    </div>
+
+                    <div t-foreach="problems" t-as="problem" t-key="problem_index"
+                         class="alert alert-danger py-1 px-2 small" t-esc="problem"/>
+
+                    <div class="o_bs_actions">
+                        <button class="btn btn-primary" t-att-disabled="problems.length or state.saving"
+                                t-on-click="() => this.save()">احفظ الكتلة</button>
+                        <button class="btn btn-secondary" t-on-click="() => this.close()">إغلاق</button>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

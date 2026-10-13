@@ -50,6 +50,10 @@
               parent="menu_myaccounting_settings_root" sequence="1"
               action="action_myaccounting_settings"/>
 
+    <menuitem id="menu_myaccounting_blocks" name="الكتل الجاهزة"
+              parent="menu_myaccounting_settings_root" sequence="3"
+              action="action_myaccounting_blocks"/>
+
     <menuitem id="menu_myaccounting_tax_return" name="الاقرار الضريبي"
               parent="menu_myaccounting_settings_root" sequence="5"
               action="action_myaccounting_tax_return"/>

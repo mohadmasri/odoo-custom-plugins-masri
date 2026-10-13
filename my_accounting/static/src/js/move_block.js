@@ -1,93 +1,44 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useRef, useState } from "@odoo/owl";
+import { Component, onWillStart, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
+import { buildBlockLines } from "./block_formula";
 
 const ACCOUNT_LIST_ID = "o_move_block_accounts";
 
-/** ثلاث خانات عشرية كما في بقية النظام */
-function round3(value) {
-    return Math.round((Number(value) || 0) * 1000) / 1000;
-}
-
-/** وصف كل كتلة: عنوانها وأيقونتها والحسابات التي تُحفظ لاستعمالها لاحقاً */
-const BLOCKS = {
-    invoice: {
-        title: "فاتورة",
-        icon: "fa-file-text-o",
-        hint: "ذمم الجهة مديناً، الإيراد دائناً، وضريبة المبيعات دائناً.",
-        remembered: ["income_account_id", "tax_account_id", "tax_rate"],
-    },
-    guarantee: {
-        title: "كفالة",
-        icon: "fa-shield",
-        hint: "الكفالة والعمولة مدينتان، والبنك دائن بالمجموع.",
-        remembered: ["guarantee_account_id", "commission_account_id", "guarantee_bank_id"],
-    },
-    receipt: {
-        title: "قبض",
-        icon: "fa-money",
-        hint: "ذمم الجهة دائنة، البنك مدين بالصافي، والطوابع مدينة بالفرق.",
-        remembered: ["receipt_bank_id", "receipt_fee_account_id"],
-    },
-};
-
 /**
- * نافذة الكتلة: صف واحد من البيانات يُترجم إلى بنود القيد الثلاثة.
- * المبالغ تُحسب أمام المستخدم قبل الإضافة، فلا مفاجأة بعدها.
+ * نافذة الكتلة: خانات المبالغ كما عُرّفت في صفحة "الكتل الجاهزة"، والبنود
+ * تُحسب منها أمام المستخدم قبل الإضافة فلا مفاجأة بعدها.
  */
 export class MoveBlockDialog extends Component {
     static template = "my_accounting.MoveBlockDialog";
     static components = { Dialog };
     static props = {
         close: Function,
-        kind: String,
+        block: Object,
         accounts: Array,
-        settings: Object,
         onConfirm: Function,
     };
 
     setup() {
         this.listId = ACCOUNT_LIST_ID;
-        this.firstRef = useRef("first");
-        const settings = this.props.settings;
-        this.state = useState({
-            partyId: false,
-            text: "",
-            amount: "",
-            includesTax: false,
-            exempt: false,
-            commission: "",
-            fee: "",
-            taxRate: settings.tax_rate,
-            incomeId: settings.income_account_id,
-            taxId: settings.tax_account_id,
-            guaranteeId: settings.guarantee_account_id,
-            commissionId: settings.commission_account_id,
-            bankId: this.props.kind === "receipt"
-                ? settings.receipt_bank_id
-                : settings.guarantee_bank_id,
-            feeId: settings.receipt_fee_account_id,
-        });
+        const values = {};
+        for (const field of this.props.block.fields) {
+            values[field.key] = field.default_value || "";
+        }
+        this.state = useState({ text: "", values, accounts: {} });
     }
 
     get block() {
-        return BLOCKS[this.props.kind];
+        return this.props.block;
     }
 
-    get isInvoice() {
-        return this.props.kind === "invoice";
-    }
-
-    get isGuarantee() {
-        return this.props.kind === "guarantee";
-    }
-
-    get isReceipt() {
-        return this.props.kind === "receipt";
+    /** البنود التي يُسأل عن حسابها عند كل استعمال */
+    get askedLines() {
+        return this.block.lines.filter((line) => line.ask_account);
     }
 
     accountLabel(id) {
@@ -95,102 +46,42 @@ export class MoveBlockDialog extends Component {
         return account ? account.label : "";
     }
 
-    onAccountInput(field, ev) {
+    onAccountInput(lineId, ev) {
         const account = this.props.accounts.find((acc) => acc.label === ev.target.value);
-        this.state[field] = account ? account.id : false;
+        this.state.accounts[lineId] = account ? account.id : false;
     }
 
-    onNumber(field, ev) {
-        this.state[field] = ev.target.value;
+    onValue(key, ev) {
+        this.state.values[key] = ev.target.value;
     }
 
-    // ------------------------------------------------------------------
-    // الحساب المعروض قبل الإضافة
-    // ------------------------------------------------------------------
-
-    get amountValue() {
-        return round3(parseFloat(this.state.amount) || 0);
-    }
-
-    /** الفاتورة: الصافي والضريبة والإجمالي مهما كان المُدخل شاملاً أو لا */
-    get invoiceAmounts() {
-        const rate = (parseFloat(this.state.taxRate) || 0) / 100;
-        const amount = this.amountValue;
-        if (this.state.exempt || !rate) {
-            return { net: amount, tax: 0, gross: amount };
+    get numbers() {
+        const numbers = {};
+        for (const field of this.block.fields) {
+            numbers[field.key] = parseFloat(this.state.values[field.key]) || 0;
         }
-        if (this.state.includesTax) {
-            const net = round3(amount / (1 + rate));
-            return { net, tax: round3(amount - net), gross: amount };
-        }
-        const tax = round3(amount * rate);
-        return { net: amount, tax, gross: round3(amount + tax) };
+        return numbers;
     }
 
-    get guaranteeAmounts() {
-        const amount = this.amountValue;
-        const commission = round3(parseFloat(this.state.commission) || 0);
-        return { amount, commission, total: round3(amount + commission) };
-    }
-
-    get receiptAmounts() {
-        const amount = this.amountValue;
-        const fee = round3(parseFloat(this.state.fee) || 0);
-        return { amount, fee, net: round3(amount - fee) };
-    }
-
-    /** البنود كما ستُضاف، معروضة في النافذة للمراجعة */
     get lines() {
-        const text = this.state.text.trim();
-        if (this.isInvoice) {
-            const { net, tax, gross } = this.invoiceAmounts;
-            const lines = [
-                { account_id: this.state.partyId, name: text, debit: gross, credit: 0 },
-                { account_id: this.state.incomeId, name: text, debit: 0, credit: net },
-            ];
-            // بند الضريبة يبقى ظاهراً بصفر في الفواتير المعفاة، كما تكتبها بيدك
-            lines.push({
-                account_id: this.state.taxId, name: text, debit: 0, credit: tax,
-                credit_zero_entered: !tax,
-            });
-            return lines;
-        }
-        if (this.isGuarantee) {
-            const { amount, commission, total } = this.guaranteeAmounts;
-            const lines = [
-                { account_id: this.state.guaranteeId, name: text, debit: amount, credit: 0 },
-            ];
-            if (commission) {
-                lines.push({
-                    account_id: this.state.commissionId, name: text, debit: commission, credit: 0,
-                });
-            }
-            lines.push({ account_id: this.state.bankId, name: text, debit: 0, credit: total });
-            return lines;
-        }
-        const { amount, fee, net } = this.receiptAmounts;
-        const lines = [
-            { account_id: this.state.partyId, name: text, debit: 0, credit: amount },
-            { account_id: this.state.bankId, name: text, debit: net, credit: 0 },
-        ];
-        if (fee) {
-            lines.push({ account_id: this.state.feeId, name: "طوابع", debit: fee, credit: 0 });
-        }
-        return lines;
+        return buildBlockLines(this.block, this.numbers, this.state.accounts,
+            this.state.text.trim());
     }
 
     get problem() {
         if (!this.state.text.trim()) {
-            return "اكتب البيان (رقم الفاتورة أو الكفالة أو اسم الجهة).";
+            return "اكتب البيان.";
         }
-        if (!this.amountValue) {
-            return "اكتب المبلغ.";
+        const lines = this.lines;
+        if (!lines.length) {
+            return "كل البنود بصفر، اكتب المبالغ.";
         }
-        if (this.lines.some((line) => !line.account_id)) {
+        const broken = lines.find((line) => line.error);
+        if (broken) {
+            return `خطأ في صيغة أحد البنود: ${broken.error}`;
+        }
+        if (lines.some((line) => !line.account_id)) {
             return "اختر كل الحسابات المطلوبة.";
-        }
-        if (this.isReceipt && this.receiptAmounts.net < 0) {
-            return "الطوابع أكبر من المبلغ.";
         }
         return "";
     }
@@ -199,27 +90,8 @@ export class MoveBlockDialog extends Component {
         if (this.problem) {
             return;
         }
-        const settings = {};
-        for (const key of this.block.remembered) {
-            settings[key] = key === "tax_rate"
-                ? parseFloat(this.state.taxRate) || 0
-                : this.stateOf(key);
-        }
-        this.props.onConfirm(this.lines, settings);
+        this.props.onConfirm(this.lines);
         this.props.close();
-    }
-
-    /** ربط مفتاح الإعداد المحفوظ بالخانة المقابلة له في النافذة */
-    stateOf(key) {
-        return {
-            income_account_id: this.state.incomeId,
-            tax_account_id: this.state.taxId,
-            guarantee_account_id: this.state.guaranteeId,
-            commission_account_id: this.state.commissionId,
-            guarantee_bank_id: this.state.bankId,
-            receipt_bank_id: this.state.bankId,
-            receipt_fee_account_id: this.state.feeId,
-        }[key];
     }
 
     onKeydown(ev) {
@@ -231,7 +103,7 @@ export class MoveBlockDialog extends Component {
 }
 
 /**
- * شريط الكتل فوق بنود القيد: زر لكل كتلة متكررة في قيود المكتب.
+ * شريط الكتل فوق بنود القيد: زر لكل كتلة معرَّفة في الإعدادات.
  */
 export class MoveBlockBar extends Component {
     static template = "my_accounting.MoveBlockBar";
@@ -240,13 +112,13 @@ export class MoveBlockBar extends Component {
     setup() {
         this.orm = useService("orm");
         this.dialog = useService("dialog");
+        this.action = useService("action");
         this.notification = useService("notification");
-        this.blocks = Object.entries(BLOCKS).map(([kind, block]) => ({ kind, ...block }));
-        this.setup_ = useState({ accounts: [], settings: null });
+        this.data = useState({ blocks: [], accounts: [] });
         onWillStart(async () => {
-            const data = await this.orm.call("myaccounting.move.block", "get_setup", []);
-            this.setup_.accounts = data.accounts;
-            this.setup_.settings = data.settings;
+            const loaded = await this.orm.call("myaccounting.block", "get_blocks", []);
+            this.data.blocks = loaded.blocks.filter((block) => block.active);
+            this.data.accounts = loaded.accounts;
         });
     }
 
@@ -258,19 +130,15 @@ export class MoveBlockBar extends Component {
         return ACCOUNT_LIST_ID;
     }
 
-    open(kind) {
-        if (!this.setup_.settings) {
-            return;
-        }
+    open(block) {
         this.dialog.add(MoveBlockDialog, {
-            kind,
-            accounts: this.setup_.accounts,
-            settings: this.setup_.settings,
-            onConfirm: (lines, settings) => this.addLines(kind, lines, settings),
+            block,
+            accounts: this.data.accounts,
+            onConfirm: (lines) => this.addLines(block, lines),
         });
     }
 
-    async addLines(kind, lines, settings) {
+    async addLines(block, lines) {
         const list = this.props.record.data.line_ids;
         for (const line of lines) {
             // mode readonly: نضيف البنود دون فتح أي صف في وضع التحرير
@@ -284,15 +152,17 @@ export class MoveBlockBar extends Component {
                 credit_zero_entered: !!line.credit_zero_entered,
             });
         }
-        this.notification.add(`أُضيفت ${lines.length} بنود من كتلة ${BLOCKS[kind].title}.`,
+        this.notification.add(`أُضيفت ${lines.length} بنود من كتلة ${block.name}.`,
             { type: "success" });
-        Object.assign(this.setup_.settings, settings);
-        await this.orm.call("myaccounting.move.block", "remember", [settings]);
     }
 
     label(id) {
-        const account = this.setup_.accounts.find((acc) => acc.id === id);
+        const account = this.data.accounts.find((acc) => acc.id === id);
         return account ? account.name : "";
+    }
+
+    openSettings() {
+        this.action.doAction("my_accounting.action_myaccounting_blocks");
     }
 }
 
