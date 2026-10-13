@@ -1416,18 +1416,3 @@ class MyAccountingMoveLine(models.Model):
             if line.debit < 0 or line.credit < 0:
                 raise ValidationError('لا يمكن أن تكون قيمة المدين أو الدائن سالبة.')
 
-    def action_reorder(self, delta):
-        """يحرّك البند خطوة واحدة (delta = -1 لأعلى، 1 لأسفل) داخل قيده.
-
-        يعمل حتى على القيد المرحّل لأن الترتيب عرضي فقط ولا يغيّر المبالغ."""
-        self.ensure_one()
-        lines = list(self.move_id.line_ids)
-        index = lines.index(self)
-        target = index + delta
-        if target < 0 or target >= len(lines):
-            return False
-        lines.insert(target, lines.pop(index))
-        for position, line in enumerate(lines, start=1):
-            if line.sequence != position:
-                line.sequence = position
-        return True

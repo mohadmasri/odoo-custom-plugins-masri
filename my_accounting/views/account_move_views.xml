@@ -86,12 +86,9 @@
                                 <list editable="bottom">
                                     <!-- التأشير للنسخ: يعمل حتى في القيد المرحّل -->
                                     <widget name="my_accounting.line_select"/>
-                                    <!-- السحب لإعادة الترتيب في المسودة، وأسهم في القيد
-                                         المرحّل لأن قائمته مجمّدة فلا تُسحب بنودها -->
-                                    <field name="sequence" widget="handle"
-                                           column_invisible="parent.state == 'posted'"/>
-                                    <field name="sequence" widget="myaccounting_line_order" string=" "
-                                           column_invisible="parent.state != 'posted'"/>
+                                    <!-- الترتيب بالسحب. ترتيب البنود واحد في المسودة
+                                         والمرحّل والطباعة لأن الجميع يقرأ sequence -->
+                                    <field name="sequence" widget="handle"/>
                                     <field name="account_label" column_invisible="1"/>
                                     <field name="move_state" column_invisible="1"/>
                                     <field name="account_id" column_invisible="1"/>
