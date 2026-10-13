@@ -124,3 +124,16 @@
     font-size: 0.75rem;
     white-space: nowrap;
 }
+
+/* رابط القيد في جداول الإقرار */
+.o_tr_link {
+    text-align: center;
+}
+
+.o_tr_link a {
+    color: var(--gray-600, #6c757d);
+}
+
+.o_tr_link a:hover {
+    color: var(--o-accent, #0d6efd);
+}
