@@ -80,3 +80,47 @@
         color: #000 !important;
     }
 }
+
+/* جداول الإقرار القابلة للتحرير */
+.o_tr_sheet_bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 18px 0 10px;
+}
+
+.o_tr_sheet {
+    margin-top: 18px;
+}
+
+.o_tr_table td {
+    padding: 2px 4px;
+    vertical-align: middle;
+}
+
+.o_tr_table th {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_tr_table .form-control {
+    min-width: 55px;
+}
+
+/* خانات الأرقام تتّسع لمبلغ بثلاث خانات عشرية */
+.o_tr_table input[type="number"] {
+    min-width: 95px;
+}
+
+/* الجدول عريض الأعمدة: يُمرَّر أفقياً بدل أن تنضغط الخانات */
+.o_tr_sheet {
+    overflow-x: auto;
+}
+
+.o_tr_mark {
+    text-align: center;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}

@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { Component, onWillStart, useState } from "@odoo/owl";
+import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { loadLedgerYears } from "./ledger_years";
@@ -40,6 +41,8 @@ export class TaxReturn extends Component {
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
+        this.dialog = useService("dialog");
+        this.notification = useService("notification");
         this.months = MONTHS;
         this.pairs = PAIRS;
         this.printPage = usePrintPageSize("A4 portrait", "10mm");
@@ -50,6 +53,8 @@ export class TaxReturn extends Component {
             monthFrom: 1,
             monthTo: 2,
             data: null,
+            sheet: null,       // جداول الكشف القابلة للتحرير
+            busy: false,
         });
         onWillStart(async () => {
             const [years, latest] = await Promise.all([
@@ -74,16 +79,101 @@ export class TaxReturn extends Component {
         return this.state.monthTo < this.state.monthFrom ? year + 1 : year;
     }
 
+    get period() {
+        return [parseInt(this.state.year, 10), this.state.monthFrom,
+                this.yearTo, this.state.monthTo];
+    }
+
     async load() {
         this.state.loading = true;
         try {
-            this.state.data = await this.orm.call("myaccounting.tax.return", "get_return", [
-                parseInt(this.state.year, 10), this.state.monthFrom,
-                this.yearTo, this.state.monthTo,
+            const [data, sheet] = await Promise.all([
+                this.orm.call("myaccounting.tax.return", "get_return", this.period),
+                this.orm.call("myaccounting.tax.sheet", "get_sheet", this.period),
             ]);
+            this.state.data = data;
+            this.state.sheet = sheet;
         } finally {
             this.state.loading = false;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // جداول الكشف
+    // ------------------------------------------------------------------
+
+    get sheet() {
+        return this.state.sheet;
+    }
+
+    rowsOf(key) {
+        return this.state.sheet ? this.state.sheet.rows[key] : [];
+    }
+
+    totalOf(key, field) {
+        return this.state.sheet ? this.state.sheet.totals[key][field] : 0;
+    }
+
+    isPurchase(key) {
+        return key.startsWith("purchase");
+    }
+
+    /** المستحق من مجاميع الجداول: مبيعات ناقص مرتجعاتها ناقص صافي المشتريات */
+    get sheetDue() {
+        const net = (key) => this.totalOf(key, "tax");
+        return Math.round((net("sale") - net("sale_return")
+            - (net("purchase") - net("purchase_return"))) * 1000) / 1000;
+    }
+
+    async build(keepEdits) {
+        if (this.state.busy) {
+            return;
+        }
+        this.state.busy = true;
+        try {
+            const result = await this.orm.call("myaccounting.tax.sheet", "build_sheet",
+                [...this.period, keepEdits]);
+            this.state.sheet = result;
+            this.notification.add(
+                result.added ? `أُضيف ${result.added} سطراً من القيود.`
+                             : "لا جديد في القيود لم يُسجَّل بعد.",
+                { type: result.added ? "success" : "info" });
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر البناء.", { type: "danger" });
+        } finally {
+            this.state.busy = false;
+        }
+    }
+
+    rebuild() {
+        this.dialog.add(ConfirmationDialog, {
+            title: "إعادة بناء الكشف",
+            body: "سيُمسح كل ما في الجداول ويُبنى من جديد من القيود، "
+                + "بما في ذلك ما كتبته بيدك (الأرقام الضريبية والصفوف المضافة).",
+            confirmLabel: "أعد البناء",
+            confirm: () => this.build(false),
+            cancel: () => {},
+        });
+    }
+
+    async saveCell(row, field, ev) {
+        const value = field === "amount" || field === "tax"
+            ? parseFloat(ev.target.value) || 0
+            : ev.target.value;
+        if (String(row[field]) === String(value)) {
+            return;
+        }
+        this.state.sheet = await this.orm.call("myaccounting.tax.sheet", "save_row",
+            [row.id, { [field]: value }]);
+    }
+
+    async addRow(key) {
+        this.state.sheet = await this.orm.call("myaccounting.tax.sheet", "add_row",
+            [this.state.sheet.id, key]);
+    }
+
+    async deleteRow(row) {
+        this.state.sheet = await this.orm.call("myaccounting.tax.sheet", "delete_row", [row.id]);
     }
 
     get data() {

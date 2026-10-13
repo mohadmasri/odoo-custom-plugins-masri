@@ -23,3 +23,7 @@ access_myaccounting_block_field_view,myaccounting.block.field.view,model_myaccou
 access_myaccounting_block_field_edit,myaccounting.block.field.edit,model_myaccounting_block_field,group_myaccounting_edit,1,1,1,1
 access_myaccounting_block_line_view,myaccounting.block.line.view,model_myaccounting_block_line,group_myaccounting_view,1,0,0,0
 access_myaccounting_block_line_edit,myaccounting.block.line.edit,model_myaccounting_block_line,group_myaccounting_edit,1,1,1,1
+access_myaccounting_tax_sheet_view,myaccounting.tax.sheet.view,model_myaccounting_tax_sheet,group_myaccounting_view,1,0,0,0
+access_myaccounting_tax_sheet_edit,myaccounting.tax.sheet.edit,model_myaccounting_tax_sheet,group_myaccounting_edit,1,1,1,1
+access_myaccounting_tax_sheet_row_view,myaccounting.tax.sheet.row.view,model_myaccounting_tax_sheet_row,group_myaccounting_view,1,0,0,0
+access_myaccounting_tax_sheet_row_edit,myaccounting.tax.sheet.row.edit,model_myaccounting_tax_sheet_row,group_myaccounting_edit,1,1,1,1

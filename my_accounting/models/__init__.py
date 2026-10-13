@@ -9,6 +9,7 @@ from . import print_index
 from . import move_block
 from . import block
 from . import tax_return
+from . import tax_sheet
 from . import photo_entry
 from . import account_move
 from . import backup

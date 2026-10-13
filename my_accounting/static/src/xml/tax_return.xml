@@ -68,70 +68,139 @@
                     </div>
                 </div>
 
-                <!-- الخلاصة أولاً، والتفاصيل تحتها -->
-                <table class="table table-bordered table-sm o_tr_summary">
+                <!-- جداول الإقرار: تُبنى من القيود ثم تُحرَّر -->
+                <div class="o_tr_sheet_bar">
+                    <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
+                            t-on-click="() => this.build(true)">
+                        <i class="fa fa-refresh me-1"/> أضف ما استجدّ من القيود
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" t-att-disabled="state.busy"
+                            t-on-click="() => this.rebuild()">إعادة بناء الكشف</button>
+                    <span class="small text-muted">
+                        الجداول لك: عدّل أي خانة، وأضف صفوفاً أو احذفها.
+                    </span>
+                </div>
+
+                <div t-foreach="sheet.tables" t-as="table" t-key="table.key" class="o_tr_sheet">
+                    <h4 class="o_tr_section_title"><t t-esc="table.label"/></h4>
+                    <table class="table table-bordered table-sm o_tr_table">
+                        <thead>
+                            <tr>
+                                <th style="width:34px;"/>
+                                <th t-if="isPurchase(table.key)" style="width:120px;">الرقم الضريبي</th>
+                                <th style="width:110px;">
+                                    <t t-if="isPurchase(table.key)">رقم الفاتورة</t>
+                                    <t t-else="">رقم السند</t>
+                                </th>
+                                <th t-if="!isPurchase(table.key)" style="width:90px;">نوعه</th>
+                                <th style="width:125px;">التاريخ</th>
+                                <!-- البيان يأخذ ما بقي من عرض الجدول -->
+                                <th style="width:100%; min-width:220px;">البيان</th>
+                                <th class="text-end" style="width:120px;">القيمة</th>
+                                <th class="text-end" style="width:110px;">الضريبة</th>
+                                <th t-if="isPurchase(table.key)" style="width:100px;">سند القيد</th>
+                                <th style="width:34px;"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="rowsOf(table.key)" t-as="row" t-key="row.id">
+                                <td class="o_tr_mark">
+                                    <sup t-if="row.marks.length" class="text-danger"
+                                         t-att-title="'له مرتجع بالمستند ' + row.marks.join('، ')">
+                                        *<t t-esc="row.marks.join(',')"/>
+                                    </sup>
+                                    <sup t-if="row.return_of" class="text-muted"
+                                         t-att-title="'مرتجع عن المستند ' + row.return_of">
+                                        ←<t t-esc="row.return_of"/>
+                                    </sup>
+                                </td>
+                                <td t-if="isPurchase(table.key)">
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="row.tax_number"
+                                           t-on-change="(ev) => this.saveCell(row, 'tax_number', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="row.doc_number"
+                                           t-on-change="(ev) => this.saveCell(row, 'doc_number', ev)"/>
+                                </td>
+                                <td t-if="!isPurchase(table.key)">
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="row.doc_type"
+                                           t-on-change="(ev) => this.saveCell(row, 'doc_type', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="date" class="form-control form-control-sm"
+                                           t-att-value="row.date"
+                                           t-on-change="(ev) => this.saveCell(row, 'date', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="row.label"
+                                           t-on-change="(ev) => this.saveCell(row, 'label', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.001"
+                                           class="form-control form-control-sm text-end"
+                                           t-att-value="row.amount"
+                                           t-on-change="(ev) => this.saveCell(row, 'amount', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.001"
+                                           class="form-control form-control-sm text-end"
+                                           t-att-value="row.tax"
+                                           t-on-change="(ev) => this.saveCell(row, 'tax', ev)"/>
+                                </td>
+                                <td t-if="isPurchase(table.key)">
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="row.move_name"
+                                           t-on-change="(ev) => this.saveCell(row, 'move_name', ev)"/>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0" title="حذف السطر"
+                                            t-on-click="() => this.deleteRow(row)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr t-if="!rowsOf(table.key).length">
+                                <td colspan="9" class="text-muted text-center py-2">لا صفوف</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="5" class="text-end">المجموع</td>
+                                <td class="text-end" t-esc="fmt(totalOf(table.key, 'amount'))"/>
+                                <td class="text-end" t-esc="fmt(totalOf(table.key, 'tax'))"/>
+                                <td t-if="isPurchase(table.key)"/>
+                                <td/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <button class="btn btn-sm btn-outline-secondary no-print"
+                            t-on-click="() => this.addRow(table.key)">
+                        <i class="fa fa-plus me-1"/> صف
+                    </button>
+                </div>
+
+                <table class="table table-bordered table-sm o_tr_summary mt-4">
                     <tbody>
                         <tr>
-                            <td>المبيعات الخاضعة (بعد المرتجعات)</td>
-                            <td class="text-end" t-esc="fmt(totals.taxable_base)"/>
+                            <td>ضريبة المبيعات (بعد المرتجعات)</td>
+                            <td class="text-end"
+                                t-esc="fmt(totalOf('sale', 'tax') - totalOf('sale_return', 'tax'))"/>
                         </tr>
                         <tr>
-                            <td>المبيعات المعفاة</td>
-                            <td class="text-end" t-esc="fmt(totals.exempt_base)"/>
-                        </tr>
-                        <tr>
-                            <td>ضريبة المبيعات</td>
-                            <td class="text-end" t-esc="fmt(totals.output)"/>
-                        </tr>
-                        <tr>
-                            <td>ناقص: ضريبة مرتجعات المبيعات</td>
-                            <td class="text-end" t-esc="'(' + fmt(totals.returns) + ')'"/>
-                        </tr>
-                        <tr class="o_tr_subtotal">
-                            <td>صافي ضريبة المبيعات</td>
-                            <td class="text-end" t-esc="fmt(totals.net_output)"/>
-                        </tr>
-                        <tr>
-                            <td>ناقص: ضريبة المشتريات</td>
-                            <td class="text-end" t-esc="'(' + fmt(totals.input) + ')'"/>
+                            <td>ناقص: ضريبة المشتريات (بعد المرتجعات)</td>
+                            <td class="text-end"
+                                t-esc="'(' + fmt(totalOf('purchase', 'tax') - totalOf('purchase_return', 'tax')) + ')'"/>
                         </tr>
                         <tr class="o_tr_due">
                             <td>المستحق للفترة</td>
-                            <td class="text-end" t-esc="fmt(totals.due)"/>
+                            <td class="text-end" t-esc="fmt(sheetDue)"/>
                         </tr>
                     </tbody>
                 </table>
-
-                <div t-foreach="data.warnings" t-as="warning" t-key="warning_index"
-                     class="alert alert-warning py-1 px-2 small" t-esc="warning"/>
-
-                <!-- التفاصيل -->
-                <t t-call="my_accounting.TaxReturnSection">
-                    <t t-set="title" t-value="'المبيعات الخاضعة'"/>
-                    <t t-set="rows" t-value="data.sales"/>
-                    <t t-set="withBase" t-value="true"/>
-                </t>
-                <t t-call="my_accounting.TaxReturnSection">
-                    <t t-set="title" t-value="'مرتجعات المبيعات الخاضعة'"/>
-                    <t t-set="rows" t-value="data.sale_returns"/>
-                    <t t-set="withBase" t-value="true"/>
-                </t>
-                <t t-call="my_accounting.TaxReturnSection">
-                    <t t-set="title" t-value="'المبيعات المعفاة (بلا ضريبة)'"/>
-                    <t t-set="rows" t-value="data.exempt"/>
-                    <t t-set="withBase" t-value="true"/>
-                    <t t-set="hideTax" t-value="true"/>
-                </t>
-                <t t-call="my_accounting.TaxReturnSection">
-                    <t t-set="title" t-value="'ضريبة المشتريات'"/>
-                    <t t-set="rows" t-value="data.inputs"/>
-                    <t t-set="withBase" t-value="true"/>
-                </t>
-                <t t-call="my_accounting.TaxReturnSection">
-                    <t t-set="title" t-value="'مستبعد من الحساب'"/>
-                    <t t-set="rows" t-value="data.excluded"/>
-                    <t t-set="withReason" t-value="true"/>
-                </t>
             </t>
         </div>
     </t>
