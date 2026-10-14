@@ -207,14 +207,42 @@
     align-items: center;
 }
 
+/* زر مميّز عن بقية أيقونات الشريط: كبسولة بخلفية شفافة ونص */
 .o_qs_systray_btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 4px;
+    padding: 2px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.15);
     color: inherit;
-    opacity: 0.9;
-    padding: 0 8px;
+    font-size: 0.85rem;
+    line-height: 1.6;
 }
 
-.o_qs_systray_btn:hover {
-    opacity: 1;
+.o_qs_systray_btn:hover,
+.o_qs_systray_btn.o_qs_on {
+    background: rgba(255, 255, 255, 0.28);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: inherit;
+}
+
+.o_qs_systray_kbd {
+    padding: 0 5px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    font-size: 0.68rem;
+    opacity: 0.8;
+}
+
+/* الشاشات الضيّقة: الأيقونة وحدها */
+@media (max-width: 767px) {
+    .o_qs_systray_text,
+    .o_qs_systray_kbd {
+        display: none;
+    }
 }
 
 .o_qs_systray_panel {

@@ -50,9 +50,11 @@
 
     <t t-name="my_accounting.SearchSystray">
         <div class="o_qs_systray" t-ref="root">
-            <button type="button" class="btn o_qs_systray_btn"
-                    title="بحث (Ctrl+K)" t-on-click="() => this.toggle()">
+            <button type="button" t-attf-class="btn o_qs_systray_btn {{ state.open ? 'o_qs_on' : '' }}"
+                    title="بحث في كل شيء (Ctrl+K)" t-on-click="() => this.toggle()">
                 <i class="fa fa-search"/>
+                <span class="o_qs_systray_text">بحث</span>
+                <span class="o_qs_systray_kbd">Ctrl K</span>
             </button>
             <div t-if="state.open" class="o_qs_systray_panel">
                 <QuickSearch autofocus="true"
