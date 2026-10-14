@@ -48,6 +48,19 @@
         </div>
     </t>
 
+    <t t-name="my_accounting.SearchSystray">
+        <div class="o_qs_systray" t-ref="root">
+            <button type="button" class="btn o_qs_systray_btn"
+                    title="بحث (Ctrl+K)" t-on-click="() => this.toggle()">
+                <i class="fa fa-search"/>
+            </button>
+            <div t-if="state.open" class="o_qs_systray_panel">
+                <QuickSearch autofocus="true"
+                             onNavigate="() => { state.open = false; }"/>
+            </div>
+        </div>
+    </t>
+
     <t t-name="my_accounting.SearchPage">
         <div class="o_search_page p-4">
             <h2 class="mb-3">البحث</h2>

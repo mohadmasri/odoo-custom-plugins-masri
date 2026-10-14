@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useExternalListener, useRef, useState } from "@odoo/owl";
+import { Component, onMounted, onWillStart, useExternalListener, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { openRecord } from "./open_record";
@@ -19,6 +19,7 @@ export class QuickSearch extends Component {
         autofocus: { type: Boolean, optional: true },
         initialQuery: { type: String, optional: true },
         onSubmit: { type: Function, optional: true },
+        onNavigate: { type: Function, optional: true },
     };
 
     setup() {
@@ -35,6 +36,12 @@ export class QuickSearch extends Component {
             active: -1,       // السهم لأعلى/أسفل
         });
         this.timer = null;
+        // صفة autofocus لا تعمل على عنصر يُضاف بعد تحميل الصفحة
+        onMounted(() => {
+            if (this.props.autofocus && this.inputRef.el) {
+                this.inputRef.el.focus();
+            }
+        });
         // الضغط خارج الشريط يغلق القائمة
         useExternalListener(window, "mousedown", (ev) => {
             if (this.rootRef.el && !this.rootRef.el.contains(ev.target)) {
@@ -126,6 +133,9 @@ export class QuickSearch extends Component {
     openItem(item, isMiddleClick) {
         this.state.open = false;
         openRecord(this.action, item.model, item.id, isMiddleClick);
+        if (!isMiddleClick && this.props.onNavigate) {
+            this.props.onNavigate();
+        }
     }
 
     openPage() {
@@ -141,6 +151,9 @@ export class QuickSearch extends Component {
         this.action.doAction("my_accounting.action_myaccounting_search", {
             additionalContext: { search_query: query },
         });
+        if (this.props.onNavigate) {
+            this.props.onNavigate();
+        }
     }
 
     clear() {
@@ -296,3 +309,42 @@ export class SearchPage extends Component {
 }
 
 registry.category("actions").add("my_accounting.search_page", SearchPage);
+
+/**
+ * أيقونة البحث في الشريط العلوي: تفتح الشريط نفسه في لوحة صغيرة،
+ * فيُبحث من أي صفحة بلا العودة إلى الرئيسية. Ctrl+K يفتحها أيضاً.
+ */
+export class SearchSystray extends Component {
+    static template = "my_accounting.SearchSystray";
+    static components = { QuickSearch };
+    static props = {};
+
+    setup() {
+        this.state = useState({ open: false });
+        this.rootRef = useRef("root");
+        useExternalListener(window, "mousedown", (ev) => {
+            if (this.state.open && this.rootRef.el && !this.rootRef.el.contains(ev.target)) {
+                this.state.open = false;
+            }
+        });
+        useExternalListener(window, "keydown", (ev) => {
+            if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+                ev.preventDefault();
+                this.state.open = true;
+            } else if (ev.key === "Escape" && this.state.open) {
+                this.state.open = false;
+            }
+        });
+    }
+
+    toggle() {
+        this.state.open = !this.state.open;
+    }
+}
+
+registry.category("systray").add(
+    "my_accounting.search",
+    { Component: SearchSystray },
+    { sequence: 24 }
+);
+

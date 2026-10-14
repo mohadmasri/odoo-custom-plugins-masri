@@ -199,3 +199,33 @@
     color: var(--gray-600, #6c757d);
     margin-inline-start: 6px;
 }
+
+/* أيقونة البحث في الشريط العلوي */
+.o_qs_systray {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.o_qs_systray_btn {
+    color: inherit;
+    opacity: 0.9;
+    padding: 0 8px;
+}
+
+.o_qs_systray_btn:hover {
+    opacity: 1;
+}
+
+.o_qs_systray_panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    inset-inline-end: 0;
+    width: min(92vw, 520px);
+    z-index: 1060;
+}
+
+/* داخل اللوحة لا حدّ لعرض الشريط */
+.o_qs_systray_panel .o_qs {
+    max-width: none;
+}
