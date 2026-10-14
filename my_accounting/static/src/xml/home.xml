@@ -13,8 +13,9 @@
 
     <t t-name="my_accounting.Home">
         <div class="o_myaccounting_home p-4" style="overflow:auto; height:100%;">
-            <div class="mb-4">
+            <div class="o_home_head">
                 <h2 class="m-0">المحاسبة المخصصة</h2>
+                <QuickSearch/>
             </div>
 
             <!-- التخطيط مطابق للنموذج: بطاقات التنقل يساراً، قائمة التذكير يميناً،

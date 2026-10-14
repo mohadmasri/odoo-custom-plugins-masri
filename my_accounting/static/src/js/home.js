@@ -4,11 +4,12 @@ import { Component, onWillStart, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { HomeReports } from "./reports";
+import { QuickSearch } from "./quick_search";
 
 export class MyAccountingHome extends Component {
     static template = "my_accounting.Home";
     static props = ["*"];
-    static components = { HomeReports };
+    static components = { HomeReports, QuickSearch };
 
     setup() {
         this.actionService = useService("action");

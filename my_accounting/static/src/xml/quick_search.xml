@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.QuickSearch">
+        <div class="o_qs" t-ref="root">
+            <div class="o_qs_box">
+                <i class="fa fa-search o_qs_icon"/>
+                <input type="text" class="o_qs_input" t-ref="input" autocomplete="off"
+                       t-att-autofocus="props.autofocus"
+                       t-att-placeholder="props.placeholder or 'ابحث عن قيد أو حساب أو مبلغ أو أي بيان...'"
+                       t-att-value="state.query"
+                       t-on-input="(ev) => this.onInput(ev)"
+                       t-on-focus="() => this.onFocus()"
+                       t-on-keydown="(ev) => this.onKeydown(ev)"/>
+                <i t-if="state.loading" class="fa fa-circle-o-notch fa-spin o_qs_spin"/>
+                <button t-elif="state.query" type="button" class="o_qs_clear" title="مسح"
+                        t-on-click="() => this.clear()">×</button>
+            </div>
+
+            <div t-if="state.open" class="o_qs_menu">
+                <t t-if="state.groups.length">
+                    <div t-foreach="state.groups" t-as="group" t-key="group.label" class="o_qs_group">
+                        <div class="o_qs_group_label" t-esc="group.label"/>
+                        <div t-foreach="group.items" t-as="item" t-key="item.kind + '-' + item.id + '-' + item_index"
+                             t-attf-class="o_qs_item {{ isActive(item) ? 'o_qs_active' : '' }}"
+                             t-custom-click="(ev, mid) => this.openItem(item, mid)">
+                            <i t-attf-class="fa {{ item.icon }} o_qs_item_icon"/>
+                            <div class="o_qs_item_text">
+                                <div class="o_qs_item_title">
+                                    <t t-esc="item.title"/>
+                                    <span class="o_qs_kind" t-esc="item.kind_label"/>
+                                </div>
+                                <div t-if="item.subtitle or item.extra" class="o_qs_item_sub">
+                                    <t t-esc="item.subtitle"/>
+                                    <span t-if="item.extra" class="o_qs_dot">·</span>
+                                    <t t-esc="item.extra"/>
+                                </div>
+                            </div>
+                            <div t-if="item.amount" class="o_qs_item_amount" t-esc="fmt(item.amount)"/>
+                        </div>
+                    </div>
+                    <div class="o_qs_more" t-on-click="() => this.openPage()">
+                        المزيد من النتائج (<t t-esc="state.total"/>) — أو اضغط Enter
+                    </div>
+                </t>
+                <div t-else="" class="o_qs_empty">لا نتائج لـ "<t t-esc="state.query"/>"</div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="my_accounting.SearchPage">
+        <div class="o_search_page p-4">
+            <h2 class="mb-3">البحث</h2>
+            <QuickSearch autofocus="true" initialQuery="state.query"
+                         onSubmit="(query) => this.onSubmit(query)"/>
+
+            <div t-if="state.loading" class="text-muted py-4">يبحث...</div>
+            <t t-elif="state.query">
+                <div class="small text-muted my-3">
+                    <t t-esc="state.total"/> نتيجة لـ "<t t-esc="state.query"/>"
+                </div>
+                <div t-foreach="state.groups" t-as="group" t-key="group.label" class="o_sp_group">
+                    <h4 class="o_sp_group_label" t-esc="group.label"/>
+                    <div t-foreach="group.items" t-as="item" t-key="item.kind + '-' + item.id + '-' + item_index"
+                         class="o_qs_item"
+                         t-custom-click="(ev, mid) => this.openItem(item, mid)">
+                        <i t-attf-class="fa {{ item.icon }} o_qs_item_icon"/>
+                        <div class="o_qs_item_text">
+                            <div class="o_qs_item_title">
+                                <t t-esc="item.title"/>
+                                <span class="o_qs_kind" t-esc="item.kind_label"/>
+                            </div>
+                            <div t-if="item.subtitle or item.extra" class="o_qs_item_sub">
+                                <t t-esc="item.subtitle"/>
+                                <span t-if="item.extra" class="o_qs_dot">·</span>
+                                <t t-esc="item.extra"/>
+                            </div>
+                        </div>
+                        <div t-if="item.amount" class="o_qs_item_amount" t-esc="fmt(item.amount)"/>
+                    </div>
+                </div>
+                <div t-if="!state.groups.length" class="text-muted py-4">لا نتائج.</div>
+            </t>
+        </div>
+    </t>
+
+</templates>
