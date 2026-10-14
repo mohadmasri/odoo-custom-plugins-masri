@@ -1,0 +1,11 @@
+/* الشريط العلوي: ما لا يُستعمل هنا */
+
+/* عنوان التطبيق "المحاسبة المخصصة" — زر الصفحة الرئيسية يغني عنه */
+.o_main_navbar .o_menu_brand {
+    display: none !important;
+}
+
+/* اسم الشركة بجانب حساب المستخدم — شركة واحدة فلا حاجة لتبديلها */
+.o_menu_systray .o_switch_company_menu {
+    display: none !important;
+}

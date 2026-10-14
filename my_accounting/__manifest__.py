@@ -55,6 +55,8 @@
             'my_accounting/static/src/js/move_list.js',
             'my_accounting/static/src/xml/move_list.xml',
             'my_accounting/static/src/js/move_form.js',
+            'my_accounting/static/src/js/navbar_trim.js',
+            'my_accounting/static/src/css/navbar_trim.css',
             'my_accounting/static/src/js/quick_search.js',
             'my_accounting/static/src/xml/quick_search.xml',
             'my_accounting/static/src/css/quick_search.css',
