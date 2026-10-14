@@ -79,12 +79,74 @@ class MyAccountingSearch(models.AbstractModel):
                     best = min(best, 2)
         return best
 
+
+    # ------------------------------------------------------------------
+    # الفلاتر: تُطبَّق فوق النص لا بدلاً منه
     # ------------------------------------------------------------------
 
     @api.model
-    def _move_items(self, tokens, limit):
+    def search_options(self):
+        """خيارات الفلاتر الجاهزة للواجهة."""
+        Move = self.env['myaccounting.move']
+        accounts = self.env['myaccounting.account'].search([], order='code_path')
+        return {
+            'years': Move.get_ledger_years(),
+            'journals': self.env['myaccounting.journal'].get_journal_names(),
+            'states': [('posted', 'مرحّل'), ('draft', 'مسودة'), ('incomplete', 'غير مكتمل')],
+            'kinds': [('moves', 'القيود والسندات'), ('accounts', 'الحسابات'),
+                      ('lines', 'بنود القيود')],
+            'accounts': [{'id': acc.id, 'label': f'{acc.code} - {acc.name}' if acc.code
+                          else acc.name} for acc in accounts],
+        }
+
+    @api.model
+    def _amount_bounds(self, filters):
+        def number(key):
+            value = filters.get(key)
+            if value in (None, '', False):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+        return number('amount_min'), number('amount_max')
+
+    @api.model
+    def _move_filter_domain(self, filters, prefix=''):
+        """شروط الفلاتر على القيد. prefix للوصول إليه من البند."""
+        domain = []
+        if filters.get('year'):
+            domain.append((prefix + 'ledger_year', '=', int(filters['year'])))
+        if filters.get('month'):
+            domain.append((prefix + 'ledger_month', '=', str(filters['month'])))
+        if filters.get('states'):
+            domain.append((prefix + 'state', 'in', list(filters['states'])))
+        if filters.get('journal'):
+            domain.append((prefix + 'journal', 'ilike', filters['journal']))
+        return domain
+
+    @api.model
+    def _has_record_filters(self, filters):
+        """فلاتر لا معنى لها على الحسابات، فوجودها يُخرج مجموعة الحسابات."""
+        low, high = self._amount_bounds(filters)
+        return bool(filters.get('year') or filters.get('month') or filters.get('states')
+                    or filters.get('journal') or filters.get('account_id')
+                    or low is not None or high is not None)
+
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _move_items(self, tokens, limit, filters):
         Move = self.env['myaccounting.move']
         domain = tokens_domain(tokens, ['name', 'ref', 'journal'])
+        domain += self._move_filter_domain(filters)
+        if filters.get('account_id'):
+            domain.append(('line_ids.account_id', 'child_of', int(filters['account_id'])))
+        low, high = self._amount_bounds(filters)
+        if low is not None:
+            domain.append(('total_debit', '>=', low))
+        if high is not None:
+            domain.append(('total_debit', '<=', high))
         moves = Move.search(domain, limit=limit * 4, order='sort_key desc')
         items = []
         for move in moves:
@@ -104,10 +166,12 @@ class MyAccountingSearch(models.AbstractModel):
         return items
 
     @api.model
-    def _account_items(self, tokens, limit):
+    def _account_items(self, tokens, limit, filters):
         Account = self.env['myaccounting.account']
-        accounts = Account.search(tokens_domain(tokens, ['code', 'name']),
-                                  limit=limit * 4, order='code_path')
+        domain = tokens_domain(tokens, ['code', 'name'])
+        if filters.get('account_id'):
+            domain.append(('id', 'child_of', int(filters['account_id'])))
+        accounts = Account.search(domain, limit=limit * 4, order='code_path')
         return [{
             'kind': 'account',
             'kind_label': 'حساب',
@@ -122,7 +186,7 @@ class MyAccountingSearch(models.AbstractModel):
         } for account in accounts]
 
     @api.model
-    def _line_items(self, tokens, limit, query):
+    def _line_items(self, tokens, limit, query, filters):
         """بنود القيود: يُفتح قيدها، فالبند وحده لا معنى له."""
         Line = self.env['myaccounting.move.line']
         domain = tokens_domain(tokens, ['name'])
@@ -131,10 +195,18 @@ class MyAccountingSearch(models.AbstractModel):
             # رقم مجرّد: نبحث عنه مبلغاً أيضاً، لا نصّاً فقط
             value = float(amount)
             domain = ['|', '|', ('debit', '=', value), ('credit', '=', value)] + domain
-        lines = Line.search(domain, limit=limit * 5, order='move_sort_key desc, id desc')
+        domain += self._move_filter_domain(filters, prefix='move_id.')
+        if filters.get('account_id'):
+            domain.append(('account_id', 'child_of', int(filters['account_id'])))
+        low, high = self._amount_bounds(filters)
+        lines = Line.search(domain, limit=limit * 8, order='move_sort_key desc, id desc')
         items = []
         seen = set()
         for line in lines:
+            # مبلغ البند هو المدين أو الدائن أيّهما كُتب
+            value = line.debit or line.credit
+            if (low is not None and value < low) or (high is not None and value > high):
+                continue
             key = (line.move_id.id, (line.name or '').strip())
             if key in seen:
                 continue
@@ -156,20 +228,34 @@ class MyAccountingSearch(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def search_all(self, query, limit=6):
-        """نتائج مجمّعة حسب النوع، لكل نوع أهمّ نتائجه."""
+    def search_all(self, query, limit=6, filters=None):
+        """نتائج مجمّعة حسب النوع، لكل نوع أهمّ نتائجه.
+
+        الفلاتر تضيق النتائج فوق النص. ومع وجود فلتر واحد على الأقل
+        يجوز أن يكون النص فارغاً، فيصير البحث تصفّحاً بالفلاتر.
+        """
+        filters = filters or {}
         query = (query or '').strip()
         tokens = split_tokens(query)
-        if not tokens or len(query) < 2:
+        has_filters = self._has_record_filters(filters)
+        if (not tokens or len(query) < 2) and not has_filters:
             return {'query': query, 'groups': [], 'total': 0}
         limit = max(1, int(limit))
+        kinds = list(filters.get('kinds') or ['moves', 'accounts', 'lines'])
         groups = []
         total = 0
-        for label, items in (
-            ('القيود والسندات', self._move_items(tokens, limit)),
-            ('الحسابات', self._account_items(tokens, limit)),
-            ('بنود القيود', self._line_items(tokens, limit, query)),
-        ):
+        sources = []
+        if 'moves' in kinds:
+            sources.append(('القيود والسندات', self._move_items(tokens, limit, filters)))
+        # الحسابات لا فترة لها ولا حالة، فتُخفى متى ضُيّق البحث بما لا يخصّها
+        if 'accounts' in kinds and not has_filters:
+            sources.append(('الحسابات', self._account_items(tokens, limit, filters)))
+        elif 'accounts' in kinds and filters.get('account_id') and not any(
+                filters.get(key) for key in ('year', 'month', 'states', 'journal')):
+            sources.append(('الحسابات', self._account_items(tokens, limit, filters)))
+        if 'lines' in kinds:
+            sources.append(('بنود القيود', self._line_items(tokens, limit, query, filters)))
+        for label, items in sources:
             items.sort(key=lambda item: (item['rank'], item['title']))
             total += len(items)
             if items:

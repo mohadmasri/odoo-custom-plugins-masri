@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useExternalListener, useRef, useState } from "@odoo/owl";
+import { Component, onWillStart, useExternalListener, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { openRecord } from "./open_record";
@@ -172,29 +172,115 @@ export class SearchPage extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
-        this.state = useState({ query: "", groups: [], total: 0, loading: false });
+        this.months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        this.state = useState({
+            query: "", groups: [], total: 0, loading: false,
+            options: { years: [], journals: [], states: [], kinds: [], accounts: [] },
+            filters: {
+                kinds: [], year: "", month: "", states: [], journal: "",
+                account_id: false, amount_min: "", amount_max: "",
+            },
+        });
         const context = (this.props.action && this.props.action.context) || {};
-        const query = context.search_query || "";
-        if (query) {
-            this.state.query = query;
-            this.search(query);
-        }
+        this.state.query = context.search_query || "";
+        onWillStart(async () => {
+            this.state.options = await this.orm.call(
+                "myaccounting.search", "search_options", []);
+            if (this.state.query) {
+                await this.search();
+            }
+        });
     }
 
     onSubmit(query) {
         this.state.query = query;
-        this.search(query);
+        this.search();
     }
 
-    async search(query) {
+    get filters() {
+        return this.state.filters;
+    }
+
+    /** هل ضُيّق البحث بفلتر؟ يسمح بالبحث بلا نص */
+    get hasFilters() {
+        const f = this.state.filters;
+        return !!(f.year || f.month || f.states.length || f.journal || f.account_id
+            || f.amount_min !== "" || f.amount_max !== "");
+    }
+
+    get activeCount() {
+        const f = this.state.filters;
+        return [f.year, f.month, f.journal, f.account_id,
+                f.amount_min !== "" ? 1 : "", f.amount_max !== "" ? 1 : ""]
+            .filter(Boolean).length + f.states.length + f.kinds.length;
+    }
+
+    async search() {
+        const query = (this.state.query || "").trim();
+        if (query.length < 2 && !this.hasFilters) {
+            this.state.groups = [];
+            this.state.total = 0;
+            return;
+        }
         this.state.loading = true;
         try {
-            const data = await this.orm.call("myaccounting.search", "search_all", [query, 50]);
+            const data = await this.orm.call("myaccounting.search", "search_all",
+                [query, 50, { ...this.state.filters }]);
             this.state.groups = data.groups;
             this.state.total = data.total;
         } finally {
             this.state.loading = false;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // الفلاتر: كل تغيير يعيد البحث فوراً
+    // ------------------------------------------------------------------
+
+    toggleIn(list, value) {
+        const current = this.state.filters[list];
+        this.state.filters[list] = current.includes(value)
+            ? current.filter((item) => item !== value)
+            : current.concat([value]);
+        this.search();
+    }
+
+    isOn(list, value) {
+        return this.state.filters[list].includes(value);
+    }
+
+    setFilter(key, value) {
+        this.state.filters[key] = value;
+        this.search();
+    }
+
+    onFilterInput(key, ev) {
+        this.setFilter(key, ev.target.value);
+    }
+
+    onAccountInput(ev) {
+        const account = this.state.options.accounts.find(
+            (item) => item.label === ev.target.value);
+        this.setFilter("account_id", account ? account.id : false);
+    }
+
+    /** مقارنة نصية بين قيمة الفلتر والخيار (القوالب لا تعرف String) */
+    isSame(value, option) {
+        return `${value}` === `${option}`;
+    }
+
+    accountLabel() {
+        const account = this.state.options.accounts.find(
+            (item) => item.id === this.state.filters.account_id);
+        return account ? account.label : "";
+    }
+
+    clearFilters() {
+        this.state.filters = {
+            kinds: [], year: "", month: "", states: [], journal: "",
+            account_id: false, amount_min: "", amount_max: "",
+        };
+        this.search();
     }
 
     openItem(item, isMiddleClick) {

@@ -173,3 +173,29 @@
     gap: 16px;
     margin-bottom: 1.5rem;
 }
+
+/* فلاتر صفحة البحث */
+.o_sp_filters {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 10px;
+    background: var(--o-surface, #fff);
+}
+
+.o_sp_filter_row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.o_sp_filter_row + .o_sp_filter_row {
+    margin-top: 8px;
+}
+
+.o_sp_filter_label {
+    font-size: 0.8rem;
+    color: var(--gray-600, #6c757d);
+    margin-inline-start: 6px;
+}

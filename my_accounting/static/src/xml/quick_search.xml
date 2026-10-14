@@ -54,10 +54,84 @@
             <QuickSearch autofocus="true" initialQuery="state.query"
                          onSubmit="(query) => this.onSubmit(query)"/>
 
+            <!-- الفلاتر تُطبَّق فوق النص، والصفحة تتحدّث مع كل تغيير -->
+            <div class="o_sp_filters">
+                <div class="o_sp_filter_row">
+                    <span class="o_sp_filter_label">النوع</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button t-foreach="state.options.kinds" t-as="kind" t-key="kind[0]"
+                                type="button"
+                                t-attf-class="btn {{ isOn('kinds', kind[0]) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.toggleIn('kinds', kind[0])"
+                                t-esc="kind[1]"/>
+                    </div>
+                    <span class="o_sp_filter_label">الحالة</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button t-foreach="state.options.states" t-as="st" t-key="st[0]"
+                                type="button"
+                                t-attf-class="btn {{ isOn('states', st[0]) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.toggleIn('states', st[0])"
+                                t-esc="st[1]"/>
+                    </div>
+                </div>
+
+                <div class="o_sp_filter_row">
+                    <span class="o_sp_filter_label">السنة</span>
+                    <select class="form-select form-select-sm" style="width:100px;"
+                            t-on-change="(ev) => this.onFilterInput('year', ev)">
+                        <option value="">الكل</option>
+                        <option t-foreach="state.options.years" t-as="y" t-key="y"
+                                t-att-value="y" t-att-selected="isSame(filters.year, y)"
+                                t-esc="y"/>
+                    </select>
+                    <span class="o_sp_filter_label">الشهر</span>
+                    <select class="form-select form-select-sm" style="width:90px;"
+                            t-on-change="(ev) => this.onFilterInput('month', ev)">
+                        <option value="">الكل</option>
+                        <option t-foreach="months" t-as="m" t-key="m"
+                                t-att-value="m" t-att-selected="isSame(filters.month, m)"
+                                t-esc="m"/>
+                    </select>
+                    <span class="o_sp_filter_label">اليومية</span>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onFilterInput('journal', ev)">
+                        <option value="">الكل</option>
+                        <option t-foreach="state.options.journals" t-as="j" t-key="j"
+                                t-att-value="j" t-att-selected="filters.journal === j" t-esc="j"/>
+                    </select>
+                </div>
+
+                <div class="o_sp_filter_row">
+                    <span class="o_sp_filter_label">الحساب</span>
+                    <input type="text" class="form-control form-control-sm" style="width:230px;"
+                           list="o_sp_accounts" placeholder="كل الحسابات"
+                           t-att-value="accountLabel()"
+                           t-on-change="(ev) => this.onAccountInput(ev)"/>
+                    <datalist id="o_sp_accounts">
+                        <option t-foreach="state.options.accounts" t-as="acc" t-key="acc.id"
+                                t-att-value="acc.label"/>
+                    </datalist>
+                    <span class="o_sp_filter_label">المبلغ من</span>
+                    <input type="number" step="0.001" class="form-control form-control-sm"
+                           style="width:120px;" t-att-value="filters.amount_min"
+                           t-on-change="(ev) => this.onFilterInput('amount_min', ev)"/>
+                    <span class="o_sp_filter_label">إلى</span>
+                    <input type="number" step="0.001" class="form-control form-control-sm"
+                           style="width:120px;" t-att-value="filters.amount_max"
+                           t-on-change="(ev) => this.onFilterInput('amount_max', ev)"/>
+                    <button t-if="activeCount" class="btn btn-sm btn-link"
+                            t-on-click="() => this.clearFilters()">
+                        مسح الفلاتر (<t t-esc="activeCount"/>)
+                    </button>
+                </div>
+            </div>
+
             <div t-if="state.loading" class="text-muted py-4">يبحث...</div>
-            <t t-elif="state.query">
+            <t t-elif="state.query or hasFilters">
                 <div class="small text-muted my-3">
-                    <t t-esc="state.total"/> نتيجة لـ "<t t-esc="state.query"/>"
+                    <t t-esc="state.total"/> نتيجة
+                    <t t-if="state.query"> لـ "<t t-esc="state.query"/>"</t>
+                    <t t-if="activeCount"> مع <t t-esc="activeCount"/> فلتر</t>
                 </div>
                 <div t-foreach="state.groups" t-as="group" t-key="group.label" class="o_sp_group">
                     <h4 class="o_sp_group_label" t-esc="group.label"/>
