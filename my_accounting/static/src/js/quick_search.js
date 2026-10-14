@@ -342,9 +342,10 @@ export class SearchSystray extends Component {
     }
 }
 
+// 26.5: بين زر مكان المحادثة والمرفقات (27) وزر الوضع الداكن (26)
 registry.category("systray").add(
     "my_accounting.search",
     { Component: SearchSystray },
-    { sequence: 24 }
+    { sequence: 26.5 }
 );
 
