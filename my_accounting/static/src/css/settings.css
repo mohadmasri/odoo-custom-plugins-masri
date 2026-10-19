@@ -34,3 +34,55 @@
 .o_settings_row_desc {
     max-width: 480px;
 }
+
+/* ترتيب أعمدة دفتر الأستاذ العام */
+.o_lo_list {
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.o_lo_row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: var(--o-surface, #fff);
+    cursor: grab;
+}
+
+.o_lo_row + .o_lo_row {
+    border-top: 1px solid var(--o-surface-border, #eee);
+}
+
+.o_lo_row:hover {
+    background: var(--o-surface-2, #f6f7f9);
+}
+
+.o_lo_dragging {
+    opacity: 0.5;
+}
+
+.o_lo_handle {
+    color: var(--gray-600, #adb5bd);
+}
+
+.o_lo_pos {
+    min-width: 22px;
+    font-size: 0.78rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_lo_name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o_lo_arrows {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}

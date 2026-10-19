@@ -32,9 +32,88 @@ export class MyAccountingSettings extends Component {
             // فهرس الطباعة
             printIndex: null,
             savingPrintIndex: false,
+            // ترتيب أعمدة دفتر الأستاذ العام
+            ledgerOrder: [],
+            savingLedgerOrder: false,
+            dragIndex: -1,
         });
         onWillStart(() => Promise.all([this.loadJournals(), this.loadBackupConfig(), this.loadTheme(),
-                                       this.loadPrintIndex()]));
+                                       this.loadPrintIndex(), this.loadLedgerOrder()]));
+    }
+
+    // ------------------------------------------------------------------
+    // ترتيب أعمدة دفتر الأستاذ العام (الشاشة والطباعة وسطر الدفتر في القيد)
+    // ------------------------------------------------------------------
+
+    async loadLedgerOrder() {
+        this.state.ledgerOrder = await this.orm.call(
+            "myaccounting.account", "get_ledger_order", []);
+    }
+
+    onDragStart(index, ev) {
+        this.state.dragIndex = index;
+        ev.dataTransfer.effectAllowed = "move";
+        // فايرفوكس لا يبدأ السحب بلا بيانات
+        ev.dataTransfer.setData("text/plain", String(index));
+    }
+
+    onDragOver(index, ev) {
+        ev.preventDefault();
+        const from = this.state.dragIndex;
+        if (from === -1 || from === index) {
+            return;
+        }
+        const list = this.state.ledgerOrder;
+        const [moved] = list.splice(from, 1);
+        list.splice(index, 0, moved);
+        this.state.dragIndex = index;
+    }
+
+    onDragEnd() {
+        if (this.state.dragIndex !== -1) {
+            this.state.dragIndex = -1;
+            this.saveLedgerOrder();
+        }
+    }
+
+    moveColumn(index, step) {
+        const list = this.state.ledgerOrder;
+        const target = index + step;
+        if (target < 0 || target >= list.length) {
+            return;
+        }
+        [list[index], list[target]] = [list[target], list[index]];
+        this.saveLedgerOrder();
+    }
+
+    /**
+     * الحفظ يتسلسل ولا يُلغى: نقرتان متتاليتان على السهم كانت الثانية
+     * تضيع، فصار كل حفظ ينتظر الذي قبله. ولا نستبدل القائمة بما يعيده
+     * الخادم لأن ما على الشاشة هو الأحدث.
+     */
+    async saveLedgerOrder() {
+        const ids = this.state.ledgerOrder.map((item) => item.id);
+        this.state.savingLedgerOrder = true;
+        this.saveChain = (this.saveChain || Promise.resolve())
+            .catch(() => {})
+            .then(() => this.orm.call("myaccounting.account", "set_ledger_order", [ids]));
+        try {
+            await this.saveChain;
+            this.notification.add("حُفظ ترتيب أعمدة دفتر الأستاذ.", { type: "success" });
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر حفظ الترتيب.",
+                { type: "danger" });
+            await this.loadLedgerOrder();
+        } finally {
+            this.state.savingLedgerOrder = false;
+        }
+    }
+
+    async resetLedgerOrder() {
+        const sorted = [...this.state.ledgerOrder].sort(
+            (a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true }));
+        this.state.ledgerOrder = sorted;
+        await this.saveLedgerOrder();
     }
 
     setTab(tab) {

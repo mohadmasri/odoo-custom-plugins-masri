@@ -34,12 +34,65 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.activeTab === 'ledgerOrder' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('ledgerOrder')">
+                        <i class="fa fa-columns me-1"/> أعمدة دفتر الأستاذ
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.activeTab === 'system' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('system')">
                         <i class="fa fa-power-off me-1"/> النظام
                     </a>
                 </li>
             </ul>
+
+            <t t-if="state.activeTab === 'ledgerOrder'">
+                <div style="max-width: 620px;">
+                    <div class="small text-muted mb-3">
+                        ترتيب الحسابات الرئيسية كما تظهر أعمدةً في دفتر الأستاذ العام.
+                        اسحب الحساب إلى مكانه، أو حرّكه بالسهمين. الترتيب نفسه يُطبَّق على
+                        <b>الدفتر وطباعته</b> وعلى <b>سطر الدفتر داخل القيد وطباعته</b>.
+                    </div>
+
+                    <div class="o_lo_list">
+                        <div t-foreach="state.ledgerOrder" t-as="account" t-key="account.id"
+                             t-attf-class="o_lo_row {{ state.dragIndex === account_index ? 'o_lo_dragging' : '' }}"
+                             draggable="true"
+                             t-on-dragstart="(ev) => this.onDragStart(account_index, ev)"
+                             t-on-dragover="(ev) => this.onDragOver(account_index, ev)"
+                             t-on-dragend="() => this.onDragEnd()">
+                            <span class="o_lo_handle" title="اسحب لتغيير الترتيب">
+                                <i class="fa fa-bars"/>
+                            </span>
+                            <span class="o_lo_pos" t-esc="account_index + 1"/>
+                            <span class="o_lo_name" t-esc="account.label"/>
+                            <span class="o_lo_arrows">
+                                <button class="btn btn-sm btn-link p-0" title="أعلى"
+                                        t-att-disabled="account_index === 0"
+                                        t-on-click="() => this.moveColumn(account_index, -1)">
+                                    <i class="fa fa-arrow-up"/>
+                                </button>
+                                <button class="btn btn-sm btn-link p-0" title="أسفل"
+                                        t-att-disabled="account_index === state.ledgerOrder.length - 1"
+                                        t-on-click="() => this.moveColumn(account_index, 1)">
+                                    <i class="fa fa-arrow-down"/>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div t-if="!state.ledgerOrder.length" class="text-muted py-3">
+                        لا توجد حسابات رئيسية بعد.
+                    </div>
+
+                    <button class="btn btn-sm btn-outline-secondary mt-3"
+                            t-att-disabled="state.savingLedgerOrder"
+                            t-on-click="() => this.resetLedgerOrder()">
+                        ترتيب حسب الرمز
+                    </button>
+                </div>
+            </t>
 
             <t t-if="state.activeTab === 'printIndex' and state.printIndex">
                 <div class="mb-4" style="max-width: 720px;">

@@ -206,6 +206,40 @@ class MyAccountingAccount(models.Model):
     def _ordered_moves(self):
         return self.env['myaccounting.move'].search([], order='sort_key, id')
 
+    # ------------------------------------------------------------------
+    # ترتيب أعمدة دفتر الأستاذ العام
+    # ------------------------------------------------------------------
+
+    @api.model
+    def get_ledger_order(self):
+        """الحسابات الرئيسية بترتيب ظهورها عموداً في الدفتر."""
+        roots = self.search([('parent_id', '=', False)], order='ledger_sequence, code')
+        return [{
+            'id': account.id,
+            'code': account.code or '',
+            'name': account.name,
+            'label': f'{account.code} - {account.name}' if account.code else account.name,
+            'sequence': account.ledger_sequence,
+        } for account in roots]
+
+    @api.model
+    def set_ledger_order(self, account_ids):
+        """يحفظ الترتيب الجديد: العمود الأول 10، ثم 20، وهكذا.
+
+        الترتيب واحد في كل مكان يُعرض فيه الدفتر: الشاشة والطباعة وسطر
+        الدفتر داخل القيد وطباعته، لأن الجميع يقرأ ledger_sequence.
+        """
+        accounts = self.browse([int(item) for item in account_ids]).exists()
+        for position, account in enumerate(accounts, start=1):
+            if account.ledger_sequence != position * 10:
+                account.ledger_sequence = position * 10
+        # أي حساب رئيسي لم يُذكر (أُنشئ بعد فتح الصفحة) يُترك بعد المرتَّبين
+        rest = self.search([('parent_id', '=', False), ('id', 'not in', accounts.ids)])
+        base = (len(accounts) + 1) * 10
+        for position, account in enumerate(rest, start=0):
+            account.ledger_sequence = base + position * 10
+        return self.get_ledger_order()
+
     @api.model
     def get_ledger_columns(self):
         """أعمدة دفتر الأستاذ العام: الحسابات الرئيسية بترتيب الدفتر، مع ربط كل
