@@ -151,7 +151,7 @@
                                            t-on-change="(ev) => this.saveCell(row, 'label', ev)"/>
                                     <span class="o_tr_out" t-esc="row.label"/>
                                 </td>
-                                <td>
+                                <td class="o_tr_party">
                                     <input type="text" class="form-control form-control-sm o_tr_in"
                                            t-att-value="row.party"
                                            t-on-change="(ev) => this.saveCell(row, 'party', ev)"/>

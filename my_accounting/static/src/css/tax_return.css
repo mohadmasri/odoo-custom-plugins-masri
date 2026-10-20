@@ -236,3 +236,19 @@
     .o_tr_c_tax { width: 80px !important; }
     .o_tr_c_move { width: 60px !important; }
 }
+
+/* الجدول على الشاشة بعرض تلقائي، فالعمود يتقلّص إلى أصغر عرض لحقله.
+   اسم الجهة يحتاج مساحة تكفيه، فنفرض حدّاً أدنى على الشاشة وحدها. */
+.o_tr_c_party {
+    min-width: 180px;
+}
+
+.o_tr_table .o_tr_party .form-control {
+    min-width: 170px;
+}
+
+@media print {
+    .o_tr_c_party {
+        min-width: 0 !important;
+    }
+}
