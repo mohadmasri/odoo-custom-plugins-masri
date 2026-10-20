@@ -86,24 +86,25 @@
                     <table class="table table-bordered table-sm o_tr_table">
                         <thead>
                             <tr>
-                                <th style="width:34px;"/>
-                                <th t-if="isPurchase(table.key)" style="width:120px;">الرقم الضريبي</th>
+                                <th class="o_tr_c_mark" style="width:34px;"/>
+                                <th t-if="isPurchase(table.key)" class="o_tr_c_taxno" style="width:120px;">الرقم الضريبي</th>
                                 <!-- رابط القيد: قبل رقم السند في المبيعات -->
-                                <th t-if="!isPurchase(table.key)" style="width:34px;"/>
-                                <th style="width:110px;">
+                                <th t-if="!isPurchase(table.key)" class="o_tr_link" style="width:34px;"/>
+                                <th class="o_tr_c_doc" style="width:110px;">
                                     <t t-if="isPurchase(table.key)">رقم الفاتورة</t>
                                     <t t-else="">رقم السند</t>
                                 </th>
-                                <th t-if="!isPurchase(table.key)" style="width:90px;">نوعه</th>
-                                <th style="width:125px;">التاريخ</th>
+                                <th t-if="!isPurchase(table.key)" class="o_tr_c_type" style="width:90px;">نوعه</th>
+                                <th class="o_tr_c_date" style="width:125px;">التاريخ</th>
                                 <!-- البيان يأخذ ما بقي من عرض الجدول -->
-                                <th style="width:100%; min-width:220px;">البيان</th>
-                                <th class="text-end" style="width:120px;">القيمة</th>
-                                <th class="text-end" style="width:110px;">الضريبة</th>
-                                <th t-if="isPurchase(table.key)" style="width:100px;">سند القيد</th>
+                                <th class="o_tr_c_label" style="width:100%; min-width:200px;">البيان</th>
+                                <th class="o_tr_c_party" style="width:170px;">لصالح من</th>
+                                <th class="text-end o_tr_c_amount" style="width:120px;">القيمة</th>
+                                <th class="text-end o_tr_c_tax" style="width:110px;">الضريبة</th>
+                                <th t-if="isPurchase(table.key)" class="o_tr_c_move" style="width:100px;">سند القيد</th>
                                 <!-- رابط القيد: بجانب عمود سند القيد في المشتريات -->
-                                <th t-if="isPurchase(table.key)" style="width:34px;"/>
-                                <th style="width:34px;"/>
+                                <th t-if="isPurchase(table.key)" class="o_tr_link" style="width:34px;"/>
+                                <th class="o_tr_del" style="width:34px;"/>
                             </tr>
                         </thead>
                         <tbody>
@@ -145,9 +146,16 @@
                                            t-on-change="(ev) => this.saveCell(row, 'date', ev)"/>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm"
+                                    <input type="text" class="form-control form-control-sm o_tr_in"
                                            t-att-value="row.label"
                                            t-on-change="(ev) => this.saveCell(row, 'label', ev)"/>
+                                    <span class="o_tr_out" t-esc="row.label"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm o_tr_in"
+                                           t-att-value="row.party"
+                                           t-on-change="(ev) => this.saveCell(row, 'party', ev)"/>
+                                    <span class="o_tr_out" t-esc="row.party"/>
                                 </td>
                                 <td>
                                     <input type="number" step="0.001"
@@ -172,7 +180,7 @@
                                         <i class="fa fa-external-link"/>
                                     </a>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center o_tr_del">
                                     <button class="btn btn-sm btn-link text-danger p-0" title="حذف السطر"
                                             t-on-click="() => this.deleteRow(row)">
                                         <i class="fa fa-trash"/>
@@ -180,19 +188,21 @@
                                 </td>
                             </tr>
                             <tr t-if="!rowsOf(table.key).length">
-                                <td t-att-colspan="isPurchase(table.key) ? 10 : 9"
+                                <td t-att-colspan="isPurchase(table.key) ? 11 : 10"
                                     class="text-muted text-center py-2">لا صفوف</td>
                             </tr>
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold">
-                                <td t-att-colspan="isPurchase(table.key) ? 5 : 6"
-                                    class="text-end">المجموع</td>
+                                <td/>
+                                <td t-if="!isPurchase(table.key)" class="o_tr_link"/>
+                                <!-- يغطي من رقم المستند حتى "لصالح من" -->
+                                <td colspan="5" class="text-end">المجموع</td>
                                 <td class="text-end" t-esc="fmt(totalOf(table.key, 'amount'))"/>
                                 <td class="text-end" t-esc="fmt(totalOf(table.key, 'tax'))"/>
                                 <td t-if="isPurchase(table.key)"/>
-                                <td t-if="isPurchase(table.key)"/>
-                                <td/>
+                                <td t-if="isPurchase(table.key)" class="o_tr_link"/>
+                                <td class="o_tr_del"/>
                             </tr>
                         </tfoot>
                     </table>

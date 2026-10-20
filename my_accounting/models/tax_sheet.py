@@ -23,6 +23,7 @@ SETTLEMENT_RE = re.compile(r'[اأإ]قرار')
 ANY_NUMBER_RE = re.compile(r'([0-9٠-٩]+)')
 # "مرتجع عن فاتورة رقم 290": رقم الفاتورة الأصلية
 RETURN_RE = re.compile(r'مرتجع\s*عن[^0-9٠-٩]*([0-9٠-٩]+)')
+RETURN_WORD_RE = re.compile(r'مرتجع')
 
 ARABIC_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 
@@ -118,12 +119,30 @@ class MyAccountingTaxSheet(models.Model):
             # إيرادات القيد مرتبة برقم مستندها، لأن بند الضريبة قد يحمل بياناً
             # مختلفاً قليلاً عن بند الإيراد (فاتورة معفاة مثلاً)
             income_by_number = {}
+            # الطرف المقابل (لصالح من): حساب الجهة في الفاتورة الصادرة،
+            # وحساب المورّد في الواردة. نفهرسه بالجانب ورقم المستند أيضاً
+            # لأن بيان بند الضريبة قد يختلف عن بيان بند الطرف.
+            party_by_number = {}
+            party_by_label = []
             for line in move.line_ids:
                 if line.account_id == income_account:
                     number = doc_number_of(line.name)
                     if number:
                         income_by_number.setdefault(number, 0.0)
                         income_by_number[number] += line.credit - line.debit
+                elif line.account_id and line.account_id != tax_account:
+                    side = 'debit' if line.debit else ('credit' if line.credit else '')
+                    if not side:
+                        continue
+                    text = (line.name or '').strip()
+                    # بند المرتجع وبند الفاتورة يحملان الرقم نفسه، فنميّزهما
+                    back = bool(RETURN_WORD_RE.search(text))
+                    number = doc_number_of(text)
+                    if number:
+                        party_by_number.setdefault((back, side, number),
+                                                   line.account_id.name)
+                    if len(text) >= 4:
+                        party_by_label.append((back, side, text, line.account_id.name))
             for label, lines in buckets.items():
                 tax_lines = [line for line in lines if line.account_id == tax_account]
                 if not tax_lines:
@@ -156,8 +175,30 @@ class MyAccountingTaxSheet(models.Model):
                 # فنستنتجها من الضريبة ونسبتها ليراجعها المستخدم
                 if not amount and tax_value and rate:
                     amount = round(abs(tax_value) / (rate / 100.0), 3)
+                # الطرف يقابل الإيراد/المصروف: في البيع مدين، وفي الشراء دائن
+                side = {'sale': 'debit', 'sale_return': 'credit',
+                        'purchase': 'credit', 'purchase_return': 'debit'}[table]
+                party = ''
+                for line in lines:
+                    if line.account_id in (tax_account | income_account) or not line.account_id:
+                        continue
+                    if (line.debit if side == 'debit' else line.credit):
+                        party = line.account_id.name
+                        break
+                back = bool(RETURN_WORD_RE.search(label))
+                if not party:
+                    party = party_by_number.get((back, side, doc_number_of(label)), '')
+                if not party:
+                    # بيان بند الطرف قد يكون جزءاً من بيان بند الضريبة
+                    # ("فحص تربة فلادلفيا" داخل "فحص تربة فلادلفيا / المجموعة…")
+                    best = ''
+                    for line_back, line_side, text, name in party_by_label:
+                        if line_back != back or line_side != side:
+                            continue
+                        if (text in label or label in text) and len(text) > len(best):
+                            best, party = text, name
                 groups.append({
-                    'table': table, 'label': label, 'move': move,
+                    'table': table, 'label': label, 'move': move, 'party': party,
                     'line': tax_lines[0], 'amount': amount, 'tax': tax_value,
                 })
         return groups
@@ -172,6 +213,7 @@ class MyAccountingTaxSheet(models.Model):
             'doc_type': 'قبض' if move.move_type == 'receipt' else 'قيد',
             'date': move.date,
             'label': label,
+            'party': group.get('party') or '',
             'amount': group['amount'],
             'tax': group['tax'],
             'move_name': move.name or '',
@@ -231,7 +273,7 @@ class MyAccountingTaxSheet(models.Model):
     def save_row(self, row_id, values):
         row = self.env['myaccounting.tax.sheet.row'].browse(int(row_id))
         allowed = ('tax_number', 'doc_number', 'doc_type', 'date', 'label',
-                   'amount', 'tax', 'move_name')
+                   'party', 'amount', 'tax', 'move_name')
         clean = {}
         for key in allowed:
             if key not in values:
@@ -270,6 +312,7 @@ class MyAccountingTaxSheetRow(models.Model):
     doc_type = fields.Char(string='نوعه')
     date = fields.Date(string='التاريخ')
     label = fields.Char(string='البيان')
+    party = fields.Char(string='لصالح من')
     amount = fields.Float(string='القيمة', digits=(16, 3))
     tax = fields.Float(string='الضريبة', digits=(16, 3))
     move_name = fields.Char(string='سند القيد')
@@ -292,6 +335,7 @@ class MyAccountingTaxSheetRow(models.Model):
             'doc_type': self.doc_type or '',
             'date': self.date and fields.Date.to_string(self.date) or '',
             'label': self.label or '',
+            'party': self.party or '',
             'amount': self.amount,
             'tax': self.tax,
             'move_name': self.move_name or '',

@@ -45,7 +45,8 @@ export class TaxReturn extends Component {
         this.notification = useService("notification");
         this.months = MONTHS;
         this.pairs = PAIRS;
-        this.printPage = usePrintPageSize("A4 portrait", "10mm");
+        // الكشف عريض الأعمدة، فالورقة أفقية
+        this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.state = useState({
             loading: true,
             years: [],

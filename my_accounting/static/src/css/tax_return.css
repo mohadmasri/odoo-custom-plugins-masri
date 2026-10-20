@@ -79,6 +79,73 @@
     .o_tax_return th {
         color: #000 !important;
     }
+
+    /* أدوات التحرير لا تُطبع: الأزرار وخانة الحذف ورابط القيد */
+    .o_tr_sheet_bar,
+    .o_tr_del,
+    .o_tr_link,
+    .o_tax_return .btn {
+        display: none !important;
+    }
+
+    /* الخانات تُطبع نصاً لا مربعات إدخال */
+    .o_tr_table .form-control {
+        border: 0 !important;
+        background: transparent !important;
+        padding: 0 2px !important;
+        min-width: 0 !important;
+        height: auto !important;
+        box-shadow: none !important;
+        color: #000 !important;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .o_tr_table input[type="number"] {
+        min-width: 0 !important;
+    }
+
+    /* خانة التاريخ تُظهر أيقونة النتيجة في الطباعة */
+    .o_tr_table input[type="date"]::-webkit-calendar-picker-indicator {
+        display: none;
+    }
+
+    /* الجدول كاملاً على الورقة بلا تمرير أفقي */
+    .o_tr_sheet {
+        overflow: visible !important;
+        page-break-inside: auto;
+    }
+
+    .o_tr_table {
+        font-size: 9px;
+        width: 100% !important;
+        table-layout: fixed;
+    }
+
+    .o_tr_table td,
+    .o_tr_table th {
+        padding: 1px 3px !important;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    /* الأرقام لا تنكسر على سطرين */
+    .o_tr_table .text-end {
+        white-space: nowrap;
+    }
+
+    .o_tr_sheet thead {
+        display: table-header-group;
+    }
+
+    .o_tr_sheet tr {
+        page-break-inside: avoid;
+    }
+
+    .o_tr_section_title {
+        font-size: 12px;
+        margin-top: 10px;
+    }
 }
 
 /* جداول الإقرار القابلة للتحرير */
@@ -136,4 +203,36 @@
 
 .o_tr_link a:hover {
     color: var(--o-accent, #0d6efd);
+}
+
+/* النسخة النصية من خانتي البيان و"لصالح من": للطباعة وحدها */
+.o_tr_out {
+    display: none;
+}
+
+@media print {
+    .o_tr_table .o_tr_in {
+        display: none !important;
+    }
+
+    .o_tr_out {
+        display: block;
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.25;
+    }
+}
+
+/* عرض الأعمدة في الطباعة: نضيّق ما يكفيه القليل ليتسع البيان */
+@media print {
+    .o_tr_c_mark { width: 24px !important; }
+    .o_tr_c_taxno { width: 85px !important; }
+    .o_tr_c_doc { width: 70px !important; }
+    .o_tr_c_type { width: 45px !important; }
+    .o_tr_c_date { width: 70px !important; }
+    .o_tr_c_label { width: auto !important; min-width: 0 !important; }
+    .o_tr_c_party { width: 150px !important; }
+    .o_tr_c_amount { width: 85px !important; }
+    .o_tr_c_tax { width: 80px !important; }
+    .o_tr_c_move { width: 60px !important; }
 }
