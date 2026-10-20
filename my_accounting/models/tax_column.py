@@ -16,6 +16,7 @@ PURCHASE_COLUMNS = [
 
 SALE_COLUMNS = [
     ('doc', 'رقم السند'),
+    ('move', 'رقم القبض'),
     ('type', 'نوعه'),
     ('date', 'التاريخ'),
     ('label', 'البيان'),
@@ -58,15 +59,21 @@ class MyAccountingTaxColumn(models.Model):
         if stale:
             columns = columns - stale
             stale.unlink()
-        existing = {(column.table, column.key) for column in columns}
+        existing = {(column.table, column.key): column for column in columns}
         created = self.browse()
         for table, defaults in DEFAULT_COLUMNS.items():
             for index, (key, label) in enumerate(defaults):
-                if (table, key) not in existing:
-                    created |= self.create({
-                        'table': table, 'key': key, 'label': label,
-                        'sequence': (index + 1) * 10,
-                    })
+                if (table, key) in existing:
+                    continue
+                before = defaults[index - 1][0] if index else None
+                neighbour = existing.get((table, before)) if before else None
+                sequence = (neighbour.sequence + 5) if neighbour else (index + 1) * 10
+                column = self.create({
+                    'table': table, 'key': key, 'label': label,
+                    'sequence': sequence,
+                })
+                existing[(table, key)] = column
+                created |= column
         return columns | created
 
     @api.model
