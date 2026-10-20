@@ -227,8 +227,7 @@
 @media print {
     .o_tr_c_mark { width: 24px !important; }
     .o_tr_c_taxno { width: 85px !important; }
-    .o_tr_c_doc_purchase,
-    .o_tr_c_doc_sale { width: 70px !important; }
+    .o_tr_c_doc { width: 70px !important; }
     .o_tr_c_type { width: 45px !important; }
     .o_tr_c_date { width: 70px !important; }
     .o_tr_c_label { width: auto !important; min-width: 0 !important; }
@@ -265,8 +264,7 @@
     width: 120px;
 }
 
-.o_tr_c_doc_purchase,
-.o_tr_c_doc_sale {
+.o_tr_c_doc {
     width: 110px;
 }
 

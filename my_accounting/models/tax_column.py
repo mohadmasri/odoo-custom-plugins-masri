@@ -1,39 +1,49 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
-# أعمدة جداول الإقرار: المفتاح، الاسم المبدئي، وأين يظهر العمود.
+# أعمدة كل جدول من جداول الإقرار على حدة: المفتاح والاسم المبدئي.
 # المفتاح ثابت لأن القالب يبني الخانة عليه؛ الاسم والترتيب وحدهما للمستخدم.
-DEFAULT_COLUMNS = [
-    ('taxno', 'الرقم الضريبي', 'purchase'),
-    ('doc_purchase', 'رقم الفاتورة', 'purchase'),
-    ('doc_sale', 'رقم السند', 'sale'),
-    ('type', 'نوعه', 'sale'),
-    ('date', 'التاريخ', 'both'),
-    ('label', 'البيان', 'both'),
-    ('party', 'لصالح من', 'both'),
-    ('amount', 'القيمة', 'both'),
-    ('tax', 'الضريبة', 'both'),
-    ('move', 'سند القيد', 'purchase'),
+PURCHASE_COLUMNS = [
+    ('taxno', 'الرقم الضريبي'),
+    ('doc', 'رقم الفاتورة'),
+    ('date', 'التاريخ'),
+    ('label', 'البيان'),
+    ('party', 'لصالح من'),
+    ('amount', 'القيمة'),
+    ('tax', 'الضريبة'),
+    ('move', 'سند القيد'),
 ]
 
-SCOPE_LABELS = {
-    'both': '',
-    'purchase': 'المشتريات فقط',
-    'sale': 'المبيعات فقط',
+SALE_COLUMNS = [
+    ('doc', 'رقم السند'),
+    ('type', 'نوعه'),
+    ('date', 'التاريخ'),
+    ('label', 'البيان'),
+    ('party', 'لصالح من'),
+    ('amount', 'القيمة'),
+    ('tax', 'الضريبة'),
+]
+
+DEFAULT_COLUMNS = {
+    'purchase': PURCHASE_COLUMNS,
+    'purchase_return': PURCHASE_COLUMNS,
+    'sale': SALE_COLUMNS,
+    'sale_return': SALE_COLUMNS,
 }
 
 
 class MyAccountingTaxColumn(models.Model):
     _name = 'myaccounting.tax.column'
-    _description = 'عمود في جداول الإقرار الضريبي'
-    _order = 'sequence, id'
+    _description = 'عمود في جدول من جداول الإقرار الضريبي'
+    _order = 'table, sequence, id'
 
+    table = fields.Char(string='الجدول', required=True, index=True)
     key = fields.Char(string='المفتاح', required=True, index=True)
     label = fields.Char(string='الاسم', required=True)
     sequence = fields.Integer(string='الترتيب', default=10, index=True)
 
     _sql_constraints = [
-        ('key_unique', 'unique(key)', 'لكل عمود مفتاح واحد.'),
+        ('table_key_unique', 'unique(table, key)', 'لكل عمود مفتاح واحد في جدوله.'),
     ]
 
     # ------------------------------------------------------------------
@@ -42,55 +52,69 @@ class MyAccountingTaxColumn(models.Model):
 
     @api.model
     def _ensure(self):
-        """ينشئ الأعمدة الناقصة بأسمائها وترتيبها المبدئي."""
-        existing = {column.key: column for column in self.search([])}
-        for index, (key, label, _scope) in enumerate(DEFAULT_COLUMNS):
-            if key not in existing:
-                existing[key] = self.create({
-                    'key': key, 'label': label, 'sequence': (index + 1) * 10,
-                })
-        return self.search([])
+        """ينشئ الأعمدة الناقصة بأسمائها المبدئية، ويزيل ما لم يعد له جدول."""
+        columns = self.search([])
+        stale = columns.filtered(lambda column: column.table not in DEFAULT_COLUMNS)
+        if stale:
+            columns = columns - stale
+            stale.unlink()
+        existing = {(column.table, column.key) for column in columns}
+        created = self.browse()
+        for table, defaults in DEFAULT_COLUMNS.items():
+            for index, (key, label) in enumerate(defaults):
+                if (table, key) not in existing:
+                    created |= self.create({
+                        'table': table, 'key': key, 'label': label,
+                        'sequence': (index + 1) * 10,
+                    })
+        return columns | created
 
     @api.model
     def get_columns(self):
-        scopes = {key: scope for key, _label, scope in DEFAULT_COLUMNS}
-        defaults = {key: label for key, label, _scope in DEFAULT_COLUMNS}
-        columns = []
-        for column in self._ensure():
-            if column.key not in scopes:
+        """أعمدة كل جدول بترتيبه: {مفتاح الجدول: [أعمدة]}."""
+        result = {table: [] for table in DEFAULT_COLUMNS}
+        for column in self._ensure().sorted(lambda c: (c.sequence, c.id)):
+            if column.table not in result:
                 continue
-            columns.append({
+            defaults = dict(DEFAULT_COLUMNS[column.table])
+            result[column.table].append({
                 'id': column.id,
                 'key': column.key,
-                'label': column.label or defaults[column.key],
-                'scope': scopes[column.key],
-                'scope_label': SCOPE_LABELS[scopes[column.key]],
-                'default_label': defaults[column.key],
+                'label': column.label or defaults.get(column.key, column.key),
+                'default_label': defaults.get(column.key, column.key),
             })
-        return columns
+        return result
 
     # ------------------------------------------------------------------
     # الكتابة
     # ------------------------------------------------------------------
 
     @api.model
-    def set_columns(self, items):
-        """يحفظ الأسماء والترتيب معاً. items: [{key, label}, ...] بالترتيب."""
-        by_key = {column.key: column for column in self._ensure()}
-        defaults = {key: label for key, label, _scope in DEFAULT_COLUMNS}
+    def set_columns(self, table, items):
+        """يحفظ أسماء أعمدة جدول واحد وترتيبها. items: [{key, label}, ...]."""
+        if table not in DEFAULT_COLUMNS:
+            return self.get_columns()
+        by_key = {column.key: column
+                  for column in self._ensure().filtered(lambda c: c.table == table)}
+        defaults = dict(DEFAULT_COLUMNS[table])
         for index, item in enumerate(items or []):
             column = by_key.get(item.get('key'))
             if not column:
                 continue
-            label = (item.get('label') or '').strip() or defaults[column.key]
+            label = (item.get('label') or '').strip() or defaults.get(column.key, column.key)
             column.write({'label': label, 'sequence': (index + 1) * 10})
         return self.get_columns()
 
     @api.model
-    def reset_columns(self):
-        by_key = {column.key: column for column in self._ensure()}
-        for index, (key, label, _scope) in enumerate(DEFAULT_COLUMNS):
-            column = by_key.get(key)
-            if column:
-                column.write({'label': label, 'sequence': (index + 1) * 10})
+    def reset_columns(self, table=None):
+        """يعيد جدولاً واحداً — أو كل الجداول — إلى أسمائه وترتيبه الأصلي."""
+        tables = [table] if table in DEFAULT_COLUMNS else list(DEFAULT_COLUMNS)
+        columns = self._ensure()
+        for name in tables:
+            by_key = {column.key: column
+                      for column in columns.filtered(lambda c: c.table == name)}
+            for index, (key, label) in enumerate(DEFAULT_COLUMNS[name]):
+                column = by_key.get(key)
+                if column:
+                    column.write({'label': label, 'sequence': (index + 1) * 10})
         return self.get_columns()

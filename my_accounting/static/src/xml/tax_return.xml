@@ -17,37 +17,7 @@
                 </div>
             </div>
 
-            <!-- إعدادات الأعمدة: الاسم والترتيب لكل الإقرارات وللطباعة -->
-            <div t-if="state.showColumns" class="o_tr_cols no-print">
-                <div class="small text-muted mb-2">
-                    غيّر اسم العمود أو اسحبه إلى مكانه. ما تغيّره هنا يسري على
-                    <b>كل الإقرارات</b> — السابقة والقادمة — <b>وعلى الطباعة</b>.
-                </div>
-                <div class="o_tr_cols_list">
-                    <div t-foreach="state.columns" t-as="column"
-                         t-key="column.key + '|' + column.label"
-                         t-attf-class="o_tr_cols_row {{ state.dragIndex === column_index ? 'o_tr_cols_drag' : '' }}"
-                         draggable="true"
-                         t-on-dragstart="(ev) => this.onColumnDragStart(column_index, ev)"
-                         t-on-dragover="(ev) => this.onColumnDragOver(column_index, ev)"
-                         t-on-dragend="() => this.onColumnDragEnd()">
-                        <span class="o_tr_cols_handle" title="اسحب لتغيير الترتيب">
-                            <i class="fa fa-bars"/>
-                        </span>
-                        <span class="o_tr_cols_pos" t-esc="column_index + 1"/>
-                        <input type="text" class="form-control form-control-sm o_tr_cols_name"
-                               t-att-value="column.label"
-                               t-on-change="(ev) => this.onColumnLabel(column, ev)"/>
-                        <span t-if="column.scope_label" class="o_tr_cols_scope"
-                              t-esc="column.scope_label"/>
-                    </div>
-                </div>
-                <button class="btn btn-sm btn-outline-secondary mt-2"
-                        t-att-disabled="state.savingColumns"
-                        t-on-click="() => this.resetColumns()">
-                    الأسماء والترتيب الأصلية
-                </button>
-            </div>
+
 
             <!-- اختيار الفترة -->
             <div class="o_tr_filter no-print">
@@ -121,6 +91,38 @@
 
                 <div t-foreach="sheet.tables" t-as="table" t-key="table.key" class="o_tr_sheet">
                     <h4 class="o_tr_section_title"><t t-esc="table.label"/></h4>
+
+                    <!-- أعمدة هذا الجدول وحده: اسمها وترتيبها -->
+                    <div t-if="state.showColumns" class="o_tr_cols no-print">
+                        <div class="small text-muted mb-2">
+                            أعمدة <b t-esc="table.label"/>: غيّر اسم العمود أو اسحبه إلى مكانه.
+                            ما تغيّره هنا يسري على هذا الجدول في
+                            <b>كل الإقرارات</b> — السابقة والقادمة — <b>وعلى الطباعة</b>.
+                        </div>
+                        <div class="o_tr_cols_list">
+                            <div t-foreach="columnsFor(table.key)" t-as="column"
+                                 t-key="column.key + '|' + column.label"
+                                 t-attf-class="o_tr_cols_row {{ isDragging(table.key, column_index) ? 'o_tr_cols_drag' : '' }}"
+                                 draggable="true"
+                                 t-on-dragstart="(ev) => this.onColumnDragStart(table.key, column_index, ev)"
+                                 t-on-dragover="(ev) => this.onColumnDragOver(table.key, column_index, ev)"
+                                 t-on-dragend="() => this.onColumnDragEnd(table.key)">
+                                <span class="o_tr_cols_handle" title="اسحب لتغيير الترتيب">
+                                    <i class="fa fa-bars"/>
+                                </span>
+                                <span class="o_tr_cols_pos" t-esc="column_index + 1"/>
+                                <input type="text" class="form-control form-control-sm o_tr_cols_name"
+                                       t-att-value="column.label"
+                                       t-on-change="(ev) => this.onColumnLabel(table.key, column, ev)"/>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary mt-2"
+                                t-att-disabled="state.savingColumns"
+                                t-on-click="() => this.resetColumns(table.key)">
+                            أسماء وترتيب هذا الجدول الأصلية
+                        </button>
+                    </div>
+
                     <table class="table table-bordered table-sm o_tr_table">
                         <thead>
                             <tr>

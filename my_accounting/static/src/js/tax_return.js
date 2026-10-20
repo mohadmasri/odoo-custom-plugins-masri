@@ -56,10 +56,11 @@ export class TaxReturn extends Component {
             data: null,
             sheet: null,       // جداول الكشف القابلة للتحرير
             busy: false,
-            // إعدادات الأعمدة: الاسم والترتيب، تُطبَّق على كل الإقرارات
-            columns: [],
+            // إعدادات الأعمدة: لكل جدول قائمته، وتُطبَّق على كل الإقرارات
+            columns: {},
             showColumns: false,
             savingColumns: false,
+            dragTable: "",
             dragIndex: -1,
         });
         onWillStart(async () => {
@@ -130,11 +131,9 @@ export class TaxReturn extends Component {
     // أعمدة الجداول: الاسم والترتيب من الإعدادات
     // ------------------------------------------------------------------
 
-    /** أعمدة جدول بعينه بترتيب الإعدادات، دون ما لا يخصّه */
+    /** أعمدة جدول بعينه بترتيب إعداداته هو */
     columnsFor(key) {
-        const scope = this.isPurchase(key) ? "purchase" : "sale";
-        return this.state.columns.filter(
-            (column) => column.scope === "both" || column.scope === scope);
+        return this.state.columns[key] || [];
     }
 
     /** عدد خانات السطر كله: الأعمدة زائد الإشارة والرابط والحذف */
@@ -150,21 +149,13 @@ export class TaxReturn extends Component {
     }
 
     cellValue(row, column) {
-        switch (column.key) {
-            case "taxno": return row.tax_number;
-            case "doc_purchase":
-            case "doc_sale": return row.doc_number;
-            case "type": return row.doc_type;
-            case "move": return row.move_name;
-            default: return row[column.key];
-        }
+        return row[this.cellField(column)];
     }
 
     cellField(column) {
         switch (column.key) {
             case "taxno": return "tax_number";
-            case "doc_purchase":
-            case "doc_sale": return "doc_number";
+            case "doc": return "doc_number";
             case "type": return "doc_type";
             case "move": return "move_name";
             default: return column.key;
@@ -184,48 +175,56 @@ export class TaxReturn extends Component {
         this.state.showColumns = !this.state.showColumns;
     }
 
-    onColumnDragStart(index, ev) {
+    isDragging(table, index) {
+        return this.state.dragTable === table && this.state.dragIndex === index;
+    }
+
+    onColumnDragStart(table, index, ev) {
+        this.state.dragTable = table;
         this.state.dragIndex = index;
         ev.dataTransfer.effectAllowed = "move";
         ev.dataTransfer.setData("text/plain", `${index}`);
     }
 
-    onColumnDragOver(index, ev) {
+    onColumnDragOver(table, index, ev) {
         ev.preventDefault();
         const from = this.state.dragIndex;
-        if (from === -1 || from === index) {
+        // السحب لا يعبر من جدول إلى آخر: لكل جدول أعمدته
+        if (this.state.dragTable !== table || from === -1 || from === index) {
             return;
         }
-        const list = this.state.columns;
+        const list = this.state.columns[table];
         const [moved] = list.splice(from, 1);
         list.splice(index, 0, moved);
         this.state.dragIndex = index;
     }
 
-    onColumnDragEnd() {
+    onColumnDragEnd(table) {
         if (this.state.dragIndex !== -1) {
             this.state.dragIndex = -1;
-            this.saveColumns();
+            this.state.dragTable = "";
+            this.saveColumns(table);
         }
     }
 
-    onColumnLabel(column, ev) {
+    onColumnLabel(table, column, ev) {
         const label = ev.target.value.trim() || column.default_label;
         if (label === column.label) {
             return;
         }
         column.label = label;
-        this.saveColumns();
+        this.saveColumns(table);
     }
 
-    async saveColumns() {
-        const items = this.state.columns.map(
+    async saveColumns(table) {
+        const items = this.columnsFor(table).map(
             (column) => ({ key: column.key, label: column.label }));
         this.state.savingColumns = true;
         // الحفظ متسلسل: نقرتان متتاليتان لا تتسابقان على الترتيب
         this.saveChain = (this.saveChain || Promise.resolve())
             .catch(() => {})
-            .then(() => this.orm.call("myaccounting.tax.column", "set_columns", [items]));
+            .then(() => this.orm.call("myaccounting.tax.column", "set_columns",
+                                      [table, items]));
         try {
             await this.saveChain;
         } catch (error) {
@@ -238,10 +237,10 @@ export class TaxReturn extends Component {
         }
     }
 
-    async resetColumns() {
+    async resetColumns(table) {
         this.state.columns = await this.orm.call(
-            "myaccounting.tax.column", "reset_columns", []);
-        this.notification.add("عادت الأعمدة إلى أسمائها وترتيبها الأصلي.",
+            "myaccounting.tax.column", "reset_columns", [table]);
+        this.notification.add("عادت أعمدة الجدول إلى أسمائها وترتيبها الأصلي.",
             { type: "success" });
     }
 
