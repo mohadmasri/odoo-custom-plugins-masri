@@ -6,8 +6,46 @@
 
             <div class="d-flex justify-content-between align-items-center mb-3 no-print">
                 <h2 class="m-0">الإقرار الضريبي</h2>
-                <button class="btn btn-secondary btn-sm" t-on-click="() => this.print()">
-                    <i class="fa fa-print me-1"/> طباعة
+                <div class="d-flex gap-2">
+                    <button t-attf-class="btn btn-sm {{ state.showColumns ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.toggleColumns()">
+                        <i class="fa fa-columns me-1"/> إعدادات الأعمدة
+                    </button>
+                    <button class="btn btn-secondary btn-sm" t-on-click="() => this.print()">
+                        <i class="fa fa-print me-1"/> طباعة
+                    </button>
+                </div>
+            </div>
+
+            <!-- إعدادات الأعمدة: الاسم والترتيب لكل الإقرارات وللطباعة -->
+            <div t-if="state.showColumns" class="o_tr_cols no-print">
+                <div class="small text-muted mb-2">
+                    غيّر اسم العمود أو اسحبه إلى مكانه. ما تغيّره هنا يسري على
+                    <b>كل الإقرارات</b> — السابقة والقادمة — <b>وعلى الطباعة</b>.
+                </div>
+                <div class="o_tr_cols_list">
+                    <div t-foreach="state.columns" t-as="column"
+                         t-key="column.key + '|' + column.label"
+                         t-attf-class="o_tr_cols_row {{ state.dragIndex === column_index ? 'o_tr_cols_drag' : '' }}"
+                         draggable="true"
+                         t-on-dragstart="(ev) => this.onColumnDragStart(column_index, ev)"
+                         t-on-dragover="(ev) => this.onColumnDragOver(column_index, ev)"
+                         t-on-dragend="() => this.onColumnDragEnd()">
+                        <span class="o_tr_cols_handle" title="اسحب لتغيير الترتيب">
+                            <i class="fa fa-bars"/>
+                        </span>
+                        <span class="o_tr_cols_pos" t-esc="column_index + 1"/>
+                        <input type="text" class="form-control form-control-sm o_tr_cols_name"
+                               t-att-value="column.label"
+                               t-on-change="(ev) => this.onColumnLabel(column, ev)"/>
+                        <span t-if="column.scope_label" class="o_tr_cols_scope"
+                              t-esc="column.scope_label"/>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary mt-2"
+                        t-att-disabled="state.savingColumns"
+                        t-on-click="() => this.resetColumns()">
+                    الأسماء والترتيب الأصلية
                 </button>
             </div>
 
@@ -86,25 +124,15 @@
                     <table class="table table-bordered table-sm o_tr_table">
                         <thead>
                             <tr>
-                                <th class="o_tr_c_mark" style="width:34px;"/>
-                                <th t-if="isPurchase(table.key)" class="o_tr_c_taxno" style="width:120px;">الرقم الضريبي</th>
-                                <!-- رابط القيد: قبل رقم السند في المبيعات -->
-                                <th t-if="!isPurchase(table.key)" class="o_tr_link" style="width:34px;"/>
-                                <th class="o_tr_c_doc" style="width:110px;">
-                                    <t t-if="isPurchase(table.key)">رقم الفاتورة</t>
-                                    <t t-else="">رقم السند</t>
-                                </th>
-                                <th t-if="!isPurchase(table.key)" class="o_tr_c_type" style="width:90px;">نوعه</th>
-                                <th class="o_tr_c_date" style="width:125px;">التاريخ</th>
-                                <!-- البيان يأخذ ما بقي من عرض الجدول -->
-                                <th class="o_tr_c_label" style="width:100%; min-width:200px;">البيان</th>
-                                <th class="o_tr_c_party" style="width:170px;">لصالح من</th>
-                                <th class="text-end o_tr_c_amount" style="width:120px;">القيمة</th>
-                                <th class="text-end o_tr_c_tax" style="width:110px;">الضريبة</th>
-                                <th t-if="isPurchase(table.key)" class="o_tr_c_move" style="width:100px;">سند القيد</th>
-                                <!-- رابط القيد: بجانب عمود سند القيد في المشتريات -->
-                                <th t-if="isPurchase(table.key)" class="o_tr_link" style="width:34px;"/>
-                                <th class="o_tr_del" style="width:34px;"/>
+                                <th class="o_tr_c_mark"/>
+                                <!-- رابط القيد في المبيعات: أول الجدول -->
+                                <th t-if="!isPurchase(table.key)" class="o_tr_link"/>
+                                <th t-foreach="columnsFor(table.key)" t-as="col" t-key="col.key"
+                                    t-attf-class="o_tr_c_{{ col.key }} {{ isNumberColumn(col) ? 'text-end' : '' }}"
+                                    t-esc="col.label"/>
+                                <!-- رابط القيد في المشتريات: آخر الجدول -->
+                                <th t-if="isPurchase(table.key)" class="o_tr_link"/>
+                                <th class="o_tr_del"/>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,61 +147,38 @@
                                         ←<t t-esc="row.return_of"/>
                                     </sup>
                                 </td>
-                                <td t-if="isPurchase(table.key)">
-                                    <input type="text" class="form-control form-control-sm"
-                                           t-att-value="row.tax_number"
-                                           t-on-change="(ev) => this.saveCell(row, 'tax_number', ev)"/>
-                                </td>
                                 <td t-if="!isPurchase(table.key)" class="o_tr_link">
                                     <a t-if="row.move_id" href="#" title="افتح القيد"
                                        t-custom-click="(ev, mid) => this.openMove(row.move_id, mid)">
                                         <i class="fa fa-external-link"/>
                                     </a>
                                 </td>
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                           t-att-value="row.doc_number"
-                                           t-on-change="(ev) => this.saveCell(row, 'doc_number', ev)"/>
-                                </td>
-                                <td t-if="!isPurchase(table.key)">
-                                    <input type="text" class="form-control form-control-sm"
-                                           t-att-value="row.doc_type"
-                                           t-on-change="(ev) => this.saveCell(row, 'doc_type', ev)"/>
-                                </td>
-                                <td>
-                                    <input type="date" class="form-control form-control-sm"
-                                           t-att-value="row.date"
-                                           t-on-change="(ev) => this.saveCell(row, 'date', ev)"/>
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control form-control-sm o_tr_in"
-                                           t-att-value="row.label"
-                                           t-on-change="(ev) => this.saveCell(row, 'label', ev)"/>
-                                    <span class="o_tr_out" t-esc="row.label"/>
-                                </td>
-                                <td class="o_tr_party">
-                                    <input type="text" class="form-control form-control-sm o_tr_in"
-                                           t-att-value="row.party"
-                                           t-on-change="(ev) => this.saveCell(row, 'party', ev)"/>
-                                    <span class="o_tr_out" t-esc="row.party"/>
-                                </td>
-                                <td>
-                                    <input type="number" step="0.001"
-                                           class="form-control form-control-sm text-end"
-                                           t-att-value="row.amount"
-                                           t-on-change="(ev) => this.saveCell(row, 'amount', ev)"/>
-                                </td>
-                                <td>
-                                    <input type="number" step="0.001"
-                                           class="form-control form-control-sm text-end"
-                                           t-att-value="row.tax"
-                                           t-on-change="(ev) => this.saveCell(row, 'tax', ev)"/>
-                                </td>
-                                <td t-if="isPurchase(table.key)">
-                                    <input type="text" class="form-control form-control-sm"
-                                           t-att-value="row.move_name"
-                                           t-on-change="(ev) => this.saveCell(row, 'move_name', ev)"/>
-                                </td>
+                                <t t-foreach="columnsFor(table.key)" t-as="col" t-key="col.key">
+                                    <td t-if="col.key === 'date'">
+                                        <input type="date" class="form-control form-control-sm"
+                                               t-att-value="row.date"
+                                               t-on-change="(ev) => this.saveCell(row, 'date', ev)"/>
+                                    </td>
+                                    <td t-elif="isNumberColumn(col)">
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="cellValue(row, col)"
+                                               t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
+                                    </td>
+                                    <td t-elif="isWrapColumn(col)"
+                                        t-attf-class="{{ col.key === 'party' ? 'o_tr_party' : '' }}">
+                                        <input type="text"
+                                               class="form-control form-control-sm o_tr_in"
+                                               t-att-value="cellValue(row, col)"
+                                               t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
+                                        <span class="o_tr_out" t-esc="cellValue(row, col)"/>
+                                    </td>
+                                    <td t-else="">
+                                        <input type="text" class="form-control form-control-sm"
+                                               t-att-value="cellValue(row, col)"
+                                               t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
+                                    </td>
+                                </t>
                                 <td t-if="isPurchase(table.key)" class="o_tr_link">
                                     <a t-if="row.move_id" href="#" title="افتح القيد"
                                        t-custom-click="(ev, mid) => this.openMove(row.move_id, mid)">
@@ -188,7 +193,7 @@
                                 </td>
                             </tr>
                             <tr t-if="!rowsOf(table.key).length">
-                                <td t-att-colspan="isPurchase(table.key) ? 11 : 10"
+                                <td t-att-colspan="spanOf(table.key)"
                                     class="text-muted text-center py-2">لا صفوف</td>
                             </tr>
                         </tbody>
@@ -196,11 +201,13 @@
                             <tr class="fw-bold">
                                 <td/>
                                 <td t-if="!isPurchase(table.key)" class="o_tr_link"/>
-                                <!-- يغطي من رقم المستند حتى "لصالح من" -->
-                                <td colspan="5" class="text-end">المجموع</td>
-                                <td class="text-end" t-esc="fmt(totalOf(table.key, 'amount'))"/>
-                                <td class="text-end" t-esc="fmt(totalOf(table.key, 'tax'))"/>
-                                <td t-if="isPurchase(table.key)"/>
+                                <t t-foreach="columnsFor(table.key)" t-as="col" t-key="col.key">
+                                    <td t-if="isNumberColumn(col)" class="text-end"
+                                        t-esc="fmt(totalOf(table.key, cellField(col)))"/>
+                                    <td t-elif="col.key === totalLabelKey(table.key)"
+                                        class="text-end">المجموع</td>
+                                    <td t-else=""/>
+                                </t>
                                 <td t-if="isPurchase(table.key)" class="o_tr_link"/>
                                 <td class="o_tr_del"/>
                             </tr>

@@ -56,12 +56,19 @@ export class TaxReturn extends Component {
             data: null,
             sheet: null,       // جداول الكشف القابلة للتحرير
             busy: false,
+            // إعدادات الأعمدة: الاسم والترتيب، تُطبَّق على كل الإقرارات
+            columns: [],
+            showColumns: false,
+            savingColumns: false,
+            dragIndex: -1,
         });
         onWillStart(async () => {
-            const [years, latest] = await Promise.all([
+            const [years, latest, columns] = await Promise.all([
                 loadLedgerYears(this.orm),
                 this.orm.call("myaccounting.move", "get_latest_ledger_period", []),
+                this.orm.call("myaccounting.tax.column", "get_columns", []),
             ]);
+            this.state.columns = columns;
             this.state.years = years;
             // الفترة الافتراضية: التي يقع فيها آخر شهر فيه قيود، لا الشهر الحالي
             const year = parseInt(latest.year, 10) || years[0] || new Date().getFullYear();
@@ -117,6 +124,125 @@ export class TaxReturn extends Component {
 
     isPurchase(key) {
         return key.startsWith("purchase");
+    }
+
+    // ------------------------------------------------------------------
+    // أعمدة الجداول: الاسم والترتيب من الإعدادات
+    // ------------------------------------------------------------------
+
+    /** أعمدة جدول بعينه بترتيب الإعدادات، دون ما لا يخصّه */
+    columnsFor(key) {
+        const scope = this.isPurchase(key) ? "purchase" : "sale";
+        return this.state.columns.filter(
+            (column) => column.scope === "both" || column.scope === scope);
+    }
+
+    /** عدد خانات السطر كله: الأعمدة زائد الإشارة والرابط والحذف */
+    spanOf(key) {
+        return this.columnsFor(key).length + 3;
+    }
+
+    /** العمود الذي تُكتب فيه كلمة "المجموع": ما قبل أول عمود رقمي */
+    totalLabelKey(key) {
+        const columns = this.columnsFor(key);
+        const first = columns.findIndex((column) => this.isNumberColumn(column));
+        return first > 0 ? columns[first - 1].key : null;
+    }
+
+    cellValue(row, column) {
+        switch (column.key) {
+            case "taxno": return row.tax_number;
+            case "doc_purchase":
+            case "doc_sale": return row.doc_number;
+            case "type": return row.doc_type;
+            case "move": return row.move_name;
+            default: return row[column.key];
+        }
+    }
+
+    cellField(column) {
+        switch (column.key) {
+            case "taxno": return "tax_number";
+            case "doc_purchase":
+            case "doc_sale": return "doc_number";
+            case "type": return "doc_type";
+            case "move": return "move_name";
+            default: return column.key;
+        }
+    }
+
+    isNumberColumn(column) {
+        return column.key === "amount" || column.key === "tax";
+    }
+
+    /** الخانات الطويلة تُطبع نصاً بجانب حقلها لتلتفّ على سطرين */
+    isWrapColumn(column) {
+        return column.key === "label" || column.key === "party";
+    }
+
+    toggleColumns() {
+        this.state.showColumns = !this.state.showColumns;
+    }
+
+    onColumnDragStart(index, ev) {
+        this.state.dragIndex = index;
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/plain", `${index}`);
+    }
+
+    onColumnDragOver(index, ev) {
+        ev.preventDefault();
+        const from = this.state.dragIndex;
+        if (from === -1 || from === index) {
+            return;
+        }
+        const list = this.state.columns;
+        const [moved] = list.splice(from, 1);
+        list.splice(index, 0, moved);
+        this.state.dragIndex = index;
+    }
+
+    onColumnDragEnd() {
+        if (this.state.dragIndex !== -1) {
+            this.state.dragIndex = -1;
+            this.saveColumns();
+        }
+    }
+
+    onColumnLabel(column, ev) {
+        const label = ev.target.value.trim() || column.default_label;
+        if (label === column.label) {
+            return;
+        }
+        column.label = label;
+        this.saveColumns();
+    }
+
+    async saveColumns() {
+        const items = this.state.columns.map(
+            (column) => ({ key: column.key, label: column.label }));
+        this.state.savingColumns = true;
+        // الحفظ متسلسل: نقرتان متتاليتان لا تتسابقان على الترتيب
+        this.saveChain = (this.saveChain || Promise.resolve())
+            .catch(() => {})
+            .then(() => this.orm.call("myaccounting.tax.column", "set_columns", [items]));
+        try {
+            await this.saveChain;
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر حفظ الأعمدة.",
+                { type: "danger" });
+            this.state.columns = await this.orm.call(
+                "myaccounting.tax.column", "get_columns", []);
+        } finally {
+            this.state.savingColumns = false;
+        }
+    }
+
+    async resetColumns() {
+        this.state.columns = await this.orm.call(
+            "myaccounting.tax.column", "reset_columns", []);
+        this.notification.add("عادت الأعمدة إلى أسمائها وترتيبها الأصلي.",
+            { type: "success" });
     }
 
     /** المستحق من مجاميع الجداول: مبيعات ناقص مرتجعاتها ناقص صافي المشتريات */
