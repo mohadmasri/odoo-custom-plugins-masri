@@ -42,6 +42,10 @@
               parent="menu_myaccounting_root" sequence="45"
               action="action_myaccounting_trial_balance"/>
 
+    <menuitem id="menu_myaccounting_tax_return" name="الاقرار الضريبي"
+              parent="menu_myaccounting_root" sequence="47"
+              action="action_myaccounting_tax_return"/>
+
     <!-- "اعدادات اخرى" قائمة فرعية: الإعدادات + إدخال القيود عبر الصور (BETA) -->
     <menuitem id="menu_myaccounting_settings_root" name="اعدادات اخرى"
               parent="menu_myaccounting_root" sequence="50"/>
@@ -53,10 +57,6 @@
     <menuitem id="menu_myaccounting_blocks" name="الكتل الجاهزة"
               parent="menu_myaccounting_settings_root" sequence="3"
               action="action_myaccounting_blocks"/>
-
-    <menuitem id="menu_myaccounting_tax_return" name="الاقرار الضريبي"
-              parent="menu_myaccounting_settings_root" sequence="5"
-              action="action_myaccounting_tax_return"/>
 
     <menuitem id="menu_myaccounting_photo_capture" name="اضافة قيد عبر صورة BETA"
               parent="menu_myaccounting_settings_root" sequence="10"
