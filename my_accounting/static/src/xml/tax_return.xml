@@ -116,6 +116,30 @@
                                        t-on-change="(ev) => this.onColumnLabel(table.key, column, ev)"/>
                             </div>
                         </div>
+                        <div class="o_tr_cols_sort">
+                            <span class="o_tr_cols_sortlabel">رتّب صفوف الجدول حسب</span>
+                            <select class="form-select form-select-sm" style="width:150px;"
+                                    t-on-change="(ev) => this.onSortColumn(table.key, ev)">
+                                <option value="">ترتيب البناء</option>
+                                <option t-foreach="columnsFor(table.key)" t-as="col"
+                                        t-key="col.key" t-att-value="col.key"
+                                        t-att-selected="isSortColumn(table.key, col.key)"
+                                        t-esc="col.label"/>
+                            </select>
+                            <div class="btn-group btn-group-sm">
+                                <button t-attf-class="btn {{ hasSort(table.key) and !sortOf(table.key).descending ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        t-att-disabled="!hasSort(table.key)"
+                                        t-on-click="() => this.setSortDirection(table.key, false)">
+                                    تصاعدي
+                                </button>
+                                <button t-attf-class="btn {{ sortOf(table.key).descending ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                        t-att-disabled="!hasSort(table.key)"
+                                        t-on-click="() => this.setSortDirection(table.key, true)">
+                                    تنازلي
+                                </button>
+                            </div>
+                        </div>
+
                         <button class="btn btn-sm btn-outline-secondary mt-2"
                                 t-att-disabled="state.savingColumns"
                                 t-on-click="() => this.resetColumns(table.key)">

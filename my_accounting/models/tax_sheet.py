@@ -27,6 +27,42 @@ RETURN_WORD_RE = re.compile(r'مرتجع')
 
 ARABIC_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 
+# خانة الصف التي يقابلها كل عمود من أعمدة الجدول
+FIELD_OF_COLUMN = {
+    'taxno': 'tax_number',
+    'doc': 'doc_number',
+    'type': 'doc_type',
+    'date': 'date',
+    'label': 'label',
+    'party': 'party',
+    'amount': 'amount',
+    'tax': 'tax',
+    'move': 'move_name',
+}
+
+CHUNK_RE = re.compile(r'(\d+)')
+
+
+def _natural_key(text):
+    """مفتاح ترتيب يقرأ الأرقام أرقاماً: "4/8" قبل "12/8"، و"297" قبل "5325"."""
+    parts = []
+    for piece in CHUNK_RE.split(_clean_number(text)):
+        if piece.isdigit():
+            parts.append((0, int(piece), ''))
+        elif piece:
+            parts.append((1, 0, piece))
+    return tuple(parts)
+
+
+def _row_key(item, column):
+    field = FIELD_OF_COLUMN.get(column, column)
+    value = item.get(field)
+    if column in ('amount', 'tax'):
+        return (0, float(value or 0.0), ())
+    # الخانات الفارغة في الآخر مهما كان الاتجاه ليس مطلوباً هنا؛
+    # تكفي قيمة أولى تضعها بعد المملوءة في التصاعدي
+    return (1 if not value else 0, 0.0, _natural_key(value))
+
 
 def _clean_number(text):
     return (text or '').translate(ARABIC_DIGITS).strip()
@@ -82,6 +118,13 @@ class MyAccountingTaxSheet(models.Model):
         rows = {key: [] for key, _label in TABLES}
         for row in self.row_ids:
             rows[row.table].append(row._payload())
+        # ترتيب الصفوف حسب عمود الجدول، إعداداً يسري على كل الإقرارات
+        sorts = self.env['myaccounting.tax.sort'].get_sorts()
+        for key, _label in TABLES:
+            order = sorts.get(key) or {}
+            if order.get('key'):
+                rows[key].sort(key=lambda item: _row_key(item, order['key']),
+                               reverse=order.get('descending', False))
         totals = {}
         for key, _label in TABLES:
             totals[key] = {

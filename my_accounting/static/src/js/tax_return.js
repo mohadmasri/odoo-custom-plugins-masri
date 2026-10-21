@@ -57,18 +57,21 @@ export class TaxReturn extends Component {
             busy: false,
             // إعدادات الأعمدة: لكل جدول قائمته، وتُطبَّق على كل الإقرارات
             columns: {},
+            sorts: {},
             showColumns: false,
             savingColumns: false,
             dragTable: "",
             dragIndex: -1,
         });
         onWillStart(async () => {
-            const [years, latest, columns] = await Promise.all([
+            const [years, latest, columns, sorts] = await Promise.all([
                 loadLedgerYears(this.orm),
                 this.orm.call("myaccounting.move", "get_latest_ledger_period", []),
                 this.orm.call("myaccounting.tax.column", "get_columns", []),
+                this.orm.call("myaccounting.tax.sort", "get_sorts", []),
             ]);
             this.state.columns = columns;
+            this.state.sorts = sorts;
             this.state.years = years;
             // الفترة الافتراضية: التي يقع فيها آخر شهر فيه قيود، لا الشهر الحالي
             const year = parseInt(latest.year, 10) || years[0] || new Date().getFullYear();
@@ -178,6 +181,52 @@ export class TaxReturn extends Component {
 
     toggleColumns() {
         this.state.showColumns = !this.state.showColumns;
+    }
+
+    // ------------------------------------------------------------------
+    // ترتيب صفوف الجدول حسب عمود منه
+    // ------------------------------------------------------------------
+
+    sortOf(table) {
+        return this.state.sorts[table] || { key: "", descending: false };
+    }
+
+    isSortColumn(table, key) {
+        return this.sortOf(table).key === key;
+    }
+
+    hasSort(table) {
+        return !!this.sortOf(table).key;
+    }
+
+    onSortColumn(table, ev) {
+        const key = ev.target.value;
+        // عمود يُختار لأول مرة يبدأ تصاعدياً، لا باتجاه ترتيب سابق
+        const descending = key && this.hasSort(table) ? this.sortOf(table).descending : false;
+        this.saveSort(table, key, descending);
+    }
+
+    setSortDirection(table, descending) {
+        if (!this.hasSort(table) || this.sortOf(table).descending === descending) {
+            return;
+        }
+        this.saveSort(table, this.sortOf(table).key, descending);
+    }
+
+    async saveSort(table, key, descending) {
+        this.state.savingColumns = true;
+        try {
+            this.state.sorts = await this.orm.call(
+                "myaccounting.tax.sort", "set_sort", [table, key, descending]);
+            // الترتيب يُطبَّق عند قراءة الكشف، فنعيد قراءته
+            this.state.sheet = await this.orm.call(
+                "myaccounting.tax.sheet", "get_sheet", this.period);
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر حفظ الترتيب.",
+                { type: "danger" });
+        } finally {
+            this.state.savingColumns = false;
+        }
     }
 
     isDragging(table, index) {

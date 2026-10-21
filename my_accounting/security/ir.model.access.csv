@@ -29,3 +29,5 @@ access_myaccounting_tax_sheet_row_view,myaccounting.tax.sheet.row.view,model_mya
 access_myaccounting_tax_sheet_row_edit,myaccounting.tax.sheet.row.edit,model_myaccounting_tax_sheet_row,group_myaccounting_edit,1,1,1,1
 access_myaccounting_tax_column_view,myaccounting.tax.column.view,model_myaccounting_tax_column,group_myaccounting_view,1,0,0,0
 access_myaccounting_tax_column_edit,myaccounting.tax.column.edit,model_myaccounting_tax_column,group_myaccounting_edit,1,1,1,1
+access_myaccounting_tax_sort_view,myaccounting.tax.sort.view,model_myaccounting_tax_sort,group_myaccounting_view,1,0,0,0
+access_myaccounting_tax_sort_edit,myaccounting.tax.sort.edit,model_myaccounting_tax_sort,group_myaccounting_edit,1,1,1,1

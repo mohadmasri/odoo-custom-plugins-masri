@@ -357,3 +357,17 @@
     color: var(--gray-600, #6c757d);
     white-space: nowrap;
 }
+
+/* اختيار عمود ترتيب الصفوف */
+.o_tr_cols_sort {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.o_tr_cols_sortlabel {
+    font-size: 0.8rem;
+    color: var(--gray-600, #6c757d);
+}

@@ -125,3 +125,48 @@ class MyAccountingTaxColumn(models.Model):
                 if column:
                     column.write({'label': label, 'sequence': (index + 1) * 10})
         return self.get_columns()
+
+
+class MyAccountingTaxSort(models.Model):
+    """ترتيب صفوف جدول من جداول الإقرار حسب عمود منه.
+
+    إعداد واحد لكل جدول يسري على كل الإقرارات — السابقة واللاحقة —
+    لأنه يُطبَّق لحظة قراءة الكشف لا عند بنائه.
+    """
+    _name = 'myaccounting.tax.sort'
+    _description = 'ترتيب صفوف جدول في الإقرار الضريبي'
+
+    table = fields.Char(string='الجدول', required=True, index=True)
+    key = fields.Char(string='العمود')          # فارغ: بترتيب البناء
+    descending = fields.Boolean(string='تنازلي')
+
+    _sql_constraints = [
+        ('table_unique', 'unique(table)', 'لكل جدول ترتيب واحد.'),
+    ]
+
+    @api.model
+    def get_sorts(self):
+        result = {table: {'key': '', 'descending': False} for table in DEFAULT_COLUMNS}
+        for row in self.search([]):
+            if row.table in result:
+                result[row.table] = {
+                    'key': row.key or '',
+                    'descending': row.descending,
+                }
+        return result
+
+    @api.model
+    def set_sort(self, table, key, descending):
+        if table not in DEFAULT_COLUMNS:
+            return self.get_sorts()
+        known = {column_key for column_key, _label in DEFAULT_COLUMNS[table]}
+        values = {
+            'key': key if key in known else '',
+            'descending': bool(descending),
+        }
+        row = self.search([('table', '=', table)], limit=1)
+        if row:
+            row.write(values)
+        else:
+            self.create(dict(values, table=table))
+        return self.get_sorts()
