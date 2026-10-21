@@ -23,9 +23,19 @@
     margin-bottom: 10px;
 }
 
+/* خلاصتا الإقرار جنباً إلى جنب */
+.o_tr_summaries {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
+}
+
 /* خلاصة الإقرار: عمودان، الرقم إلى اليسار */
 .o_tr_summary {
-    max-width: 520px;
+    flex: 1 1 380px;
+    max-width: 560px;
+    margin-bottom: 0;
 }
 
 .o_tr_summary td {
@@ -77,10 +87,16 @@
     }
 
     /* الخلاصتان بحجم الجداول وبهوامش ضيّقة ليبقى الإقرار في صفحة واحدة */
+    .o_tr_summaries {
+        gap: 10px;
+        margin-top: 8px !important;
+    }
+
     .o_tr_summary {
         font-size: 9px;
-        max-width: 360px;
-        margin-top: 8px !important;
+        flex: 1 1 0;
+        max-width: none;
+        margin-top: 0 !important;
     }
 
     .o_tr_summary td {

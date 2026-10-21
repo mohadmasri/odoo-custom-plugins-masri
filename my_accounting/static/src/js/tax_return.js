@@ -343,6 +343,11 @@ export class TaxReturn extends Component {
             - this.totalOf(`${key}_return`, "amount"));
     }
 
+    /** المبيعات الخاضعة: كامل المبيعات بعد المرتجع ناقص المعفاة */
+    get taxableSales() {
+        return this.round(this.netAmount("sale") - this.exemptSales);
+    }
+
     /** المبيعات التي لا ضريبة عليها (صفرية أو معفاة)، بعد خصم مرتجعاتها */
     get exemptSales() {
         const sum = (key) => this.rowsOf(key)

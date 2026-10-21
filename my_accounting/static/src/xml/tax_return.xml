@@ -256,7 +256,8 @@
                     </button>
                 </div>
 
-                <table class="table table-bordered table-sm o_tr_summary mt-4">
+                <div class="o_tr_summaries mt-4">
+                <table class="table table-bordered table-sm o_tr_summary">
                     <tbody>
                         <tr>
                             <td>ضريبة المبيعات (بعد المرتجعات)</td>
@@ -276,22 +277,27 @@
                 </table>
 
                 <!-- مجاميع القيم، لا الضريبة -->
-                <table class="table table-bordered table-sm o_tr_summary mt-4">
+                <table class="table table-bordered table-sm o_tr_summary">
                     <tbody>
                         <tr>
                             <td>مجموع المشتريات بعد خصم المرتجع</td>
                             <td class="text-end" t-esc="fmt(netAmount('purchase'))"/>
                         </tr>
                         <tr>
-                            <td>مجموع المبيعات بعد خصم المرتجع</td>
-                            <td class="text-end" t-esc="fmt(netAmount('sale'))"/>
+                            <td>مجموع المبيعات بعد خصم المرتجع - المعفاة بعد خصم المرتجع</td>
+                            <td class="text-end" t-esc="fmt(taxableSales)"/>
                         </tr>
                         <tr>
                             <td>مجموع المبيعات الصفرية/معفاة بعد خصم المرتجع</td>
                             <td class="text-end" t-esc="fmt(exemptSales)"/>
                         </tr>
+                        <tr>
+                            <td>مجموع المبيعات كاملة بعد خصم المرتجع</td>
+                            <td class="text-end" t-esc="fmt(netAmount('sale'))"/>
+                        </tr>
                     </tbody>
                 </table>
+                </div>
                 </t>
 
                 <!-- نموذج الدائرة: خاناته محسوبة من الجداول -->
