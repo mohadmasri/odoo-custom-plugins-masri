@@ -45,8 +45,7 @@ export class TaxReturn extends Component {
         this.notification = useService("notification");
         this.months = MONTHS;
         this.pairs = PAIRS;
-        // الكشف عريض الأعمدة، فالورقة أفقية
-        this.printPage = usePrintPageSize("A4 landscape", "8mm");
+        this.printPage = usePrintPageSize("A4 portrait", "6mm");
         this.state = useState({
             loading: true,
             years: [],
@@ -169,6 +168,12 @@ export class TaxReturn extends Component {
     /** الخانات الطويلة تُطبع نصاً بجانب حقلها لتلتفّ على سطرين */
     isWrapColumn(column) {
         return column.key === "label" || column.key === "party";
+    }
+
+    /** التاريخ في الطباعة كما يعرضه الحقل: شهر/يوم/سنة */
+    fmtDate(value) {
+        const parts = `${value || ""}`.split("-");
+        return parts.length === 3 ? `${parts[1]}/${parts[2]}/${parts[0]}` : (value || "");
     }
 
     toggleColumns() {

@@ -156,29 +156,28 @@
                                     </a>
                                 </td>
                                 <t t-foreach="columnsFor(table.key)" t-as="col" t-key="col.key">
+                                    <!-- كل خانة: حقل للشاشة ونصّ للطباعة، فالحقل
+                                         لا يلتفّ ويقصّ ما لا يسعه -->
                                     <td t-if="col.key === 'date'">
-                                        <input type="date" class="form-control form-control-sm"
+                                        <input type="date" class="form-control form-control-sm o_tr_in"
                                                t-att-value="row.date"
                                                t-on-change="(ev) => this.saveCell(row, 'date', ev)"/>
+                                        <span class="o_tr_out" t-esc="fmtDate(row.date)"/>
                                     </td>
-                                    <td t-elif="isNumberColumn(col)">
+                                    <td t-elif="isNumberColumn(col)" class="text-end">
                                         <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
+                                               class="form-control form-control-sm text-end o_tr_in"
                                                t-att-value="cellValue(row, col)"
                                                t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
+                                        <span class="o_tr_out" t-esc="fmt(cellValue(row, col))"/>
                                     </td>
-                                    <td t-elif="isWrapColumn(col)"
+                                    <td t-else=""
                                         t-attf-class="{{ col.key === 'party' ? 'o_tr_party' : '' }}">
                                         <input type="text"
                                                class="form-control form-control-sm o_tr_in"
                                                t-att-value="cellValue(row, col)"
                                                t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
                                         <span class="o_tr_out" t-esc="cellValue(row, col)"/>
-                                    </td>
-                                    <td t-else="">
-                                        <input type="text" class="form-control form-control-sm"
-                                               t-att-value="cellValue(row, col)"
-                                               t-on-change="(ev) => this.saveCell(row, cellField(col), ev)"/>
                                     </td>
                                 </t>
                                 <td t-if="isPurchase(table.key)" class="o_tr_link">

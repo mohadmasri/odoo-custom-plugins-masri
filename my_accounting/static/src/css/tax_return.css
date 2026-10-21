@@ -117,16 +117,17 @@
     }
 
     .o_tr_table {
-        font-size: 9px;
+        font-size: 8.5px;
         width: 100% !important;
         table-layout: fixed;
     }
 
     .o_tr_table td,
     .o_tr_table th {
-        padding: 1px 3px !important;
+        padding: 1px 2px !important;
         white-space: normal;
         word-break: break-word;
+        overflow: hidden;
     }
 
     /* الأرقام لا تنكسر على سطرين */
@@ -221,20 +222,26 @@
         word-break: break-word;
         line-height: 1.25;
     }
+
+    /* الأرقام إلى يمين خانتها كما على الشاشة */
+    .o_tr_table .text-end .o_tr_out {
+        text-align: end;
+        white-space: nowrap;
+    }
 }
 
 /* عرض الأعمدة في الطباعة: نضيّق ما يكفيه القليل ليتسع البيان */
 @media print {
-    .o_tr_c_mark { width: 24px !important; }
-    .o_tr_c_taxno { width: 85px !important; }
-    .o_tr_c_doc { width: 70px !important; }
-    .o_tr_c_type { width: 45px !important; }
-    .o_tr_c_date { width: 70px !important; }
+    .o_tr_c_mark { width: 22px !important; }
+    .o_tr_c_taxno { width: 56px !important; }
+    .o_tr_c_doc { width: 44px !important; }
+    .o_tr_c_type { width: 30px !important; }
+    .o_tr_c_date { width: 50px !important; }
     .o_tr_c_label { width: auto !important; min-width: 0 !important; }
-    .o_tr_c_party { width: 150px !important; }
-    .o_tr_c_amount { width: 85px !important; }
-    .o_tr_c_tax { width: 80px !important; }
-    .o_tr_c_move { width: 60px !important; }
+    .o_tr_c_party { width: 96px !important; }
+    .o_tr_c_amount { width: 58px !important; }
+    .o_tr_c_tax { width: 58px !important; }
+    .o_tr_c_move { width: 40px !important; }
 }
 
 /* الجدول على الشاشة بعرض تلقائي، فالعمود يتقلّص إلى أصغر عرض لحقله.
