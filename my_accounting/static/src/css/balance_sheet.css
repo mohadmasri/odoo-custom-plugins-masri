@@ -1,0 +1,152 @@
+.o_balance_sheet {
+    overflow: auto;
+    height: 100%;
+}
+
+.o_bs_filter {
+    margin-bottom: 1rem;
+}
+
+.o_bs_head {
+    margin-bottom: 12px;
+}
+
+/* الجانبان جنباً إلى جنب، وينزل أحدهما تحت الآخر في الشاشات الضيّقة */
+.o_bs_body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.o_bs_side {
+    flex: 1 1 420px;
+    min-width: 0;
+}
+
+.o_bs_table th {
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_bs_table td {
+    padding: 3px 8px;
+}
+
+.o_bs_root td {
+    font-weight: 600;
+    background: var(--o-surface-2, #f7f8fa);
+}
+
+.o_bs_line td:first-child {
+    padding-inline-start: 24px;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs_line {
+    cursor: pointer;
+}
+
+.o_bs_line:hover td {
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_bs_total td {
+    font-weight: 700;
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
+    background: var(--o-surface-2, #f2f2f2);
+}
+
+.o_bs_check {
+    margin-top: 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.o_bs_ok {
+    background: var(--o-surface-2, #eef7ee);
+    color: var(--body-color, #212529);
+}
+
+.o_bs_bad {
+    background: var(--o-surface-2, #fdf1f1);
+    color: var(--body-color, #212529);
+    font-weight: 600;
+}
+
+/* تصنيف الحسابات الرئيسية */
+.o_bs_groups {
+    max-width: 620px;
+    margin-bottom: 1rem;
+    padding: 12px;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 10px;
+    background: var(--o-surface, #fff);
+}
+
+.o_bs_groups_list {
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.o_bs_groups_row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 10px;
+    background: var(--o-surface, #fff);
+}
+
+.o_bs_groups_row + .o_bs_groups_row {
+    border-top: 1px solid var(--o-surface-border, #eee);
+}
+
+.o_bs_groups_code {
+    min-width: 40px;
+    font-size: 0.78rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs_groups_name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media print {
+    .o_balance_sheet {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    .o_balance_sheet td,
+    .o_balance_sheet th {
+        color: #000 !important;
+    }
+
+    .o_bs_body {
+        gap: 10px;
+    }
+
+    .o_bs_side {
+        flex: 1 1 0;
+    }
+
+    .o_bs_table {
+        font-size: 9px;
+    }
+
+    .o_bs_table td,
+    .o_bs_table th {
+        padding: 1px 4px !important;
+    }
+
+    .o_bs_side,
+    .o_bs_check {
+        break-inside: avoid;
+    }
+}

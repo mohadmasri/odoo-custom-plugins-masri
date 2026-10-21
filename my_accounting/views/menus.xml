@@ -46,6 +46,10 @@
               parent="menu_myaccounting_root" sequence="47"
               action="action_myaccounting_tax_return"/>
 
+    <menuitem id="menu_myaccounting_balance_sheet" name="الميزانية السنوية"
+              parent="menu_myaccounting_root" sequence="48"
+              action="action_myaccounting_balance_sheet"/>
+
     <!-- "اعدادات اخرى" قائمة فرعية: الإعدادات + إدخال القيود عبر الصور (BETA) -->
     <menuitem id="menu_myaccounting_settings_root" name="اعدادات اخرى"
               parent="menu_myaccounting_root" sequence="50"/>

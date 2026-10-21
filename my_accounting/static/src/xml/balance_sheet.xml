@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.BalanceSheetSide">
+        <t t-foreach="roots" t-as="root" t-key="root.id">
+            <tr class="o_bs_root">
+                <td><t t-esc="root.code"/> — <t t-esc="root.name"/></td>
+                <td class="text-end" t-esc="fmt(root.amount)"/>
+            </tr>
+            <t t-foreach="root.accounts" t-as="line" t-key="line.id">
+                <tr t-if="!line.root" class="o_bs_line"
+                    t-custom-click="(ev, mid) => this.openAccount(line.id, mid)">
+                    <td><t t-esc="line.code"/> <t t-esc="line.name"/></td>
+                    <td class="text-end" t-esc="fmt(line.amount)"/>
+                </tr>
+            </t>
+        </t>
+    </t>
+
+    <t t-name="my_accounting.BalanceSheet">
+        <div class="o_balance_sheet p-3">
+
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <h2 class="m-0">الميزانية السنوية</h2>
+                <div class="d-flex gap-2">
+                    <button t-attf-class="btn btn-sm {{ state.showGroups ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.toggleGroups()">
+                        <i class="fa fa-sitemap me-1"/> تصنيف الحسابات
+                    </button>
+                    <button t-attf-class="btn btn-sm {{ state.showEmpty ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.toggleEmpty()">
+                        الحسابات الصفرية
+                    </button>
+                    <button class="btn btn-secondary btn-sm" t-on-click="() => this.print()">
+                        <i class="fa fa-print me-1"/> طباعة
+                    </button>
+                </div>
+            </div>
+
+            <div class="o_bs_filter no-print">
+                <label class="form-label small mb-1">السنة</label>
+                <select class="form-select form-select-sm" style="width:120px;"
+                        t-on-change="(ev) => this.onYear(ev)">
+                    <option t-foreach="data ? data.years : []" t-as="y" t-key="y"
+                            t-att-value="y" t-att-selected="isYear(y)" t-esc="y"/>
+                </select>
+            </div>
+
+            <!-- تصنيف الحسابات الرئيسية: أين يقع كل حساب من الميزانية -->
+            <div t-if="state.showGroups and state.groups" class="o_bs_groups no-print">
+                <div class="small text-muted mb-2">
+                    التصنيف المبدئي من أول رقم في رمز الحساب. صحّحه هنا متى لزم،
+                    فالتغيير يسري على الميزانية كلها — هذه السنة والسنوات الأخرى.
+                </div>
+                <div class="o_bs_groups_list">
+                    <div t-foreach="state.groups.roots" t-as="root"
+                         t-key="root.id + '|' + root.group" class="o_bs_groups_row">
+                        <span class="o_bs_groups_code" t-esc="root.code"/>
+                        <span class="o_bs_groups_name" t-esc="root.name"/>
+                        <select class="form-select form-select-sm" style="width:150px;"
+                                t-att-disabled="state.busy"
+                                t-on-change="(ev) => this.onGroup(root, ev)">
+                            <option t-foreach="state.groups.groups" t-as="group" t-key="group.key"
+                                    t-att-value="group.key"
+                                    t-att-selected="isGroup(root, group.key)"
+                                    t-esc="group.label"/>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-muted py-5 text-center">تُحسب الميزانية...</div>
+
+            <t t-elif="data">
+                <div class="o_bs_head">
+                    <h3 class="m-0">الميزانية كما في نهاية سنة <t t-esc="data.year"/></h3>
+                    <div class="small text-muted">
+                        من أرصدة القيود المرحّلة المتراكمة حتى نهاية السنة
+                    </div>
+                </div>
+
+                <div class="o_bs_body">
+                    <!-- الأصول -->
+                    <div class="o_bs_side">
+                        <table class="table table-bordered table-sm o_bs_table">
+                            <thead>
+                                <tr>
+                                    <th>الأصول</th>
+                                    <th class="text-end" style="width:140px;">المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-call="my_accounting.BalanceSheetSide">
+                                    <t t-set="roots" t-value="section('asset').roots"/>
+                                </t>
+                                <tr t-if="!section('asset').roots.length">
+                                    <td colspan="2" class="text-muted text-center py-2">لا حسابات</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="o_bs_total">
+                                    <td>مجموع الأصول</td>
+                                    <td class="text-end" t-esc="fmt(data.assets)"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- الخصوم وحقوق الملكية -->
+                    <div class="o_bs_side">
+                        <table class="table table-bordered table-sm o_bs_table">
+                            <thead>
+                                <tr>
+                                    <th>الخصوم وحقوق الملكية</th>
+                                    <th class="text-end" style="width:140px;">المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-call="my_accounting.BalanceSheetSide">
+                                    <t t-set="roots" t-value="section('liability').roots"/>
+                                </t>
+                                <t t-call="my_accounting.BalanceSheetSide">
+                                    <t t-set="roots" t-value="section('equity').roots"/>
+                                </t>
+
+                                <tr class="o_bs_root">
+                                    <td>نتيجة السنة</td>
+                                    <td class="text-end" t-esc="fmt(data.profit)"/>
+                                </tr>
+                                <tr class="o_bs_line">
+                                    <td>الإيرادات</td>
+                                    <td class="text-end" t-esc="fmt(data.income)"/>
+                                </tr>
+                                <tr class="o_bs_line">
+                                    <td>ناقص: المصاريف</td>
+                                    <td class="text-end" t-esc="'(' + fmt(data.expense) + ')'"/>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="o_bs_total">
+                                    <td>مجموع الخصوم وحقوق الملكية</td>
+                                    <td class="text-end" t-esc="fmt(data.right)"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="data.balanced" class="o_bs_check o_bs_ok">
+                    الجانبان متساويان.
+                </div>
+                <div t-else="" class="o_bs_check o_bs_bad">
+                    فرق بين الجانبين: <t t-esc="fmt(data.difference)"/>
+                    <t t-if="data.outside">
+                        — منه <t t-esc="fmt(data.outside)"/> في حسابات مصنَّفة "خارج الميزانية".
+                    </t>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

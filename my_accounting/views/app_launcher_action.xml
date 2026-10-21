@@ -42,6 +42,11 @@
         <field name="tag">my_accounting.blocks_settings</field>
     </record>
 
+    <record id="action_myaccounting_balance_sheet" model="ir.actions.client">
+        <field name="name">الميزانية السنوية</field>
+        <field name="tag">my_accounting.balance_sheet</field>
+    </record>
+
     <record id="action_myaccounting_tax_return" model="ir.actions.client">
         <field name="name">الاقرار الضريبي</field>
         <field name="tag">my_accounting.tax_return</field>
