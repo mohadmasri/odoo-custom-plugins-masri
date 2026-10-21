@@ -262,6 +262,24 @@
                         </tr>
                     </tbody>
                 </table>
+
+                <!-- مجاميع القيم، لا الضريبة -->
+                <table class="table table-bordered table-sm o_tr_summary mt-4">
+                    <tbody>
+                        <tr>
+                            <td>مجموع المشتريات بعد خصم المرتجع</td>
+                            <td class="text-end" t-esc="fmt(netAmount('purchase'))"/>
+                        </tr>
+                        <tr>
+                            <td>مجموع المبيعات بعد خصم المرتجع</td>
+                            <td class="text-end" t-esc="fmt(netAmount('sale'))"/>
+                        </tr>
+                        <tr>
+                            <td>مجموع المبيعات الصفرية/معفاة بعد خصم المرتجع</td>
+                            <td class="text-end" t-esc="fmt(exemptSales)"/>
+                        </tr>
+                    </tbody>
+                </table>
             </t>
         </div>
     </t>

@@ -45,7 +45,7 @@ export class TaxReturn extends Component {
         this.notification = useService("notification");
         this.months = MONTHS;
         this.pairs = PAIRS;
-        this.printPage = usePrintPageSize("A4 portrait", "6mm");
+        this.printPage = usePrintPageSize("A4 portrait", "5mm");
         this.state = useState({
             loading: true,
             years: [],
@@ -296,6 +296,24 @@ export class TaxReturn extends Component {
             "myaccounting.tax.column", "reset_columns", [table]);
         this.notification.add("عادت أعمدة الجدول إلى أسمائها وترتيبها الأصلي.",
             { type: "success" });
+    }
+
+    /** مجموع قيم جدول بعد خصم مرتجعاته */
+    netAmount(key) {
+        return this.round(this.totalOf(key, "amount")
+            - this.totalOf(`${key}_return`, "amount"));
+    }
+
+    /** المبيعات التي لا ضريبة عليها (صفرية أو معفاة)، بعد خصم مرتجعاتها */
+    get exemptSales() {
+        const sum = (key) => this.rowsOf(key)
+            .filter((row) => !row.tax)
+            .reduce((total, row) => total + (row.amount || 0), 0);
+        return this.round(sum("sale") - sum("sale_return"));
+    }
+
+    round(value) {
+        return Math.round(value * 1000) / 1000;
     }
 
     /** المستحق من مجاميع الجداول: مبيعات ناقص مرتجعاتها ناقص صافي المشتريات */

@@ -75,6 +75,17 @@
         page-break-inside: avoid;
         break-inside: avoid;
     }
+
+    /* الخلاصتان بحجم الجداول وبهوامش ضيّقة ليبقى الإقرار في صفحة واحدة */
+    .o_tr_summary {
+        font-size: 9px;
+        max-width: 360px;
+        margin-top: 8px !important;
+    }
+
+    .o_tr_summary td {
+        padding: 1px 6px !important;
+    }
     .o_tax_return td,
     .o_tax_return th {
         color: #000 !important;
@@ -144,8 +155,13 @@
     }
 
     .o_tr_section_title {
-        font-size: 12px;
-        margin-top: 10px;
+        font-size: 11px;
+        margin-top: 5px;
+        margin-bottom: 2px;
+    }
+
+    .o_tr_head {
+        margin-bottom: 4px !important;
     }
 }
 
