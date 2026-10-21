@@ -1,6 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
+    <!-- خانة تختار حساباً أو باباً أو بنداً، بالكتابة مع قائمة مطابقة -->
+    <t t-name="my_accounting.RefPicker">
+        <div class="o_bs_picker" t-ref="root">
+            <input type="text" class="form-control form-control-sm"
+                   t-att-placeholder="props.placeholder or 'اكتب اسم الحساب أو الباب...'"
+                   t-att-value="state.text" t-att-disabled="props.disabled"
+                   t-on-input="(ev) => this.onInput(ev)"
+                   t-on-focus="() => this.onFocus()"
+                   t-on-blur="() => this.onBlur()"
+                   t-on-keydown="(ev) => this.onKeydown(ev)"/>
+            <div t-if="state.open" class="o_bs_picker_menu">
+                <div t-foreach="matches" t-as="option" t-key="option.token"
+                     t-attf-class="o_bs_picker_item {{ isActive(option_index) ? 'o_bs_picker_on' : '' }}"
+                     t-on-mousedown.prevent="() => this.choose(option)">
+                    <span t-esc="option.display"/>
+                    <span t-if="option.hint" class="o_bs_picker_hint" t-esc="option.hint"/>
+                </div>
+                <div t-if="!matches.length" class="o_bs_picker_empty">لا مطابق</div>
+            </div>
+        </div>
+    </t>
+
     <!-- جانب من جوانب الميزانية: أبوابه وحساباتها وبنوده المحسوبة -->
     <t t-name="my_accounting.BalanceSheetSide">
         <t t-foreach="sections" t-as="section" t-key="section.id">
@@ -87,6 +109,20 @@
                     </li>
                 </ul>
 
+                <div class="o_bs_savebar">
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !dirtyPanel"
+                            t-on-click="() => this.save()">
+                        <i class="fa fa-check me-1"/> حفظ
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy or !dirtyPanel"
+                            t-on-click="() => this.cancel()">
+                        إلغاء
+                    </button>
+                    <span t-if="dirtyPanel" class="o_bs_dirty">تغييرات لم تُحفظ</span>
+                </div>
+
                 <!-- الأبواب -->
                 <div t-if="state.panel === 'groups'" class="o_bs_panel">
                     <div class="small text-muted mb-2">
@@ -106,24 +142,23 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr t-foreach="state.groups" t-as="group"
-                                t-key="group.id + '|' + group.name + '|' + group.kind + '|' + group.side">
+                            <tr t-foreach="state.groups" t-as="group" t-key="group_index">
                                 <td>
                                     <input type="number" class="form-control form-control-sm"
                                            t-att-value="group.sequence"
                                            t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveGroup(group, 'sequence', ev)"/>
+                                           t-on-change="(ev) => this.editGroup(group, 'sequence', ev)"/>
                                 </td>
                                 <td>
                                     <input type="text" class="form-control form-control-sm"
                                            t-att-value="group.name"
                                            t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveGroup(group, 'name', ev)"/>
+                                           t-on-change="(ev) => this.editGroup(group, 'name', ev)"/>
                                 </td>
                                 <td>
                                     <select class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.saveGroup(group, 'kind', ev)">
+                                            t-on-change="(ev) => this.editGroup(group, 'kind', ev)">
                                         <option t-foreach="kinds" t-as="kind" t-key="kind.value"
                                                 t-att-value="kind.value"
                                                 t-att-selected="isValue(group.kind, kind.value)"
@@ -133,7 +168,7 @@
                                 <td>
                                     <select class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.saveGroup(group, 'side', ev)">
+                                            t-on-change="(ev) => this.editGroup(group, 'side', ev)">
                                         <option t-foreach="sides" t-as="side" t-key="side.value"
                                                 t-att-value="side.value"
                                                 t-att-selected="isValue(group.side, side.value)"
@@ -144,7 +179,7 @@
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-link text-danger p-0" title="حذف الباب"
                                             t-att-disabled="state.busy"
-                                            t-on-click="() => this.deleteGroup(group)">
+                                            t-on-click="() => this.removeGroup(group_index)">
                                         <i class="fa fa-trash"/>
                                     </button>
                                 </td>
@@ -180,14 +215,13 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr t-foreach="visibleAccounts" t-as="account"
-                                    t-key="account.id + '|' + account.group_id + '|' + account.opening">
+                                <tr t-foreach="visibleAccounts" t-as="account" t-key="account.id">
                                     <td class="text-muted" t-esc="account.code"/>
                                     <td t-att-style="indent(account.level)" t-esc="account.name"/>
                                     <td>
                                         <select class="form-select form-select-sm"
                                                 t-att-disabled="state.busy"
-                                                t-on-change="(ev) => this.onAccountGroup(account, ev)">
+                                                t-on-change="(ev) => this.editAccountGroup(account, ev)">
                                             <option value=""
                                                     t-att-selected="isAccountGroup(account, false)">
                                                 <t t-if="account.inherited">
@@ -206,7 +240,7 @@
                                                class="form-control form-control-sm text-end"
                                                t-att-value="account.opening"
                                                t-att-disabled="state.busy"
-                                               t-on-change="(ev) => this.onOpening(account, ev)"/>
+                                               t-on-change="(ev) => this.editOpening(account, ev)"/>
                                     </td>
                                 </tr>
                             </tbody>
@@ -236,31 +270,30 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr t-foreach="state.lines" t-as="line"
-                                t-key="line.id + '|' + line.name + '|' + line.formula + '|' + line.placement + '|' + line.group_id + '|' + line.side + '|' + line.bold">
+                            <tr t-foreach="state.lines" t-as="line" t-key="line_index">
                                 <td>
                                     <input type="number" class="form-control form-control-sm"
                                            t-att-value="line.sequence" t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveLine(line, 'sequence', ev)"/>
+                                           t-on-change="(ev) => this.editLine(line, 'sequence', ev)"/>
                                 </td>
                                 <td>
                                     <input type="text" class="form-control form-control-sm"
                                            t-att-value="line.name" t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveLine(line, 'name', ev)"/>
+                                           t-on-change="(ev) => this.editLine(line, 'name', ev)"/>
                                 </td>
                                 <td>
                                     <t t-if="isAdvanced(line)">
                                         <input type="text" class="form-control form-control-sm"
                                                dir="ltr" t-att-value="line.formula"
                                                t-att-disabled="state.busy"
-                                               t-on-change="(ev) => this.saveLine(line, 'formula', ev)"/>
+                                               t-on-change="(ev) => this.editLine(line, 'formula', ev)"/>
                                         <div class="o_bs_err">معادلة متقدّمة — تُحرَّر نصاً</div>
                                     </t>
                                     <div t-else="" class="o_bs_terms">
                                         <div t-foreach="terms(line)" t-as="term"
-                                             t-key="term_index + '|' + term.token"
-                                             class="o_bs_term">
-                                            <select class="form-select form-select-sm o_bs_term_op"
+                                             t-key="term_index" class="o_bs_term">
+                                            <select t-if="term_index > 0"
+                                                    class="form-select form-select-sm o_bs_term_op"
                                                     t-att-disabled="state.busy"
                                                     t-on-change="(ev) => this.onTermSign(line, term_index, ev)">
                                                 <option value="+"
@@ -268,12 +301,10 @@
                                                 <option value="-"
                                                         t-att-selected="term.op === '-'">−</option>
                                             </select>
-                                            <input type="text" list="o_bs_ref_options"
-                                                   class="form-control form-control-sm o_bs_term_ref"
-                                                   placeholder="اختر حساباً أو باباً..."
-                                                   t-att-value="labelOf(term.token)"
-                                                   t-att-disabled="state.busy"
-                                                   t-on-change="(ev) => this.onTermRef(line, term_index, ev)"/>
+                                            <RefPicker value="term.token"
+                                                       options="state.references"
+                                                       disabled="state.busy"
+                                                       onSelect="(token) => this.onTermRef(line, term_index, token)"/>
                                             <button class="btn btn-sm btn-link text-danger p-0"
                                                     title="حذف الخانة" t-att-disabled="state.busy"
                                                     t-on-click="() => this.removeTerm(line, term_index)">
@@ -292,7 +323,7 @@
                                 <td>
                                     <select class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.saveLine(line, 'placement', ev)">
+                                            t-on-change="(ev) => this.editLine(line, 'placement', ev)">
                                         <option t-foreach="placements" t-as="place" t-key="place.value"
                                                 t-att-value="place.value"
                                                 t-att-selected="isPlacement(line, place.value)"
@@ -303,7 +334,7 @@
                                     <select t-if="isPlacement(line, 'group')"
                                             class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.saveLine(line, 'group_id', ev)">
+                                            t-on-change="(ev) => this.editLine(line, 'group_id', ev)">
                                         <option value="" t-att-selected="isLineGroup(line, false)">
                                             — اختر باباً —
                                         </option>
@@ -315,7 +346,7 @@
                                     <select t-elif="isPlacement(line, 'side')"
                                             class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.saveLine(line, 'side', ev)">
+                                            t-on-change="(ev) => this.editLine(line, 'side', ev)">
                                         <option t-foreach="lineSides" t-as="side" t-key="side.value"
                                                 t-att-value="side.value"
                                                 t-att-selected="isLineSide(line, side.value)"
@@ -326,12 +357,12 @@
                                 <td class="text-center">
                                     <input type="checkbox" class="form-check-input"
                                            t-att-checked="line.bold" t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveLine(line, 'bold', ev)"/>
+                                           t-on-change="(ev) => this.editLine(line, 'bold', ev)"/>
                                 </td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-link text-danger p-0" title="حذف البند"
                                             t-att-disabled="state.busy"
-                                            t-on-click="() => this.deleteLine(line)">
+                                            t-on-click="() => this.removeLine(line_index)">
                                         <i class="fa fa-trash"/>
                                     </button>
                                 </td>
@@ -346,10 +377,7 @@
                         <i class="fa fa-plus me-1"/> بند جديد
                     </button>
 
-                    <datalist id="o_bs_ref_options">
-                        <option t-foreach="references.all" t-as="ref" t-key="ref.token"
-                                t-att-value="ref.label"/>
-                    </datalist>
+
                 </div>
             </t>
 

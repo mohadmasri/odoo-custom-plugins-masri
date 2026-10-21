@@ -1,7 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
-import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { Component, onWillStart, onWillUpdateProps, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { openRecord } from "./open_record";
@@ -28,38 +27,135 @@ const LINE_SIDES = [
     { value: "credit", label: "جانب الخصوم" },
 ];
 
+const TERM_RE = /^\s*([+-]?)\s*(\[[^\]]*\]|\{[^}]*\}|<[^>]*>)\s*/;
+
+function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function same(first, second) {
+    return JSON.stringify(first) === JSON.stringify(second);
+}
+
 /**
- * الميزانية السنوية: أرصدة الحسابات موزّعة على أبواب يعرّفها المستخدم،
- * مع الرصيد الافتتاحي لكل حساب.
+ * خانة في معادلة: يُكتب فيها اسم الحساب أو الباب أو البند، فتنزل قائمة
+ * بما يطابقه ويُختار منها. الاسم هو المعروض، والرمز يبقى خلفه.
+ */
+export class RefPicker extends Component {
+    static template = "my_accounting.RefPicker";
+    static props = ["*"];
+
+    setup() {
+        this.state = useState({ text: this.labelOf(this.props.value), open: false, active: 0 });
+        this.root = useRef("root");
+        onWillUpdateProps((next) => {
+            if (next.value !== this.props.value) {
+                this.state.text = this.labelOf(next.value, next.options);
+            }
+        });
+    }
+
+    labelOf(token, options) {
+        const found = (options || this.props.options || []).find(
+            (item) => item.token === token);
+        return found ? found.display : "";
+    }
+
+    get matches() {
+        const text = this.state.text.trim();
+        const options = this.props.options || [];
+        if (!text) {
+            return options.slice(0, 50);
+        }
+        return options
+            .filter((item) => item.display.includes(text) || `${item.hint}`.includes(text))
+            .slice(0, 50);
+    }
+
+    onInput(ev) {
+        this.state.text = ev.target.value;
+        this.state.open = true;
+        this.state.active = 0;
+    }
+
+    onFocus() {
+        this.state.open = true;
+    }
+
+    onBlur() {
+        // النقر على خيار يقع بعد الخروج من الحقل، فنمهله
+        setTimeout(() => {
+            if (this.root.el && this.root.el.contains(document.activeElement)) {
+                return;
+            }
+            this.state.open = false;
+            this.state.text = this.labelOf(this.props.value);
+        }, 180);
+    }
+
+    onKeydown(ev) {
+        const matches = this.matches;
+        if (ev.key === "ArrowDown") {
+            ev.preventDefault();
+            this.state.open = true;
+            this.state.active = Math.min(this.state.active + 1, matches.length - 1);
+        } else if (ev.key === "ArrowUp") {
+            ev.preventDefault();
+            this.state.active = Math.max(this.state.active - 1, 0);
+        } else if (ev.key === "Enter") {
+            ev.preventDefault();
+            if (matches[this.state.active]) {
+                this.choose(matches[this.state.active]);
+            }
+        } else if (ev.key === "Escape") {
+            this.state.open = false;
+        }
+    }
+
+    choose(option) {
+        this.state.text = option.display;
+        this.state.open = false;
+        this.props.onSelect(option.token);
+    }
+
+    isActive(index) {
+        return index === this.state.active;
+    }
+}
+
+/**
+ * الميزانية السنوية: الأصول في جانب، والخصوم وحقوق الملكية ونتيجة السنة
+ * في الآخر. وإعداداتها — الأبواب وتصنيف الحسابات والبنود المحسوبة —
+ * تُحرَّر على مسوّدة ولا تُحفظ إلا بزرّ الحفظ.
  */
 export class BalanceSheet extends Component {
     static template = "my_accounting.BalanceSheet";
+    static components = { RefPicker };
     static props = ["*"];
 
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
-        this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 portrait", "8mm");
         this.kinds = KINDS;
         this.sides = SIDES;
         this.placements = PLACEMENTS;
         this.lineSides = LINE_SIDES;
+        this.saved = { groups: [], accounts: [], lines: [] };
         this.state = useState({
             loading: true,
             data: null,
             year: "",
-            tab: "sheet",       // sheet أو settings
-            panel: "groups",    // groups أو accounts أو lines
+            tab: "sheet",
+            panel: "groups",
             groups: [],
             accounts: [],
             lines: [],
-            references: null,
+            references: [],
             showEmpty: false,
             busy: false,
             accountSearch: "",
-            draftTerms: {},
         });
         onWillStart(async () => {
             await this.load();
@@ -86,14 +182,11 @@ export class BalanceSheet extends Component {
             this.orm.call("myaccounting.statement.line", "get_lines", []),
             this.orm.call("myaccounting.account", "get_formula_references", []),
         ]);
+        this.saved = { groups: clone(groups), accounts: clone(accounts), lines: clone(lines) };
         this.state.groups = groups;
         this.state.accounts = accounts;
         this.state.lines = lines;
         this.state.references = references;
-    }
-
-    setTab(tab) {
-        this.state.tab = tab;
     }
 
     get data() {
@@ -114,189 +207,54 @@ export class BalanceSheet extends Component {
         await this.load();
     }
 
+    setTab(tab) {
+        this.state.tab = tab;
+    }
+
     setPanel(panel) {
         this.state.panel = panel;
     }
 
     // ------------------------------------------------------------------
-    // البنود المحسوبة
+    // الحفظ والإلغاء: لوحة واحدة في كل مرة
     // ------------------------------------------------------------------
 
-    async saveLine(line, field, ev) {
-        let value = ev.target.value;
-        if (field === "sequence") {
-            value = parseInt(value, 10) || 0;
-        } else if (field === "bold") {
-            value = ev.target.checked;
-        } else if (field === "group_id") {
-            value = value ? parseInt(value, 10) : false;
-        }
-        await this.withBusy(async () => {
-            this.state.lines = await this.orm.call(
-                "myaccounting.statement.line", "save_line", [line.id, { [field]: value }]);
+    isDirty(panel) {
+        return !same(this.state[panel], this.saved[panel]);
+    }
+
+    get dirtyPanel() {
+        return this.isDirty(this.state.panel);
+    }
+
+    async save() {
+        const panel = this.state.panel;
+        const calls = {
+            groups: ["myaccounting.statement.group", "save_groups"],
+            accounts: ["myaccounting.account", "save_statement_accounts"],
+            lines: ["myaccounting.statement.line", "save_lines"],
+        };
+        const [model, method] = calls[panel];
+        this.state.busy = true;
+        try {
+            const items = panel === "accounts"
+                ? this.state.accounts.map((account) => ({
+                    id: account.id, group_id: account.group_id, opening: account.opening,
+                }))
+                : clone(this.state[panel]);
+            await this.orm.call(model, method, [items]);
+            await this.loadSettings();
             await this.load();
-        });
-    }
-
-    async addLine() {
-        await this.withBusy(async () => {
-            this.state.lines = await this.orm.call(
-                "myaccounting.statement.line", "save_line",
-                [false, { name: "بند جديد", formula: "0", placement: "bottom", sequence: 50 }]);
-            await this.load();
-        });
-    }
-
-    deleteLine(line) {
-        this.dialog.add(ConfirmationDialog, {
-            title: `حذف "${line.name}"`,
-            body: "سيُحذف البند من الميزانية.",
-            confirmLabel: "احذف",
-            confirm: () => this.withBusy(async () => {
-                this.state.lines = await this.orm.call(
-                    "myaccounting.statement.line", "delete_line", [line.id]);
-                await this.load();
-            }),
-            cancel: () => {},
-        });
-    }
-
-    // ------------------------------------------------------------------
-    // بناء المعادلة بخانات: (خانة) + أو - (خانة) ...
-    // ------------------------------------------------------------------
-
-    /** كل ما يصلح مرجعاً، باسم معروض يُكتب في الخانة ورمز يدخل المعادلة */
-    get references() {
-        if (!this.state.references) {
-            return { all: [], byLabel: {}, byToken: {} };
-        }
-        const all = [];
-        for (const item of this.state.references.groups) {
-            all.push({ token: item.token, label: `باب: ${item.token.slice(1, -1)}` });
-        }
-        for (const item of this.state.references.lines) {
-            all.push({ token: item.token, label: `بند: ${item.token.slice(1, -1)}` });
-        }
-        for (const item of this.state.references.accounts) {
-            all.push({ token: item.token, label: `${item.token.slice(1, -1)} — ${item.label}` });
-        }
-        const byLabel = {};
-        const byToken = {};
-        for (const item of all) {
-            byLabel[item.label] = item.token;
-            byToken[item.token] = item.label;
-        }
-        return { all, byLabel, byToken };
-    }
-
-    labelOf(token) {
-        return this.references.byToken[token] || token;
-    }
-
-    /** يقرأ معادلة على شكل خانات متتابعة، أو null إن كانت أعقد من ذلك */
-    parseTerms(formula) {
-        const text = `${formula || ""}`.trim();
-        if (!text) {
-            return [];
-        }
-        const pattern = /^\s*([+-]?)\s*(\[[^\]]*\]|\{[^}]*\}|<[^>]*>)\s*/;
-        const terms = [];
-        let rest = text;
-        while (rest.length) {
-            const match = pattern.exec(rest);
-            if (!match) {
-                return null;
-            }
-            terms.push({ op: match[1] === "-" ? "-" : "+", token: match[2] });
-            rest = rest.slice(match[0].length);
-        }
-        return terms;
-    }
-
-    terms(line) {
-        const draft = this.state.draftTerms[line.id];
-        return draft || this.parseTerms(line.formula) || [];
-    }
-
-    /** معادلة لا تُكتب بخانات (أقواس أو ضرب أو قسمة) تبقى نصاً */
-    isAdvanced(line) {
-        return this.parseTerms(line.formula) === null;
-    }
-
-    buildFormula(terms) {
-        return terms.map((term, index) => (
-            index === 0
-                ? (term.op === "-" ? `- ${term.token}` : term.token)
-                : ` ${term.op} ${term.token}`
-        )).join("");
-    }
-
-    async applyTerms(line, terms) {
-        if (terms.length && terms.every((term) => term.token)) {
-            delete this.state.draftTerms[line.id];
-            await this.withBusy(async () => {
-                this.state.lines = await this.orm.call(
-                    "myaccounting.statement.line", "save_line",
-                    [line.id, { formula: this.buildFormula(terms) }]);
-                await this.load();
-            });
-        } else {
-            this.state.draftTerms[line.id] = terms;
+            this.notification.add("حُفظ.", { type: "success" });
+        } catch (error) {
+            this.notification.add(error.data?.message || "تعذّر الحفظ.", { type: "danger" });
+        } finally {
+            this.state.busy = false;
         }
     }
 
-    onTermSign(line, index, ev) {
-        const terms = this.terms(line).map((term) => ({ ...term }));
-        terms[index].op = ev.target.value;
-        this.applyTerms(line, terms);
-    }
-
-    onTermRef(line, index, ev) {
-        const token = this.references.byLabel[ev.target.value.trim()] || "";
-        const terms = this.terms(line).map((term) => ({ ...term }));
-        terms[index].token = token;
-        if (!token && ev.target.value.trim()) {
-            this.notification.add("لا مرجع بهذا الاسم. اختر من القائمة.", { type: "warning" });
-        }
-        this.applyTerms(line, terms);
-    }
-
-    addTerm(line) {
-        const terms = this.terms(line).map((term) => ({ ...term }));
-        terms.push({ op: "+", token: "" });
-        this.state.draftTerms[line.id] = terms;
-    }
-
-    removeTerm(line, index) {
-        const terms = this.terms(line).map((term) => ({ ...term }));
-        terms.splice(index, 1);
-        this.applyTerms(line, terms);
-    }
-
-    /** خطأ البند كما حسبه الخادم، ليظهر بجانب معادلته */
-    lineError(line) {
-        const all = [
-            ...(this.data ? this.data.bottom_formulas : []),
-            ...(this.data ? this.data.left_formulas : []),
-            ...(this.data ? this.data.right_formulas : []),
-        ];
-        for (const section of this.data ? [...this.data.left, ...this.data.right] : []) {
-            all.push(...(section.formulas || []));
-        }
-        const found = all.find((item) => item.id === line.id);
-        return found ? found.error : "";
-    }
-
-    isPlacement(line, value) {
-        return (line.placement || "") === value;
-    }
-
-    isLineGroup(line, groupId) {
-        return (line.group_id || false) === (groupId || false);
-    }
-
-    isLineSide(line, value) {
-        return (line.side || "debit") === value;
+    cancel() {
+        this.state[this.state.panel] = clone(this.saved[this.state.panel]);
     }
 
     // ------------------------------------------------------------------
@@ -307,40 +265,21 @@ export class BalanceSheet extends Component {
         return value === expected;
     }
 
-    async saveGroup(group, field, ev) {
-        const value = field === "sequence" ? parseInt(ev.target.value, 10) || 0 : ev.target.value;
-        await this.withBusy(async () => {
-            this.state.groups = await this.orm.call(
-                "myaccounting.statement.group", "save_group", [group.id, { [field]: value }]);
-            await Promise.all([this.load(), this.loadSettings()]);
+    editGroup(group, field, ev) {
+        group[field] = field === "sequence"
+            ? parseInt(ev.target.value, 10) || 0
+            : ev.target.value;
+    }
+
+    addGroup() {
+        this.state.groups.push({
+            id: false, name: "باب جديد", kind: "balance", side: "debit",
+            sequence: 10 * (this.state.groups.length + 1), accounts: 0,
         });
     }
 
-    async addGroup() {
-        await this.withBusy(async () => {
-            this.state.groups = await this.orm.call(
-                "myaccounting.statement.group", "save_group",
-                [false, { name: "باب جديد", kind: "balance", side: "debit", sequence: 60 }]);
-            await this.loadSettings();
-        });
-    }
-
-    deleteGroup(group) {
-        const body = group.accounts
-            ? `هذا الباب مرتبط بـ ${group.accounts} حساباً. بحذفه تعود هذه الحسابات `
-              + "بلا تصنيف خاص فترث تصنيف آبائها."
-            : "سيُحذف الباب.";
-        this.dialog.add(ConfirmationDialog, {
-            title: `حذف "${group.name}"`,
-            body,
-            confirmLabel: "احذف",
-            confirm: () => this.withBusy(async () => {
-                this.state.groups = await this.orm.call(
-                    "myaccounting.statement.group", "delete_group", [group.id]);
-                await Promise.all([this.load(), this.loadSettings()]);
-            }),
-            cancel: () => {},
-        });
+    removeGroup(index) {
+        this.state.groups.splice(index, 1);
     }
 
     // ------------------------------------------------------------------
@@ -360,25 +299,12 @@ export class BalanceSheet extends Component {
         this.state.accountSearch = ev.target.value;
     }
 
-    async onAccountGroup(account, ev) {
-        await this.withBusy(async () => {
-            this.state.accounts = await this.orm.call(
-                "myaccounting.account", "set_statement_account",
-                [account.id, ev.target.value ? parseInt(ev.target.value, 10) : false]);
-            await this.load();
-        });
+    editAccountGroup(account, ev) {
+        account.group_id = ev.target.value ? parseInt(ev.target.value, 10) : false;
     }
 
-    async onOpening(account, ev) {
-        const amount = parseFloat(ev.target.value) || 0;
-        if (amount === account.opening) {
-            return;
-        }
-        await this.withBusy(async () => {
-            this.state.accounts = await this.orm.call(
-                "myaccounting.account", "set_opening_balance", [account.id, amount]);
-            await this.load();
-        });
+    editOpening(account, ev) {
+        account.opening = parseFloat(ev.target.value) || 0;
     }
 
     isAccountGroup(account, groupId) {
@@ -389,16 +315,121 @@ export class BalanceSheet extends Component {
         return `padding-inline-start:${8 + (level || 0) * 16}px;`;
     }
 
-    async withBusy(action) {
-        this.state.busy = true;
-        try {
-            await action();
-        } catch (error) {
-            this.notification.add(error.data?.message || "تعذّر الحفظ.", { type: "danger" });
-            await this.loadSettings();
-        } finally {
-            this.state.busy = false;
+    // ------------------------------------------------------------------
+    // البنود المحسوبة
+    // ------------------------------------------------------------------
+
+    editLine(line, field, ev) {
+        if (field === "sequence") {
+            line.sequence = parseInt(ev.target.value, 10) || 0;
+        } else if (field === "bold") {
+            line.bold = ev.target.checked;
+        } else if (field === "group_id") {
+            line.group_id = ev.target.value ? parseInt(ev.target.value, 10) : false;
+        } else {
+            line[field] = ev.target.value;
         }
+    }
+
+    addLine() {
+        this.state.lines.push({
+            id: false, name: "بند جديد", formula: "", sequence: 50,
+            placement: "bottom", group_id: false, side: "debit", bold: false,
+            terms: [{ op: "+", token: "" }],
+        });
+    }
+
+    removeLine(index) {
+        this.state.lines.splice(index, 1);
+    }
+
+    /** خانات المعادلة، أو null إن كانت أعقد من سلسلة جمع وطرح */
+    parseTerms(formula) {
+        const text = `${formula || ""}`.trim();
+        if (!text) {
+            return [];
+        }
+        const terms = [];
+        let rest = text;
+        while (rest.length) {
+            const match = TERM_RE.exec(rest);
+            if (!match) {
+                return null;
+            }
+            terms.push({ op: match[1] === "-" ? "-" : "+", token: match[2] });
+            rest = rest.slice(match[0].length);
+        }
+        return terms;
+    }
+
+    terms(line) {
+        if (!line.terms) {
+            line.terms = this.parseTerms(line.formula) || [];
+        }
+        return line.terms;
+    }
+
+    isAdvanced(line) {
+        return this.parseTerms(line.formula) === null;
+    }
+
+    syncFormula(line) {
+        line.formula = line.terms
+            .filter((term) => term.token)
+            .map((term, index) => (
+                index === 0
+                    ? (term.op === "-" ? `- ${term.token}` : term.token)
+                    : ` ${term.op} ${term.token}`
+            ))
+            .join("");
+    }
+
+    onTermSign(line, index, ev) {
+        this.terms(line)[index].op = ev.target.value;
+        this.syncFormula(line);
+    }
+
+    onTermRef(line, index, token) {
+        this.terms(line)[index].token = token;
+        this.syncFormula(line);
+    }
+
+    addTerm(line) {
+        this.terms(line).push({ op: "+", token: "" });
+    }
+
+    removeTerm(line, index) {
+        this.terms(line).splice(index, 1);
+        this.syncFormula(line);
+    }
+
+    /** خطأ البند كما حسبه الخادم، ليظهر بجانب معادلته */
+    lineError(line) {
+        if (!this.data || !line.id) {
+            return "";
+        }
+        const all = [
+            ...this.data.bottom_formulas,
+            ...this.data.left_formulas,
+            ...this.data.right_formulas,
+        ];
+        for (const section of [...this.data.left, ...this.data.right]) {
+            all.push(...(section.formulas || []));
+        }
+        const found = all.find((item) => item.id === line.id);
+        return found ? found.error : "";
+    }
+
+    isPlacement(line, value) {
+        return (line.placement || "") === value;
+    }
+
+    isLineGroup(line, groupId) {
+        return (line.group_id || false) === (groupId || false);
+    }
+
+    isLineSide(line, value) {
+        return (line.side || "debit") === value;
     }
 
     // ------------------------------------------------------------------

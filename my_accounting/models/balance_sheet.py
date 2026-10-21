@@ -80,6 +80,32 @@ class MyAccountingStatementGroup(models.Model):
         return self.get_groups()
 
     @api.model
+    def save_groups(self, items):
+        """يحفظ لوحة الأبواب كاملة: ما حُذف يُحذف، وما استجدّ يُنشأ."""
+        existing = {group.id: group for group in self.search([])}
+        kept = set()
+        for item in items or []:
+            data = {
+                'name': (item.get('name') or '').strip(),
+                'kind': item.get('kind') or 'balance',
+                'side': item.get('side') or 'debit',
+                'sequence': int(item.get('sequence') or 0),
+            }
+            if not data['name']:
+                raise UserError('لا بدّ للباب من اسم.')
+            group = existing.get(item.get('id'))
+            if group:
+                group.write(data)
+                kept.add(group.id)
+            else:
+                kept.add(self.create(data).id)
+        gone = self.browse([key for key in existing if key not in kept])
+        if gone:
+            gone.account_ids.statement_group_id = False
+            gone.unlink()
+        return self.get_groups()
+
+    @api.model
     def delete_group(self, group_id):
         """يحذف الباب، وتعود حساباته بلا تصنيف خاص فترث تصنيف آبائها."""
         group = self.browse(int(group_id))
@@ -148,6 +174,24 @@ class MyAccountingAccountStatement(models.Model):
     def set_statement_account(self, account_id, group_id):
         account = self.browse(int(account_id))
         account.statement_group_id = int(group_id) if group_id else False
+        return self.get_statement_accounts()
+
+    @api.model
+    def save_statement_accounts(self, items):
+        """يحفظ تصنيف الحسابات وأرصدتها الافتتاحية دفعةً واحدة."""
+        for item in items or []:
+            account = self.browse(int(item['id']))
+            if not account.exists():
+                continue
+            group_id = int(item['group_id']) if item.get('group_id') else False
+            opening = float(item.get('opening') or 0.0)
+            values = {}
+            if account.statement_group_id.id != group_id:
+                values['statement_group_id'] = group_id
+            if round(account.opening_balance or 0.0, 3) != round(opening, 3):
+                values['opening_balance'] = opening
+            if values:
+                account.write(values)
         return self.get_statement_accounts()
 
     @api.model
@@ -278,14 +322,40 @@ class MyAccountingAccountStatement(models.Model):
 
     @api.model
     def get_formula_references(self):
-        """ما يصلح أن يُكتب داخل معادلة، ليُدرجه المستخدم بنقرة."""
+        """ما يصلح أن يكون خانة في معادلة، معروضاً باسمه لا برمزه.
+
+        الأسماء تتكرّر في شجرة الحسابات ("الرواتب" تحت أكثر من باب)، فيُلحق
+        بالاسم المكرّر اسم أبيه ليتميّز.
+        """
         Group = self.env['myaccounting.statement.group']
-        return {
-            'accounts': [{'token': '[%s]' % account.code, 'label': account.name or ''}
-                         for account in self.search([('code', '!=', False)], order='code')],
-            'groups': [{'token': '{%s}' % group.name, 'label': ''}
-                       for group in Group._ensure()],
-            'lines': [{'token': '<%s>' % line.name, 'label': ''}
-                      for line in self.env['myaccounting.statement.line'].search([])
-                      if line.name],
-        }
+        accounts = self.search([('code', '!=', False)], order='code')
+        seen = {}
+        for account in accounts:
+            seen[account.name] = seen.get(account.name, 0) + 1
+        references = []
+        for group in Group._ensure():
+            references.append({
+                'token': '{%s}' % group.name,
+                'display': group.name,
+                'hint': 'باب',
+                'kind': 'group',
+            })
+        for line in self.env['myaccounting.statement.line'].search([]):
+            if line.name:
+                references.append({
+                    'token': '<%s>' % line.name,
+                    'display': line.name,
+                    'hint': 'بند محسوب',
+                    'kind': 'line',
+                })
+        for account in accounts:
+            display = account.name or account.code
+            if seen.get(account.name, 0) > 1 and account.parent_id:
+                display = '%s / %s' % (account.name, account.parent_id.name)
+            references.append({
+                'token': '[%s]' % account.code,
+                'display': display,
+                'hint': account.code or '',
+                'kind': 'account',
+            })
+        return references

@@ -226,3 +226,62 @@
 .o_bs_term_add {
     white-space: nowrap;
 }
+
+/* شريط الحفظ */
+.o_bs_savebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.o_bs_dirty {
+    font-size: 0.8rem;
+    color: var(--o-danger, #c0392b);
+}
+
+/* منتقي المرجع */
+.o_bs_picker {
+    position: relative;
+    width: 230px;
+}
+
+.o_bs_picker_menu {
+    position: absolute;
+    inset-inline-start: 0;
+    top: calc(100% + 2px);
+    z-index: 1060;
+    width: 300px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 4px 0;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 8px;
+    background: var(--o-surface, #fff);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+}
+
+.o_bs_picker_item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.o_bs_picker_item:hover,
+.o_bs_picker_on {
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_bs_picker_hint {
+    font-size: 0.72rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs_picker_empty {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    color: var(--gray-600, #6c757d);
+}

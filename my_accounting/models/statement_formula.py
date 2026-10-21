@@ -171,6 +171,35 @@ class MyAccountingStatementLine(models.Model):
         return self.get_lines()
 
     @api.model
+    def save_lines(self, items):
+        """يحفظ لوحة البنود كاملة: ما حُذف يُحذف، وما استجدّ يُنشأ."""
+        existing = {line.id: line for line in self.search([])}
+        kept = set()
+        for item in items or []:
+            name = (item.get('name') or '').strip()
+            if not name:
+                raise UserError('لا بدّ للبند من اسم.')
+            data = {
+                'name': name,
+                'formula': (item.get('formula') or '0').strip() or '0',
+                'sequence': int(item.get('sequence') or 0),
+                'placement': item.get('placement') or 'bottom',
+                'group_id': int(item['group_id']) if item.get('group_id') else False,
+                'side': item.get('side') or 'debit',
+                'bold': bool(item.get('bold')),
+            }
+            line = existing.get(item.get('id'))
+            if line:
+                line.write(data)
+                kept.add(line.id)
+            else:
+                kept.add(self.create(data).id)
+        gone = self.browse([key for key in existing if key not in kept])
+        if gone:
+            gone.unlink()
+        return self.get_lines()
+
+    @api.model
     def delete_line(self, line_id):
         self.browse(int(line_id)).unlink()
         return self.get_lines()
