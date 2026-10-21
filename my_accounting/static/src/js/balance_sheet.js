@@ -17,6 +17,17 @@ const SIDES = [
     { value: "credit", label: "دائن" },
 ];
 
+const PLACEMENTS = [
+    { value: "group", label: "تحت باب" },
+    { value: "side", label: "آخر جانب" },
+    { value: "bottom", label: "جدول المؤشرات" },
+];
+
+const LINE_SIDES = [
+    { value: "debit", label: "جانب الأصول" },
+    { value: "credit", label: "جانب الخصوم" },
+];
+
 /**
  * الميزانية السنوية: أرصدة الحسابات موزّعة على أبواب يعرّفها المستخدم،
  * مع الرصيد الافتتاحي لكل حساب.
@@ -33,13 +44,18 @@ export class BalanceSheet extends Component {
         this.printPage = usePrintPageSize("A4 portrait", "8mm");
         this.kinds = KINDS;
         this.sides = SIDES;
+        this.placements = PLACEMENTS;
+        this.lineSides = LINE_SIDES;
         this.state = useState({
             loading: true,
             data: null,
             year: "",
-            panel: "",          // groups أو accounts
+            tab: "sheet",       // sheet أو settings
+            panel: "groups",    // groups أو accounts أو lines
             groups: [],
             accounts: [],
+            lines: [],
+            references: null,
             showEmpty: false,
             busy: false,
             accountSearch: "",
@@ -63,12 +79,20 @@ export class BalanceSheet extends Component {
     }
 
     async loadSettings() {
-        const [groups, accounts] = await Promise.all([
+        const [groups, accounts, lines, references] = await Promise.all([
             this.orm.call("myaccounting.statement.group", "get_groups", []),
             this.orm.call("myaccounting.account", "get_statement_accounts", []),
+            this.orm.call("myaccounting.statement.line", "get_lines", []),
+            this.orm.call("myaccounting.account", "get_formula_references", []),
         ]);
         this.state.groups = groups;
         this.state.accounts = accounts;
+        this.state.lines = lines;
+        this.state.references = references;
+    }
+
+    setTab(tab) {
+        this.state.tab = tab;
     }
 
     get data() {
@@ -90,7 +114,76 @@ export class BalanceSheet extends Component {
     }
 
     setPanel(panel) {
-        this.state.panel = this.state.panel === panel ? "" : panel;
+        this.state.panel = panel;
+    }
+
+    // ------------------------------------------------------------------
+    // البنود المحسوبة
+    // ------------------------------------------------------------------
+
+    async saveLine(line, field, ev) {
+        let value = ev.target.value;
+        if (field === "sequence") {
+            value = parseInt(value, 10) || 0;
+        } else if (field === "bold") {
+            value = ev.target.checked;
+        } else if (field === "group_id") {
+            value = value ? parseInt(value, 10) : false;
+        }
+        await this.withBusy(async () => {
+            this.state.lines = await this.orm.call(
+                "myaccounting.statement.line", "save_line", [line.id, { [field]: value }]);
+            await this.load();
+        });
+    }
+
+    async addLine() {
+        await this.withBusy(async () => {
+            this.state.lines = await this.orm.call(
+                "myaccounting.statement.line", "save_line",
+                [false, { name: "بند جديد", formula: "0", placement: "bottom", sequence: 50 }]);
+            await this.load();
+        });
+    }
+
+    deleteLine(line) {
+        this.dialog.add(ConfirmationDialog, {
+            title: `حذف "${line.name}"`,
+            body: "سيُحذف البند من الميزانية.",
+            confirmLabel: "احذف",
+            confirm: () => this.withBusy(async () => {
+                this.state.lines = await this.orm.call(
+                    "myaccounting.statement.line", "delete_line", [line.id]);
+                await this.load();
+            }),
+            cancel: () => {},
+        });
+    }
+
+    /** خطأ البند كما حسبه الخادم، ليظهر بجانب معادلته */
+    lineError(line) {
+        const all = [
+            ...(this.data ? this.data.bottom_formulas : []),
+            ...(this.data ? this.data.left_formulas : []),
+            ...(this.data ? this.data.right_formulas : []),
+        ];
+        for (const section of this.data ? [...this.data.left, ...this.data.right] : []) {
+            all.push(...(section.formulas || []));
+        }
+        const found = all.find((item) => item.id === line.id);
+        return found ? found.error : "";
+    }
+
+    isPlacement(line, value) {
+        return (line.placement || "") === value;
+    }
+
+    isLineGroup(line, groupId) {
+        return (line.group_id || false) === (groupId || false);
+    }
+
+    isLineSide(line, value) {
+        return (line.side || "debit") === value;
     }
 
     // ------------------------------------------------------------------

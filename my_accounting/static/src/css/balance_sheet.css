@@ -153,3 +153,49 @@
         break-inside: avoid;
     }
 }
+
+/* البنود المحسوبة */
+.o_bs_formula td {
+    font-style: italic;
+    background: var(--o-surface, #fff);
+}
+
+.o_bs_formula.o_bs_strong td {
+    font-style: normal;
+    font-weight: 700;
+    border-top: 1px solid var(--o-surface-border, #dee2e6);
+}
+
+.o_bs_err {
+    margin-inline-start: 6px;
+    font-size: 0.75rem;
+    font-style: normal;
+    color: var(--o-danger, #c0392b);
+}
+
+.o_bs_lines_table td,
+.o_bs_lines_table th {
+    padding: 3px 6px;
+    vertical-align: middle;
+}
+
+.o_bs_refs {
+    margin-top: 12px;
+}
+
+.o_bs_refs_list {
+    max-height: 120px;
+    overflow: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.o_bs_ref {
+    padding: 1px 6px;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    direction: ltr;
+    color: var(--gray-600, #6c757d);
+}

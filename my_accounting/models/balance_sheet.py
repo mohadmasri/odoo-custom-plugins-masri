@@ -195,11 +195,14 @@ class MyAccountingAccountStatement(models.Model):
         unclassified = {'id': 0, 'label': 'غير مصنَّف', 'kind': 'none', 'side': 'debit',
                         'lines': [], 'total': 0.0}
 
-        for account in self.search([], order='code'):
+        accounts = self.search([], order='code')
+        displayed = {}
+        for account in accounts:
             group = account._effective_group()
             section = sections.get(group.id, unclassified) if group else unclassified
             sign = -1.0 if (group and group.side == 'credit') else 1.0
             amount = round(sign * balances.get(account.id, 0.0), 3)
+            displayed[account.id] = amount
             section['total'] = round(section['total'] + amount, 3)
             if not amount and not show_empty:
                 continue
@@ -212,6 +215,20 @@ class MyAccountingAccountStatement(models.Model):
                 'inherited': not account.statement_group_id,
             })
 
+        # مراجع المعادلات: الحساب برمزه ومعه فروعه، والباب باسمه
+        children = {}
+        for account in accounts:
+            children.setdefault(account.parent_id.id, []).append(account)
+
+        def subtree(account):
+            total = displayed.get(account.id, 0.0)
+            for child in children.get(account.id, []):
+                total += subtree(child)
+            return total
+
+        account_values = {account.code: round(subtree(account), 3)
+                          for account in accounts if account.code}
+
         ordered = [sections[group.id] for group in groups]
         if unclassified['lines'] or round(unclassified['total'], 3):
             ordered.append(unclassified)
@@ -221,6 +238,14 @@ class MyAccountingAccountStatement(models.Model):
         income = [s for s in ordered if s['kind'] == 'result' and s['side'] == 'credit']
         expense = [s for s in ordered if s['kind'] == 'result' and s['side'] == 'debit']
         other = [s for s in ordered if s['kind'] == 'none']
+
+        group_values = {section['label']: section['total'] for section in ordered}
+        formulas = self.env['myaccounting.statement.line'].compute_lines(
+            account_values, group_values)
+        for section in ordered:
+            section['formulas'] = [item for item in formulas
+                                   if item['placement'] == 'group'
+                                   and item['group_id'] == section['id']]
 
         assets = round(sum(s['total'] for s in left), 3)
         income_total = round(sum(s['total'] for s in income), 3)
@@ -243,4 +268,24 @@ class MyAccountingAccountStatement(models.Model):
             'other_total': round(sum(s['total'] for s in other), 3),
             'difference': round(assets - right_total, 3),
             'balanced': round(assets - right_total, 3) == 0,
+            # البنود المحسوبة لا تدخل المجاميع، فهي مشتقة منها
+            'left_formulas': [item for item in formulas
+                              if item['placement'] == 'side' and item['side'] == 'debit'],
+            'right_formulas': [item for item in formulas
+                               if item['placement'] == 'side' and item['side'] == 'credit'],
+            'bottom_formulas': [item for item in formulas if item['placement'] == 'bottom'],
+        }
+
+    @api.model
+    def get_formula_references(self):
+        """ما يصلح أن يُكتب داخل معادلة، ليُدرجه المستخدم بنقرة."""
+        Group = self.env['myaccounting.statement.group']
+        return {
+            'accounts': [{'token': '[%s]' % account.code, 'label': account.name or ''}
+                         for account in self.search([('code', '!=', False)], order='code')],
+            'groups': [{'token': '{%s}' % group.name, 'label': ''}
+                       for group in Group._ensure()],
+            'lines': [{'token': '<%s>' % line.name, 'label': ''}
+                      for line in self.env['myaccounting.statement.line'].search([])
+                      if line.name],
         }

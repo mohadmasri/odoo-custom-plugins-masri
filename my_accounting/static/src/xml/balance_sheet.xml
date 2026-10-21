@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
-    <!-- جانب من جوانب الميزانية: أبوابه وحساباتها -->
+    <!-- جانب من جوانب الميزانية: أبوابه وحساباتها وبنوده المحسوبة -->
     <t t-name="my_accounting.BalanceSheetSide">
         <t t-foreach="sections" t-as="section" t-key="section.id">
             <tr class="o_bs_root">
@@ -17,6 +17,28 @@
                     <td class="text-end" t-esc="fmt(line.amount)"/>
                 </tr>
             </t>
+            <t t-foreach="section.formulas or []" t-as="item" t-key="item.id">
+                <tr t-attf-class="o_bs_formula {{ item.bold ? 'o_bs_strong' : '' }}">
+                    <td>
+                        <t t-esc="item.name"/>
+                        <span t-if="item.error" class="o_bs_err" t-esc="item.error"/>
+                    </td>
+                    <td class="text-end" t-esc="item.error ? '—' : fmt(item.value)"/>
+                </tr>
+            </t>
+        </t>
+    </t>
+
+    <!-- بنود محسوبة مستقلة (آخر جانب) -->
+    <t t-name="my_accounting.BalanceSheetFormulas">
+        <t t-foreach="items" t-as="item" t-key="item.id">
+            <tr t-attf-class="o_bs_formula {{ item.bold ? 'o_bs_strong' : '' }}">
+                <td>
+                    <t t-esc="item.name"/>
+                    <span t-if="item.error" class="o_bs_err" t-esc="item.error"/>
+                </td>
+                <td class="text-end" t-esc="item.error ? '—' : fmt(item.value)"/>
+            </tr>
         </t>
     </t>
 
@@ -26,15 +48,8 @@
             <div class="d-flex justify-content-between align-items-center mb-3 no-print">
                 <h2 class="m-0">الميزانية السنوية</h2>
                 <div class="d-flex gap-2">
-                    <button t-attf-class="btn btn-sm {{ state.panel === 'groups' ? 'btn-primary' : 'btn-outline-secondary' }}"
-                            t-on-click="() => this.setPanel('groups')">
-                        <i class="fa fa-list-ul me-1"/> الأبواب
-                    </button>
-                    <button t-attf-class="btn btn-sm {{ state.panel === 'accounts' ? 'btn-primary' : 'btn-outline-secondary' }}"
-                            t-on-click="() => this.setPanel('accounts')">
-                        <i class="fa fa-sitemap me-1"/> تصنيف الحسابات
-                    </button>
-                    <button t-attf-class="btn btn-sm {{ state.showEmpty ? 'btn-primary' : 'btn-outline-secondary' }}"
+                    <button t-if="state.tab === 'sheet'"
+                            t-attf-class="btn btn-sm {{ state.showEmpty ? 'btn-primary' : 'btn-outline-secondary' }}"
                             t-on-click="() => this.toggleEmpty()">
                         الحسابات الصفرية
                     </button>
@@ -44,241 +59,408 @@
                 </div>
             </div>
 
-            <div class="o_bs_filter no-print">
-                <label class="form-label small mb-1">السنة</label>
-                <select class="form-select form-select-sm" style="width:120px;"
-                        t-on-change="(ev) => this.onYear(ev)">
-                    <option t-foreach="data ? data.years : []" t-as="y" t-key="y"
-                            t-att-value="y" t-att-selected="isYear(y)" t-esc="y"/>
-                </select>
-            </div>
+            <ul class="nav nav-tabs mb-3 no-print">
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'sheet' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('sheet')">الميزانية</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'settings' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('settings')">إعدادات الميزانية</a>
+                </li>
+            </ul>
 
-            <!-- الأبواب: إضافة وتعديل وحذف -->
-            <div t-if="state.panel === 'groups'" class="o_bs_panel no-print">
-                <div class="small text-muted mb-2">
-                    الأبواب التي تُوزَّع عليها الحسابات. "الموضع" يحدّد أتكون في
-                    الميزانية أم في نتيجة السنة، و"الطبيعة" أيُعرض رصيدها المدين
-                    موجباً أم الدائن.
-                </div>
-                <table class="table table-sm o_bs_groups_table">
-                    <thead>
-                        <tr>
-                            <th style="width:46px;">ترتيب</th>
-                            <th>الاسم</th>
-                            <th style="width:140px;">الموضع</th>
-                            <th style="width:110px;">الطبيعة</th>
-                            <th style="width:70px;">حسابات</th>
-                            <th style="width:44px;"/>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-foreach="state.groups" t-as="group"
-                            t-key="group.id + '|' + group.name + '|' + group.kind + '|' + group.side">
-                            <td>
-                                <input type="number" class="form-control form-control-sm"
-                                       t-att-value="group.sequence"
-                                       t-att-disabled="state.busy"
-                                       t-on-change="(ev) => this.saveGroup(group, 'sequence', ev)"/>
-                            </td>
-                            <td>
-                                <input type="text" class="form-control form-control-sm"
-                                       t-att-value="group.name"
-                                       t-att-disabled="state.busy"
-                                       t-on-change="(ev) => this.saveGroup(group, 'name', ev)"/>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm"
-                                        t-att-disabled="state.busy"
-                                        t-on-change="(ev) => this.saveGroup(group, 'kind', ev)">
-                                    <option t-foreach="kinds" t-as="kind" t-key="kind.value"
-                                            t-att-value="kind.value"
-                                            t-att-selected="isValue(group.kind, kind.value)"
-                                            t-esc="kind.label"/>
-                                </select>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm"
-                                        t-att-disabled="state.busy"
-                                        t-on-change="(ev) => this.saveGroup(group, 'side', ev)">
-                                    <option t-foreach="sides" t-as="side" t-key="side.value"
-                                            t-att-value="side.value"
-                                            t-att-selected="isValue(group.side, side.value)"
-                                            t-esc="side.label"/>
-                                </select>
-                            </td>
-                            <td class="text-center text-muted" t-esc="group.accounts"/>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-link text-danger p-0" title="حذف الباب"
-                                        t-att-disabled="state.busy"
-                                        t-on-click="() => this.deleteGroup(group)">
-                                    <i class="fa fa-trash"/>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <button class="btn btn-sm btn-outline-secondary"
-                        t-att-disabled="state.busy" t-on-click="() => this.addGroup()">
-                    <i class="fa fa-plus me-1"/> باب جديد
-                </button>
-            </div>
+            <!-- ============================ إعدادات الميزانية -->
+            <t t-if="state.tab === 'settings'">
+                <ul class="nav nav-pills mb-3 no-print">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.panel === 'groups' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setPanel('groups')">الأبواب</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.panel === 'accounts' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setPanel('accounts')">تصنيف الحسابات</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.panel === 'lines' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setPanel('lines')">بنود محسوبة</a>
+                    </li>
+                </ul>
 
-            <!-- تصنيف كل حساب ورصيده الافتتاحي -->
-            <div t-if="state.panel === 'accounts'" class="o_bs_panel no-print">
-                <div class="small text-muted mb-2">
-                    الحساب بلا تصنيف خاص يرث تصنيف أبيه، فيجوز أن يبقى الحساب
-                    الرئيسي بلا باب وتُوزَّع فروعه على أبواب مختلفة.
-                    والرصيد الافتتاحي هو ما يبدأ به الحساب قبل قيود النظام:
-                    موجب للمدين وسالب للدائن.
-                </div>
-                <input type="text" class="form-control form-control-sm mb-2"
-                       style="max-width:260px;" placeholder="ابحث برمز أو اسم..."
-                       t-att-value="state.accountSearch"
-                       t-on-input="(ev) => this.onAccountSearch(ev)"/>
-                <div class="o_bs_accounts">
-                    <table class="table table-sm o_bs_accounts_table">
+                <!-- الأبواب -->
+                <div t-if="state.panel === 'groups'" class="o_bs_panel">
+                    <div class="small text-muted mb-2">
+                        الأبواب التي تُوزَّع عليها الحسابات. "الموضع" يحدّد أتكون في
+                        الميزانية أم في نتيجة السنة، و"الطبيعة" أيُعرض رصيدها المدين
+                        موجباً أم الدائن.
+                    </div>
+                    <table class="table table-sm o_bs_groups_table">
                         <thead>
                             <tr>
-                                <th style="width:70px;">الرمز</th>
-                                <th>الحساب</th>
-                                <th style="width:170px;">الباب</th>
-                                <th style="width:130px;">الرصيد الافتتاحي</th>
+                                <th style="width:46px;">ترتيب</th>
+                                <th>الاسم</th>
+                                <th style="width:140px;">الموضع</th>
+                                <th style="width:110px;">الطبيعة</th>
+                                <th style="width:70px;">حسابات</th>
+                                <th style="width:44px;"/>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr t-foreach="visibleAccounts" t-as="account"
-                                t-key="account.id + '|' + account.group_id + '|' + account.opening">
-                                <td class="text-muted" t-esc="account.code"/>
-                                <td t-att-style="indent(account.level)" t-esc="account.name"/>
+                            <tr t-foreach="state.groups" t-as="group"
+                                t-key="group.id + '|' + group.name + '|' + group.kind + '|' + group.side">
+                                <td>
+                                    <input type="number" class="form-control form-control-sm"
+                                           t-att-value="group.sequence"
+                                           t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveGroup(group, 'sequence', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="group.name"
+                                           t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveGroup(group, 'name', ev)"/>
+                                </td>
                                 <td>
                                     <select class="form-select form-select-sm"
                                             t-att-disabled="state.busy"
-                                            t-on-change="(ev) => this.onAccountGroup(account, ev)">
-                                        <option value=""
-                                                t-att-selected="isAccountGroup(account, false)">
-                                            <t t-if="account.inherited">
-                                                يرث: <t t-esc="account.effective"/>
-                                            </t>
-                                            <t t-else="">— بلا تصنيف —</t>
-                                        </option>
-                                        <option t-foreach="state.groups" t-as="group" t-key="group.id"
-                                                t-att-value="group.id"
-                                                t-att-selected="isAccountGroup(account, group.id)"
-                                                t-esc="group.name"/>
+                                            t-on-change="(ev) => this.saveGroup(group, 'kind', ev)">
+                                        <option t-foreach="kinds" t-as="kind" t-key="kind.value"
+                                                t-att-value="kind.value"
+                                                t-att-selected="isValue(group.kind, kind.value)"
+                                                t-esc="kind.label"/>
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="number" step="0.001"
-                                           class="form-control form-control-sm text-end"
-                                           t-att-value="account.opening"
-                                           t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.onOpening(account, ev)"/>
+                                    <select class="form-select form-select-sm"
+                                            t-att-disabled="state.busy"
+                                            t-on-change="(ev) => this.saveGroup(group, 'side', ev)">
+                                        <option t-foreach="sides" t-as="side" t-key="side.value"
+                                                t-att-value="side.value"
+                                                t-att-selected="isValue(group.side, side.value)"
+                                                t-esc="side.label"/>
+                                    </select>
+                                </td>
+                                <td class="text-center text-muted" t-esc="group.accounts"/>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0" title="حذف الباب"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.deleteGroup(group)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy" t-on-click="() => this.addGroup()">
+                        <i class="fa fa-plus me-1"/> باب جديد
+                    </button>
                 </div>
-            </div>
 
-            <div t-if="state.loading" class="text-muted py-5 text-center">تُحسب الميزانية...</div>
-
-            <t t-elif="data">
-                <div class="o_bs_head">
-                    <h3 class="m-0">الميزانية كما في نهاية سنة <t t-esc="data.year"/></h3>
-                    <div class="small text-muted">
-                        الأرصدة الافتتاحية زائد قيود النظام المرحّلة حتى نهاية السنة
+                <!-- تصنيف الحسابات والرصيد الافتتاحي -->
+                <div t-if="state.panel === 'accounts'" class="o_bs_panel">
+                    <div class="small text-muted mb-2">
+                        الحساب بلا تصنيف خاص يرث تصنيف أبيه، فيجوز أن يبقى الحساب
+                        الرئيسي بلا باب وتُوزَّع فروعه على أبواب مختلفة.
+                        والرصيد الافتتاحي هو ما يبدأ به الحساب قبل قيود النظام:
+                        موجب للمدين وسالب للدائن.
                     </div>
-                </div>
-
-                <div class="o_bs_body">
-                    <div class="o_bs_side">
-                        <table class="table table-bordered table-sm o_bs_table">
+                    <input type="text" class="form-control form-control-sm mb-2"
+                           style="max-width:260px;" placeholder="ابحث برمز أو اسم..."
+                           t-att-value="state.accountSearch"
+                           t-on-input="(ev) => this.onAccountSearch(ev)"/>
+                    <div class="o_bs_accounts">
+                        <table class="table table-sm o_bs_accounts_table">
                             <thead>
                                 <tr>
-                                    <th>الأصول</th>
-                                    <th class="text-end" style="width:140px;">المبلغ</th>
+                                    <th style="width:70px;">الرمز</th>
+                                    <th>الحساب</th>
+                                    <th style="width:170px;">الباب</th>
+                                    <th style="width:130px;">الرصيد الافتتاحي</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <t t-call="my_accounting.BalanceSheetSide">
-                                    <t t-set="sections" t-value="data.left"/>
-                                </t>
-                                <tr t-if="!data.left.length">
-                                    <td colspan="2" class="text-muted text-center py-2">لا أبواب</td>
+                                <tr t-foreach="visibleAccounts" t-as="account"
+                                    t-key="account.id + '|' + account.group_id + '|' + account.opening">
+                                    <td class="text-muted" t-esc="account.code"/>
+                                    <td t-att-style="indent(account.level)" t-esc="account.name"/>
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                t-att-disabled="state.busy"
+                                                t-on-change="(ev) => this.onAccountGroup(account, ev)">
+                                            <option value=""
+                                                    t-att-selected="isAccountGroup(account, false)">
+                                                <t t-if="account.inherited">
+                                                    يرث: <t t-esc="account.effective"/>
+                                                </t>
+                                                <t t-else="">— بلا تصنيف —</t>
+                                            </option>
+                                            <option t-foreach="state.groups" t-as="group" t-key="group.id"
+                                                    t-att-value="group.id"
+                                                    t-att-selected="isAccountGroup(account, group.id)"
+                                                    t-esc="group.name"/>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="account.opening"
+                                               t-att-disabled="state.busy"
+                                               t-on-change="(ev) => this.onOpening(account, ev)"/>
+                                    </td>
                                 </tr>
                             </tbody>
-                            <tfoot>
-                                <tr class="o_bs_total">
-                                    <td>مجموع الأصول</td>
-                                    <td class="text-end" t-esc="fmt(data.assets)"/>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-
-                    <div class="o_bs_side">
-                        <table class="table table-bordered table-sm o_bs_table">
-                            <thead>
-                                <tr>
-                                    <th>الخصوم وحقوق الملكية</th>
-                                    <th class="text-end" style="width:140px;">المبلغ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-call="my_accounting.BalanceSheetSide">
-                                    <t t-set="sections" t-value="data.right"/>
-                                </t>
-                                <tr class="o_bs_root">
-                                    <td>نتيجة السنة</td>
-                                    <td class="text-end" t-esc="fmt(data.profit)"/>
-                                </tr>
-                                <tr t-foreach="data.income" t-as="section" t-key="section.id"
-                                    class="o_bs_line">
-                                    <td t-esc="section.label"/>
-                                    <td class="text-end" t-esc="fmt(section.total)"/>
-                                </tr>
-                                <tr t-foreach="data.expense" t-as="section" t-key="section.id"
-                                    class="o_bs_line">
-                                    <td>ناقص: <t t-esc="section.label"/></td>
-                                    <td class="text-end" t-esc="'(' + fmt(section.total) + ')'"/>
-                                </tr>
-                            </tbody>
-                            <tfoot>
-                                <tr class="o_bs_total">
-                                    <td>مجموع الخصوم وحقوق الملكية</td>
-                                    <td class="text-end" t-esc="fmt(data.right_total)"/>
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
                 </div>
 
-                <!-- حسابات بلا تصنيف: تُعرض وحدها حتى لا تضيع -->
-                <div t-if="data.other.length" class="o_bs_other">
-                    <table class="table table-bordered table-sm o_bs_table">
+                <!-- بنود محسوبة -->
+                <div t-if="state.panel === 'lines'" class="o_bs_panel">
+                    <div class="small text-muted mb-2">
+                        بند تُحسب قيمته بمعادلة. المراجع:
+                        <code>[121]</code> رصيد حساب برمزه ومعه فروعه ·
+                        <code>{الأصول}</code> مجموع باب ·
+                        <code>&lt;اسم بند&gt;</code> بند محسوب آخر ·
+                        وأرقام والعمليات <code>+ - * /</code> وأقواس.
+                        القيمة المستعملة هي القيمة كما تظهر في الميزانية.
+                        والبنود لا تدخل في المجاميع لأنها مشتقة منها.
+                    </div>
+                    <table class="table table-sm o_bs_lines_table">
                         <thead>
                             <tr>
-                                <th>حسابات غير مصنَّفة</th>
-                                <th class="text-end" style="width:140px;">المبلغ</th>
+                                <th style="width:46px;">ترتيب</th>
+                                <th style="width:190px;">الاسم</th>
+                                <th>المعادلة</th>
+                                <th style="width:130px;">الموضع</th>
+                                <th style="width:150px;">الباب / الجانب</th>
+                                <th style="width:50px;">إبراز</th>
+                                <th style="width:44px;"/>
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-call="my_accounting.BalanceSheetSide">
-                                <t t-set="sections" t-value="data.other"/>
-                            </t>
+                            <tr t-foreach="state.lines" t-as="line"
+                                t-key="line.id + '|' + line.name + '|' + line.formula + '|' + line.placement + '|' + line.group_id + '|' + line.side + '|' + line.bold">
+                                <td>
+                                    <input type="number" class="form-control form-control-sm"
+                                           t-att-value="line.sequence" t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveLine(line, 'sequence', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="line.name" t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveLine(line, 'name', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           dir="ltr" t-att-value="line.formula"
+                                           t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveLine(line, 'formula', ev)"/>
+                                    <div t-if="lineError(line)" class="o_bs_err"
+                                         t-esc="lineError(line)"/>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm"
+                                            t-att-disabled="state.busy"
+                                            t-on-change="(ev) => this.saveLine(line, 'placement', ev)">
+                                        <option t-foreach="placements" t-as="place" t-key="place.value"
+                                                t-att-value="place.value"
+                                                t-att-selected="isPlacement(line, place.value)"
+                                                t-esc="place.label"/>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select t-if="isPlacement(line, 'group')"
+                                            class="form-select form-select-sm"
+                                            t-att-disabled="state.busy"
+                                            t-on-change="(ev) => this.saveLine(line, 'group_id', ev)">
+                                        <option value="" t-att-selected="isLineGroup(line, false)">
+                                            — اختر باباً —
+                                        </option>
+                                        <option t-foreach="state.groups" t-as="group" t-key="group.id"
+                                                t-att-value="group.id"
+                                                t-att-selected="isLineGroup(line, group.id)"
+                                                t-esc="group.name"/>
+                                    </select>
+                                    <select t-elif="isPlacement(line, 'side')"
+                                            class="form-select form-select-sm"
+                                            t-att-disabled="state.busy"
+                                            t-on-change="(ev) => this.saveLine(line, 'side', ev)">
+                                        <option t-foreach="lineSides" t-as="side" t-key="side.value"
+                                                t-att-value="side.value"
+                                                t-att-selected="isLineSide(line, side.value)"
+                                                t-esc="side.label"/>
+                                    </select>
+                                    <span t-else="" class="text-muted small">—</span>
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input"
+                                           t-att-checked="line.bold" t-att-disabled="state.busy"
+                                           t-on-change="(ev) => this.saveLine(line, 'bold', ev)"/>
+                                </td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0" title="حذف البند"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.deleteLine(line)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr t-if="!state.lines.length">
+                                <td colspan="7" class="text-muted text-center py-2">لا بنود بعد</td>
+                            </tr>
                         </tbody>
                     </table>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy" t-on-click="() => this.addLine()">
+                        <i class="fa fa-plus me-1"/> بند جديد
+                    </button>
+
+                    <div t-if="state.references" class="o_bs_refs">
+                        <div class="small text-muted mb-1">مراجع جاهزة للنسخ:</div>
+                        <div class="o_bs_refs_list">
+                            <span t-foreach="state.references.groups" t-as="ref" t-key="ref.token"
+                                  class="o_bs_ref" t-esc="ref.token"/>
+                            <span t-foreach="state.references.lines" t-as="ref" t-key="ref.token"
+                                  class="o_bs_ref" t-esc="ref.token"/>
+                            <span t-foreach="state.references.accounts" t-as="ref" t-key="ref.token"
+                                  class="o_bs_ref" t-att-title="ref.label" t-esc="ref.token"/>
+                        </div>
+                    </div>
+                </div>
+            </t>
+
+            <!-- ============================ الميزانية -->
+            <t t-if="state.tab === 'sheet'">
+                <div class="o_bs_filter no-print">
+                    <label class="form-label small mb-1">السنة</label>
+                    <select class="form-select form-select-sm" style="width:120px;"
+                            t-on-change="(ev) => this.onYear(ev)">
+                        <option t-foreach="data ? data.years : []" t-as="y" t-key="y"
+                                t-att-value="y" t-att-selected="isYear(y)" t-esc="y"/>
+                    </select>
                 </div>
 
-                <div t-if="data.balanced" class="o_bs_check o_bs_ok">
-                    الجانبان متساويان.
-                </div>
-                <div t-else="" class="o_bs_check o_bs_bad">
-                    فرق بين الجانبين: <t t-esc="fmt(data.difference)"/>
-                    <t t-if="data.other_total">
-                        — منه <t t-esc="fmt(data.other_total)"/> في حسابات غير مصنَّفة.
-                    </t>
-                </div>
+                <div t-if="state.loading" class="text-muted py-5 text-center">تُحسب الميزانية...</div>
+
+                <t t-elif="data">
+                    <div class="o_bs_head">
+                        <h3 class="m-0">الميزانية كما في نهاية سنة <t t-esc="data.year"/></h3>
+                        <div class="small text-muted">
+                            الأرصدة الافتتاحية زائد قيود النظام المرحّلة حتى نهاية السنة
+                        </div>
+                    </div>
+
+                    <div class="o_bs_body">
+                        <div class="o_bs_side">
+                            <table class="table table-bordered table-sm o_bs_table">
+                                <thead>
+                                    <tr>
+                                        <th>الأصول</th>
+                                        <th class="text-end" style="width:140px;">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-call="my_accounting.BalanceSheetSide">
+                                        <t t-set="sections" t-value="data.left"/>
+                                    </t>
+                                    <tr t-if="!data.left.length">
+                                        <td colspan="2" class="text-muted text-center py-2">لا أبواب</td>
+                                    </tr>
+                                    <t t-call="my_accounting.BalanceSheetFormulas">
+                                        <t t-set="items" t-value="data.left_formulas"/>
+                                    </t>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="o_bs_total">
+                                        <td>مجموع الأصول</td>
+                                        <td class="text-end" t-esc="fmt(data.assets)"/>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="o_bs_side">
+                            <table class="table table-bordered table-sm o_bs_table">
+                                <thead>
+                                    <tr>
+                                        <th>الخصوم وحقوق الملكية</th>
+                                        <th class="text-end" style="width:140px;">المبلغ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-call="my_accounting.BalanceSheetSide">
+                                        <t t-set="sections" t-value="data.right"/>
+                                    </t>
+                                    <tr class="o_bs_root">
+                                        <td>نتيجة السنة</td>
+                                        <td class="text-end" t-esc="fmt(data.profit)"/>
+                                    </tr>
+                                    <tr t-foreach="data.income" t-as="section" t-key="section.id"
+                                        class="o_bs_line">
+                                        <td t-esc="section.label"/>
+                                        <td class="text-end" t-esc="fmt(section.total)"/>
+                                    </tr>
+                                    <tr t-foreach="data.expense" t-as="section" t-key="section.id"
+                                        class="o_bs_line">
+                                        <td>ناقص: <t t-esc="section.label"/></td>
+                                        <td class="text-end" t-esc="'(' + fmt(section.total) + ')'"/>
+                                    </tr>
+                                    <t t-call="my_accounting.BalanceSheetFormulas">
+                                        <t t-set="items" t-value="data.right_formulas"/>
+                                    </t>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="o_bs_total">
+                                        <td>مجموع الخصوم وحقوق الملكية</td>
+                                        <td class="text-end" t-esc="fmt(data.right_total)"/>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div t-if="data.other.length" class="o_bs_other">
+                        <table class="table table-bordered table-sm o_bs_table">
+                            <thead>
+                                <tr>
+                                    <th>حسابات غير مصنَّفة</th>
+                                    <th class="text-end" style="width:140px;">المبلغ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-call="my_accounting.BalanceSheetSide">
+                                    <t t-set="sections" t-value="data.other"/>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div t-if="data.bottom_formulas.length" class="o_bs_other">
+                        <table class="table table-bordered table-sm o_bs_table">
+                            <thead>
+                                <tr>
+                                    <th>مؤشرات</th>
+                                    <th class="text-end" style="width:140px;">القيمة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-call="my_accounting.BalanceSheetFormulas">
+                                    <t t-set="items" t-value="data.bottom_formulas"/>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div t-if="data.balanced" class="o_bs_check o_bs_ok">
+                        الجانبان متساويان.
+                    </div>
+                    <div t-else="" class="o_bs_check o_bs_bad">
+                        فرق بين الجانبين: <t t-esc="fmt(data.difference)"/>
+                        <t t-if="data.other_total">
+                            — منه <t t-esc="fmt(data.other_total)"/> في حسابات غير مصنَّفة.
+                        </t>
+                    </div>
+                </t>
             </t>
         </div>
     </t>
