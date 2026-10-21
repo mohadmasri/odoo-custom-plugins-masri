@@ -74,9 +74,9 @@
     font-weight: 600;
 }
 
-/* تصنيف الحسابات الرئيسية */
-.o_bs_groups {
-    max-width: 620px;
+/* لوحتا الأبواب وتصنيف الحسابات */
+.o_bs_panel {
+    max-width: 860px;
     margin-bottom: 1rem;
     padding: 12px;
     border: 1px solid var(--o-surface-border, #dee2e6);
@@ -84,36 +84,39 @@
     background: var(--o-surface, #fff);
 }
 
-.o_bs_groups_list {
+.o_bs_groups_table td,
+.o_bs_groups_table th {
+    padding: 3px 6px;
+    vertical-align: middle;
+}
+
+.o_bs_accounts {
+    max-height: 420px;
+    overflow: auto;
     border: 1px solid var(--o-surface-border, #dee2e6);
     border-radius: 8px;
-    overflow: hidden;
 }
 
-.o_bs_groups_row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 5px 10px;
-    background: var(--o-surface, #fff);
+.o_bs_accounts_table {
+    margin-bottom: 0;
 }
 
-.o_bs_groups_row + .o_bs_groups_row {
-    border-top: 1px solid var(--o-surface-border, #eee);
+.o_bs_accounts_table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--o-surface-2, #f2f4f7);
 }
 
-.o_bs_groups_code {
-    min-width: 40px;
-    font-size: 0.78rem;
-    color: var(--gray-600, #6c757d);
+.o_bs_accounts_table td,
+.o_bs_accounts_table th {
+    padding: 2px 6px;
+    vertical-align: middle;
 }
 
-.o_bs_groups_name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.o_bs_other {
+    max-width: 520px;
+    margin-top: 16px;
 }
 
 @media print {

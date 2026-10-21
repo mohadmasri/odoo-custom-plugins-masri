@@ -51,6 +51,10 @@
                             <field name="ledger_sequence" invisible="parent_id"/>
                         </group>
                         <group>
+                            <field name="statement_group_id"
+                                   options="{'no_create_edit': True}"
+                                   placeholder="يرث تصنيف الحساب الأب"/>
+                            <field name="opening_balance"/>
                             <field name="balance"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="reviewed_by" readonly="1"/>
