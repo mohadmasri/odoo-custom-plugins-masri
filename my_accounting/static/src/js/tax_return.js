@@ -54,6 +54,7 @@ export class TaxReturn extends Component {
             monthTo: 2,
             data: null,
             sheet: null,       // جداول الكشف القابلة للتحرير
+            tab: "sheets",     // الجداول أو نموذج الدائرة
             busy: false,
             // إعدادات الأعمدة: لكل جدول قائمته، وتُطبَّق على كل الإقرارات
             columns: {},
@@ -296,6 +297,44 @@ export class TaxReturn extends Component {
             "myaccounting.tax.column", "reset_columns", [table]);
         this.notification.add("عادت أعمدة الجدول إلى أسمائها وترتيبها الأصلي.",
             { type: "success" });
+    }
+
+    setTab(tab) {
+        this.state.tab = tab;
+    }
+
+    // ------------------------------------------------------------------
+    // نموذج الدائرة: خانات الإقرار الرسمي محسوبة من الجداول
+    // ------------------------------------------------------------------
+
+    sumRows(key, field, keep) {
+        return this.rowsOf(key)
+            .filter(keep || (() => true))
+            .reduce((total, row) => total + (row[field] || 0), 0);
+    }
+
+    get form() {
+        const taxed = (row) => !!row.tax;
+        const net = (field, keep) => this.round(
+            this.sumRows("sale", field, keep) - this.sumRows("sale_return", field, keep));
+        // 2) المشتريات المحلية الخاضعة، بعد مرتجعها
+        const purchase = this.netAmount("purchase");
+        const purchaseTax = this.round(
+            this.totalOf("purchase", "tax") - this.totalOf("purchase_return", "tax"));
+        // 6) المبيعات الخاضعة و10) المعفاة، كلاهما بعد مرتجعه
+        const sales = net("amount", taxed);
+        const salesTax = net("tax", taxed);
+        const exempt = this.exemptSales;
+        // 11) حصة المدخلات التي تخصّ المبيعات المعفاة فلا تُخصم
+        const base = this.round(sales + exempt);
+        const blocked = base ? this.round(purchaseTax * exempt / base) : 0;
+        const due = this.round(salesTax + blocked - purchaseTax);
+        return {
+            purchase, purchaseTax, sales, salesTax, exempt, base, blocked,
+            share: base ? Math.round(exempt / base * 10000) / 100 : 0,
+            due: due > 0 ? due : 0,
+            credit: due < 0 ? -due : 0,
+        };
     }
 
     /** مجموع قيم جدول بعد خصم مرتجعاته */

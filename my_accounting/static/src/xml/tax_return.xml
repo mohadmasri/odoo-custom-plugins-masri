@@ -76,6 +76,18 @@
                     </div>
                 </div>
 
+                <ul class="nav nav-tabs mt-3 mb-3 no-print">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'sheets' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('sheets')">الجداول</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.tab === 'form' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setTab('form')">نموذج الدائرة</a>
+                    </li>
+                </ul>
+
+                <t t-if="state.tab === 'sheets'">
                 <!-- جداول الإقرار: تُبنى من القيود ثم تُحرَّر -->
                 <div class="o_tr_sheet_bar">
                     <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
@@ -280,6 +292,160 @@
                         </tr>
                     </tbody>
                 </table>
+                </t>
+
+                <!-- نموذج الدائرة: خاناته محسوبة من الجداول -->
+                <t t-if="state.tab === 'form'">
+                    <table class="table table-bordered table-sm o_tr_form">
+                        <thead>
+                            <tr>
+                                <th style="width:48px;">الرقم</th>
+                                <th>البيــان</th>
+                                <th class="text-end" style="width:150px;">القيمــة</th>
+                                <th class="text-end" style="width:150px;">الضريبة العامة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>الرصيد المدور من الفترة السابقة</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end o_tr_blank">—</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>المشتريات المحلية الخاضعة للضريبة بالنسبة العامة</td>
+                                <td class="text-end" t-esc="fmt(form.purchase)"/>
+                                <td class="text-end" t-esc="fmt(form.purchaseTax)"/>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>المستوردات الخاضعة للضريبة بالنسبة العامة</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>المستوردات مؤجلة توريد الضريبة</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>المشتريات والمستوردات المعفاة</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end o_tr_blank">—</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="3">6</td>
+                                <td>المبيعات المحلية الخاضعة للضريبة بالنسبة العامة 16%</td>
+                                <td class="text-end" t-esc="fmt(form.sales)"/>
+                                <td class="text-end" t-esc="fmt(form.salesTax)"/>
+                            </tr>
+                            <tr>
+                                <td>المبيعات المحلية الخاضعة للضريبة بالنسبة العامة 8%</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>المبيعات المحلية الخاضعة للضريبة بالنسبة العامة 4%</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td>المبيعات المحلية الخاضعة للضريبة لنسبة الصفر</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td>المبيعات المصدرة</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>9</td>
+                                <td>مبيعات غير خاضعة للضريبة</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>10</td>
+                                <td>المبيعات المحلية المعفاة</td>
+                                <td class="text-end" t-esc="fmt(form.exempt)"/>
+                                <td class="text-end o_tr_blank">—</td>
+                            </tr>
+                            <tr>
+                                <td>11</td>
+                                <td>ضريبة غير قابلة للخصم (تخص سلع مبيعات معفاة)</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(form.blocked)"/>
+                            </tr>
+                            <tr>
+                                <td>12</td>
+                                <td>حركة تعديل لصالح المسجل</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>13</td>
+                                <td>حركة تعديل لصالح الدائرة</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr class="o_tr_due">
+                                <td>14</td>
+                                <td>ضريبة الخانات (6 + 11 + 13) − (1 + 2 + 3 + 4 + 12)
+                                    موجباً: مبلغ واجب دفعه</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(form.due)"/>
+                            </tr>
+                            <tr>
+                                <td>15</td>
+                                <td>الخانات نفسها سالباً: عبء الخانات من (16 − 18)</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(form.credit)"/>
+                            </tr>
+                            <tr>
+                                <td>16</td>
+                                <td>استرداد الضريبة على السلع والخدمات المصدرة</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>17</td>
+                                <td>استرداد ضريبة مضى على تأديتها أكثر من سنة</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                            <tr>
+                                <td>18</td>
+                                <td>الرصيد المدور للفترة القادمة: 15 − (16 + 17)</td>
+                                <td class="text-end o_tr_blank">—</td>
+                                <td class="text-end" t-esc="fmt(0)"/>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="o_tr_form_notes">
+                        <div>
+                            <b>الخانة 2</b> و<b>الخانة 6</b> و<b>الخانة 10</b> بعد خصم مرتجعاتها،
+                            لأن النموذج لا سطر فيه للمرتجع.
+                        </div>
+                        <div>
+                            <b>الخانة 11</b> = ضريبة المشتريات × (المبيعات المعفاة ÷ مجموع المبيعات)
+                            = <t t-esc="fmt(form.purchaseTax)"/> ×
+                            (<t t-esc="fmt(form.exempt)"/> ÷ <t t-esc="fmt(form.base)"/>)
+                            = <t t-esc="fmt(form.purchaseTax)"/> × <t t-esc="form.share"/>%
+                            = <t t-esc="fmt(form.blocked)"/>
+                        </div>
+                        <div>
+                            <b>الخانة 1</b> (الرصيد المدور من الفترة السابقة) و<b>الخانة 5</b>
+                            (المشتريات المعفاة) ليستا في جداول الإقرار، فتُكتبان باليد إن وُجدتا.
+                        </div>
+                    </div>
+                </t>
             </t>
         </div>
     </t>

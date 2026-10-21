@@ -387,3 +387,55 @@
     font-size: 0.8rem;
     color: var(--gray-600, #6c757d);
 }
+
+/* نموذج الدائرة */
+.o_tr_form {
+    max-width: 820px;
+}
+
+.o_tr_form th {
+    text-align: center;
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_tr_form td {
+    padding: 3px 8px;
+    vertical-align: middle;
+}
+
+.o_tr_form .o_tr_blank {
+    color: var(--gray-600, #adb5bd);
+}
+
+.o_tr_form .o_tr_due td {
+    font-weight: 700;
+    background: var(--o-surface-2, #f2f2f2);
+}
+
+.o_tr_form_notes {
+    max-width: 820px;
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_tr_form_notes div + div {
+    margin-top: 4px;
+}
+
+@media print {
+    .o_tr_form {
+        width: 100% !important;
+        max-width: none;
+        font-size: 11px;
+    }
+
+    .o_tr_form td {
+        padding: 2px 6px !important;
+    }
+
+    .o_tr_form_notes {
+        max-width: none;
+        font-size: 9px;
+    }
+}
