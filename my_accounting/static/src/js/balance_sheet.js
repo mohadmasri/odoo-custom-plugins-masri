@@ -59,6 +59,7 @@ export class BalanceSheet extends Component {
             showEmpty: false,
             busy: false,
             accountSearch: "",
+            draftTerms: {},
         });
         onWillStart(async () => {
             await this.load();
@@ -158,6 +159,118 @@ export class BalanceSheet extends Component {
             }),
             cancel: () => {},
         });
+    }
+
+    // ------------------------------------------------------------------
+    // بناء المعادلة بخانات: (خانة) + أو - (خانة) ...
+    // ------------------------------------------------------------------
+
+    /** كل ما يصلح مرجعاً، باسم معروض يُكتب في الخانة ورمز يدخل المعادلة */
+    get references() {
+        if (!this.state.references) {
+            return { all: [], byLabel: {}, byToken: {} };
+        }
+        const all = [];
+        for (const item of this.state.references.groups) {
+            all.push({ token: item.token, label: `باب: ${item.token.slice(1, -1)}` });
+        }
+        for (const item of this.state.references.lines) {
+            all.push({ token: item.token, label: `بند: ${item.token.slice(1, -1)}` });
+        }
+        for (const item of this.state.references.accounts) {
+            all.push({ token: item.token, label: `${item.token.slice(1, -1)} — ${item.label}` });
+        }
+        const byLabel = {};
+        const byToken = {};
+        for (const item of all) {
+            byLabel[item.label] = item.token;
+            byToken[item.token] = item.label;
+        }
+        return { all, byLabel, byToken };
+    }
+
+    labelOf(token) {
+        return this.references.byToken[token] || token;
+    }
+
+    /** يقرأ معادلة على شكل خانات متتابعة، أو null إن كانت أعقد من ذلك */
+    parseTerms(formula) {
+        const text = `${formula || ""}`.trim();
+        if (!text) {
+            return [];
+        }
+        const pattern = /^\s*([+-]?)\s*(\[[^\]]*\]|\{[^}]*\}|<[^>]*>)\s*/;
+        const terms = [];
+        let rest = text;
+        while (rest.length) {
+            const match = pattern.exec(rest);
+            if (!match) {
+                return null;
+            }
+            terms.push({ op: match[1] === "-" ? "-" : "+", token: match[2] });
+            rest = rest.slice(match[0].length);
+        }
+        return terms;
+    }
+
+    terms(line) {
+        const draft = this.state.draftTerms[line.id];
+        return draft || this.parseTerms(line.formula) || [];
+    }
+
+    /** معادلة لا تُكتب بخانات (أقواس أو ضرب أو قسمة) تبقى نصاً */
+    isAdvanced(line) {
+        return this.parseTerms(line.formula) === null;
+    }
+
+    buildFormula(terms) {
+        return terms.map((term, index) => (
+            index === 0
+                ? (term.op === "-" ? `- ${term.token}` : term.token)
+                : ` ${term.op} ${term.token}`
+        )).join("");
+    }
+
+    async applyTerms(line, terms) {
+        if (terms.length && terms.every((term) => term.token)) {
+            delete this.state.draftTerms[line.id];
+            await this.withBusy(async () => {
+                this.state.lines = await this.orm.call(
+                    "myaccounting.statement.line", "save_line",
+                    [line.id, { formula: this.buildFormula(terms) }]);
+                await this.load();
+            });
+        } else {
+            this.state.draftTerms[line.id] = terms;
+        }
+    }
+
+    onTermSign(line, index, ev) {
+        const terms = this.terms(line).map((term) => ({ ...term }));
+        terms[index].op = ev.target.value;
+        this.applyTerms(line, terms);
+    }
+
+    onTermRef(line, index, ev) {
+        const token = this.references.byLabel[ev.target.value.trim()] || "";
+        const terms = this.terms(line).map((term) => ({ ...term }));
+        terms[index].token = token;
+        if (!token && ev.target.value.trim()) {
+            this.notification.add("لا مرجع بهذا الاسم. اختر من القائمة.", { type: "warning" });
+        }
+        this.applyTerms(line, terms);
+    }
+
+    addTerm(line) {
+        const terms = this.terms(line).map((term) => ({ ...term }));
+        terms.push({ op: "+", token: "" });
+        this.state.draftTerms[line.id] = terms;
+    }
+
+    removeTerm(line, index) {
+        const terms = this.terms(line).map((term) => ({ ...term }));
+        terms.splice(index, 1);
+        this.applyTerms(line, terms);
     }
 
     /** خطأ البند كما حسبه الخادم، ليظهر بجانب معادلته */

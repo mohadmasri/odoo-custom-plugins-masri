@@ -97,7 +97,7 @@
                     <table class="table table-sm o_bs_groups_table">
                         <thead>
                             <tr>
-                                <th style="width:46px;">ترتيب</th>
+                                <th style="width:72px;">ترتيب</th>
                                 <th>الاسم</th>
                                 <th style="width:140px;">الموضع</th>
                                 <th style="width:110px;">الطبيعة</th>
@@ -217,18 +217,16 @@
                 <!-- بنود محسوبة -->
                 <div t-if="state.panel === 'lines'" class="o_bs_panel">
                     <div class="small text-muted mb-2">
-                        بند تُحسب قيمته بمعادلة. المراجع:
-                        <code>[121]</code> رصيد حساب برمزه ومعه فروعه ·
-                        <code>{الأصول}</code> مجموع باب ·
-                        <code>&lt;اسم بند&gt;</code> بند محسوب آخر ·
-                        وأرقام والعمليات <code>+ - * /</code> وأقواس.
-                        القيمة المستعملة هي القيمة كما تظهر في الميزانية.
+                        بند تُحسب قيمته بخانات: خانة + أو − خانة … وأضف ما شئت.
+                        الخانة حساب (ومعه فروعه) أو باب أو بند محسوب آخر،
+                        تختاره بالكتابة فتُكمل لك القائمة.
+                        والقيمة المستعملة هي القيمة كما تظهر في الميزانية،
                         والبنود لا تدخل في المجاميع لأنها مشتقة منها.
                     </div>
                     <table class="table table-sm o_bs_lines_table">
                         <thead>
                             <tr>
-                                <th style="width:46px;">ترتيب</th>
+                                <th style="width:72px;">ترتيب</th>
                                 <th style="width:190px;">الاسم</th>
                                 <th>المعادلة</th>
                                 <th style="width:130px;">الموضع</th>
@@ -251,10 +249,43 @@
                                            t-on-change="(ev) => this.saveLine(line, 'name', ev)"/>
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                           dir="ltr" t-att-value="line.formula"
-                                           t-att-disabled="state.busy"
-                                           t-on-change="(ev) => this.saveLine(line, 'formula', ev)"/>
+                                    <t t-if="isAdvanced(line)">
+                                        <input type="text" class="form-control form-control-sm"
+                                               dir="ltr" t-att-value="line.formula"
+                                               t-att-disabled="state.busy"
+                                               t-on-change="(ev) => this.saveLine(line, 'formula', ev)"/>
+                                        <div class="o_bs_err">معادلة متقدّمة — تُحرَّر نصاً</div>
+                                    </t>
+                                    <div t-else="" class="o_bs_terms">
+                                        <div t-foreach="terms(line)" t-as="term"
+                                             t-key="term_index + '|' + term.token"
+                                             class="o_bs_term">
+                                            <select class="form-select form-select-sm o_bs_term_op"
+                                                    t-att-disabled="state.busy"
+                                                    t-on-change="(ev) => this.onTermSign(line, term_index, ev)">
+                                                <option value="+"
+                                                        t-att-selected="term.op === '+'">+</option>
+                                                <option value="-"
+                                                        t-att-selected="term.op === '-'">−</option>
+                                            </select>
+                                            <input type="text" list="o_bs_ref_options"
+                                                   class="form-control form-control-sm o_bs_term_ref"
+                                                   placeholder="اختر حساباً أو باباً..."
+                                                   t-att-value="labelOf(term.token)"
+                                                   t-att-disabled="state.busy"
+                                                   t-on-change="(ev) => this.onTermRef(line, term_index, ev)"/>
+                                            <button class="btn btn-sm btn-link text-danger p-0"
+                                                    title="حذف الخانة" t-att-disabled="state.busy"
+                                                    t-on-click="() => this.removeTerm(line, term_index)">
+                                                <i class="fa fa-times"/>
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-secondary o_bs_term_add"
+                                                t-att-disabled="state.busy"
+                                                t-on-click="() => this.addTerm(line)">
+                                            <i class="fa fa-plus me-1"/> خانة
+                                        </button>
+                                    </div>
                                     <div t-if="lineError(line)" class="o_bs_err"
                                          t-esc="lineError(line)"/>
                                 </td>
@@ -315,17 +346,10 @@
                         <i class="fa fa-plus me-1"/> بند جديد
                     </button>
 
-                    <div t-if="state.references" class="o_bs_refs">
-                        <div class="small text-muted mb-1">مراجع جاهزة للنسخ:</div>
-                        <div class="o_bs_refs_list">
-                            <span t-foreach="state.references.groups" t-as="ref" t-key="ref.token"
-                                  class="o_bs_ref" t-esc="ref.token"/>
-                            <span t-foreach="state.references.lines" t-as="ref" t-key="ref.token"
-                                  class="o_bs_ref" t-esc="ref.token"/>
-                            <span t-foreach="state.references.accounts" t-as="ref" t-key="ref.token"
-                                  class="o_bs_ref" t-att-title="ref.label" t-esc="ref.token"/>
-                        </div>
-                    </div>
+                    <datalist id="o_bs_ref_options">
+                        <option t-foreach="references.all" t-as="ref" t-key="ref.token"
+                                t-att-value="ref.label"/>
+                    </datalist>
                 </div>
             </t>
 

@@ -199,3 +199,30 @@
     direction: ltr;
     color: var(--gray-600, #6c757d);
 }
+
+/* خانات المعادلة */
+.o_bs_terms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.o_bs_term {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.o_bs_term_op {
+    width: 54px;
+    text-align: center;
+}
+
+.o_bs_term_ref {
+    width: 210px;
+}
+
+.o_bs_term_add {
+    white-space: nowrap;
+}
