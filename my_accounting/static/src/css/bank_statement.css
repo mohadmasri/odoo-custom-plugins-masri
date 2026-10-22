@@ -69,3 +69,19 @@
     font-size: 0.8rem;
     color: var(--o-danger, #c0392b);
 }
+
+.o_bs2_count {
+    display: inline-block;
+    margin-inline-start: 5px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font-size: 0.72rem;
+    background: var(--o-surface-2, #eef0f4);
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs2_count_missing {
+    margin-inline-start: 4px;
+    font-size: 0.7rem;
+    color: var(--o-danger, #b35c00);
+}

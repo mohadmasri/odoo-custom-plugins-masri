@@ -72,6 +72,25 @@
                     </div>
                 </div>
 
+                <ul class="nav nav-tabs mb-2">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ isKind('') ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setKind('')">
+                            الكل <span class="o_bs2_count" t-esc="data.lines.length"/>
+                        </a>
+                    </li>
+                    <li t-foreach="kinds" t-as="kind" t-key="kind.key" class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ isKind(kind.key) ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setKind(kind.key)">
+                            <t t-esc="kind.label"/>
+                            <span class="o_bs2_count" t-esc="kind.count"/>
+                            <span t-if="kind.missing" class="o_bs2_count_missing">
+                                <t t-esc="kind.missing"/> لم تظهر
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+
                 <div class="o_bs2_bar">
                     <label class="form-check-label small">
                         <input type="checkbox" class="form-check-input me-1"

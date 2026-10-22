@@ -91,56 +91,70 @@ def _party(raw, after):
     return words.strip(' -:')[:60]
 
 
-def explain(raw, amount):
-    """شرح الحركة بالعربية كما نفهمها من نصّ البنك."""
+KINDS = [
+    ('cheque_out', 'شيكات صادرة منكم'),
+    ('cheque_in', 'شيكات أودعتموها'),
+    ('guarantee', 'كفالات'),
+    ('transfer', 'حوالات وإيداعات'),
+    ('loan', 'قروض وفوائد'),
+    ('fees', 'مصاريف بنكية'),
+    ('other', 'أخرى'),
+]
+
+
+def read_line(raw, amount):
+    """نوع الحركة وشرحها بالعربية، كما نفهمهما من نصّ البنك."""
     text = raw or ''
     lowered = text.lower()
     if 'cash margin' in lowered and 'refund' not in lowered:
-        return 'تأمين كفالة%s' % _guarantee(text)
+        return 'guarantee', 'تأمين كفالة%s' % _guarantee(text)
     if 'refund of cash margin' in lowered:
-        return 'مرتجع تأمين كفالة%s' % _guarantee(text)
+        return 'guarantee', 'مرتجع تأمين كفالة%s' % _guarantee(text)
     if 'guarantee issuance' in lowered:
-        return 'عمولة إصدار كفالة%s' % _guarantee(text)
+        return 'guarantee', 'عمولة إصدار كفالة%s' % _guarantee(text)
     if 'repayment of commissions' in lowered:
-        return 'استرداد عمولة كفالة%s' % _guarantee(text)
+        return 'guarantee', 'استرداد عمولة كفالة%s' % _guarantee(text)
     if 'stamps charges' in lowered:
-        return 'رسوم طوابع كفالة%s' % _guarantee(text)
+        return 'guarantee', 'رسوم طوابع كفالة%s' % _guarantee(text)
     if 'loan granting facilities' in lowered:
-        return 'عمولة منح تسهيلات'
+        return 'loan', 'عمولة منح تسهيلات'
     if 'repayment of loan dues' in lowered:
         found = LOAN_RE.search(text)
-        return 'قسط قرض%s' % (' رقم %s' % found.group(1) if found else '')
+        return 'loan', 'قسط قرض%s' % (' رقم %s' % found.group(1) if found else '')
     if 'interest payment' in lowered:
-        return 'فائدة'
+        return 'loan', 'فائدة'
     if 'cheque book issuance' in lowered:
         found = BOOK_RE.search(text)
-        return 'رسوم دفتر شيكات%s' % (
+        return 'fees', 'رسوم دفتر شيكات%s' % (
             ' (من %s إلى %s)' % (found.group(1), found.group(2)) if found else '')
     if 'courier charges' in lowered:
-        return 'رسوم بريد'
+        return 'fees', 'رسوم بريد'
     found = CHQ_RE.search(text)
     if 'outward cheque' in lowered or 'cheque deposit' in lowered:
-        return 'شيك وارد أودعتموه رقم %s' % found.group(1) if found else 'شيك وارد أودعتموه'
+        return 'cheque_in', ('شيك وارد أودعتموه رقم %s' % found.group(1)
+                             if found else 'شيك وارد أودعتموه')
     if 'cheque payment onus' in lowered:
-        return 'شيك رقم %s صُرف داخل البنك' % found.group(1) if found else 'شيك صُرف'
+        return 'cheque_out', ('شيك رقم %s صُرف داخل البنك' % found.group(1)
+                              if found else 'شيك صُرف')
     if 'inward cheque' in lowered:
-        return 'شيك رقم %s صادر منكم وصُرف' % found.group(1) if found else 'شيك صادر منكم'
+        return 'cheque_out', ('شيك رقم %s صادر منكم وصُرف' % found.group(1)
+                              if found else 'شيك صادر منكم')
     if 'salaries transfers' in lowered:
-        return 'عمولة حوالة رواتب'
+        return 'fees', 'عمولة حوالة رواتب'
     if 'cash deposit' in lowered:
         party = _party(text, 'into your AC')
-        return 'إيداع نقدي%s' % (' من %s' % party if party else '')
+        return 'transfer', 'إيداع نقدي%s' % (' من %s' % party if party else '')
     if 'funds transfer to your ac' in lowered:
         party = _party(text, 'to your AC')
-        return 'حوالة واردة%s' % (' من %s' % party if party else '')
+        return 'transfer', 'حوالة واردة%s' % (' من %s' % party if party else '')
     if 'funds transfer from your ac' in lowered:
         party = _party(text, 'from your AC')
-        return 'حوالة صادرة%s' % (' إلى %s' % party if party else '')
+        return 'transfer', 'حوالة صادرة%s' % (' إلى %s' % party if party else '')
     if 'funds transfer' in lowered:
-        return 'حوالة %s' % ('واردة' if (amount or 0) > 0 else 'صادرة')
-    if 'commission' in lowered:
-        return 'عمولة بنكية'
-    return ''
+        return 'transfer', 'حوالة %s' % ('واردة' if (amount or 0) > 0 else 'صادرة')
+    if 'commission' in lowered or 'charges' in lowered:
+        return 'fees', 'عمولة بنكية'
+    return 'other', ''
 
 
 class MyAccountingBankStatement(models.Model):
@@ -435,6 +449,7 @@ class MyAccountingBankStatement(models.Model):
             'closing_balance': self.closing_balance,
             'check': check,
             'lines': [line._payload() for line in self.line_ids.sorted(lambda l: l.sequence)],
+            'kinds': self._kind_counts(),
             'matched_count': len(matched),
             'unmatched_count': len(unmatched),
             'unmatched_total': round(sum(unmatched.mapped('amount')), 3),
@@ -480,6 +495,18 @@ class MyAccountingBankStatement(models.Model):
                     'amount': line.amount,
                 })
         return sorted(groups.values(), key=lambda item: -item['count'])
+
+    def _kind_counts(self):
+        """عدد حركات كل نوع، وكم منها لم يظهر في القيود."""
+        counts = {key: {'key': key, 'label': label, 'count': 0, 'missing': 0}
+                  for key, label in KINDS}
+        for line in self.line_ids:
+            kind, _note = read_line(line.raw or line.label, line.amount)
+            entry = counts[kind]
+            entry['count'] += 1
+            if not line.move_line_id:
+                entry['missing'] += 1
+        return [entry for entry in counts.values() if entry['count']]
 
     def _book_lines(self):
         self.ensure_one()
@@ -583,6 +610,7 @@ class MyAccountingBankStatementLine(models.Model):
     def _payload(self):
         self.ensure_one()
         move = self.move_line_id.move_id
+        kind, note = read_line(self.raw or self.label, self.amount)
         return {
             'id': self.id,
             'date': fields.Date.to_string(self.date),
@@ -592,7 +620,8 @@ class MyAccountingBankStatementLine(models.Model):
             'amount': self.amount,
             'balance': self.balance,
             'matched': bool(self.move_line_id),
-            'note': explain(self.raw or self.label, self.amount),
+            'kind': kind,
+            'note': note,
             'move_id': move.id or False,
             'move': move.name or '',
             'move_label': self.move_line_id.name or '',

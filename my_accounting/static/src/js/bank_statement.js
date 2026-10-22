@@ -27,6 +27,7 @@ export class BankStatementPage extends Component {
             statements: [],
             data: null,
             onlyMissing: false,
+            kind: "",
         });
         onWillStart(async () => {
             const banks = await this.orm.call(
@@ -55,15 +56,28 @@ export class BankStatementPage extends Component {
         return this.state.data;
     }
 
-    /** حركات الكشف بترتيبه، وقد تُقصر على ما لم يظهر في القيود */
+    /** حركات الكشف بترتيبه، بعد تصفيتها بالنوع وبما لم يظهر */
     get rows() {
         const data = this.state.data;
         if (!data) {
             return [];
         }
-        return this.state.onlyMissing
-            ? data.lines.filter((line) => !line.matched)
-            : data.lines;
+        return data.lines.filter((line) => (
+            (!this.state.kind || line.kind === this.state.kind)
+            && (!this.state.onlyMissing || !line.matched)
+        ));
+    }
+
+    get kinds() {
+        return this.state.data ? this.state.data.kinds : [];
+    }
+
+    setKind(kind) {
+        this.state.kind = kind;
+    }
+
+    isKind(kind) {
+        return this.state.kind === kind;
     }
 
     toggleMissing() {
