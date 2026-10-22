@@ -55,6 +55,18 @@ export class BankStatementPage extends Component {
         return this.state.data;
     }
 
+    /** الحركات المعروضة حسب التبويب المختار */
+    get rows() {
+        const data = this.state.data;
+        if (!data) {
+            return [];
+        }
+        if (this.state.view === "matched") {
+            return data.matched;
+        }
+        return this.state.view === "all" ? data.lines : data.unmatched;
+    }
+
     onAccount(ev) {
         this.state.accountId = parseInt(ev.target.value, 10) || false;
     }

@@ -72,3 +72,34 @@
 .o_bs2_link {
     cursor: pointer;
 }
+
+.o_bs2_hint {
+    font-size: 0.72rem;
+    color: var(--gray-600, #6c757d);
+    margin-inline-start: 4px;
+}
+
+.o_bs2_note {
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs2_strongtag,
+.o_bs2_weaktag {
+    display: inline-block;
+    padding: 0 7px;
+    border-radius: 10px;
+    font-size: 0.74rem;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+}
+
+.o_bs2_strongtag {
+    background: var(--o-surface-2, #eaf6ea);
+    color: var(--body-color, #212529);
+}
+
+.o_bs2_weaktag {
+    background: var(--o-surface-2, #fdf4e6);
+    color: var(--o-danger, #b35c00);
+}

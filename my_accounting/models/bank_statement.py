@@ -26,6 +26,14 @@ IBAN_RE = re.compile(r'\b([A-Z]{2}\d{2}[A-Z0-9]{10,30})\b')
 PERIOD_RE = re.compile(r'(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})')
 
 
+ARABIC_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
+
+def _plain_digits(text):
+    """يوحّد الأرقام العربية باللاتينية ليُقارن ما كُتب بهذه وتلك."""
+    return (text or '').translate(ARABIC_DIGITS)
+
+
 def _number(text):
     return float((text or '0').replace(',', ''))
 
@@ -215,7 +223,8 @@ class MyAccountingBankStatement(models.Model):
     def match(self):
         """يربط كل حركة بنك بسطر قيد على حساب البنك، إن وُجد ما يطابقه."""
         self.ensure_one()
-        self.line_ids.write({'move_line_id': False})
+        self.line_ids.write({'move_line_id': False, 'match_reason': False,
+                             'match_strong': False})
         Line = self.env['myaccounting.move.line']
         window = timedelta(days=10)
         candidates = Line.search([
@@ -228,6 +237,7 @@ class MyAccountingBankStatement(models.Model):
         for statement_line in self.line_ids.sorted(lambda item: item.sequence):
             best = None
             best_score = -1
+            best_reason, best_strong = '', False
             for candidate in candidates:
                 if candidate.id in taken:
                     continue
@@ -238,16 +248,27 @@ class MyAccountingBankStatement(models.Model):
                 if days > 10:
                     continue
                 score = 100 - days
-                text = candidate.name or ''
+                text = _plain_digits(candidate.name or '')
+                reason, strong = 'المبلغ والتاريخ فقط', False
                 if statement_line.cheque and statement_line.cheque in text:
                     score += 100
-                if statement_line.reference and statement_line.reference in text:
+                    reason, strong = 'رقم الشيك %s في القيد' % statement_line.cheque, True
+                elif statement_line.reference and statement_line.reference in (
+                        candidate.name or ''):
                     score += 60
+                    reason, strong = 'مرجع البنك في القيد', True
+                elif days == 0:
+                    reason = 'المبلغ ونفس اليوم'
                 if score > best_score:
                     best, best_score = candidate, score
+                    best_reason, best_strong = reason, strong
             if best is not None:
                 taken.add(best.id)
-                statement_line.move_line_id = best.id
+                statement_line.write({
+                    'move_line_id': best.id,
+                    'match_reason': best_reason,
+                    'match_strong': best_strong,
+                })
         return True
 
     # ------------------------------------------------------------------
@@ -276,6 +297,8 @@ class MyAccountingBankStatement(models.Model):
             'check': check,
             'lines': [line._payload() for line in self.line_ids.sorted(lambda l: l.sequence)],
             'matched_count': len(matched),
+            'strong_count': len(matched.filtered('match_strong')),
+            'matched': [line._payload() for line in matched.sorted(lambda l: l.sequence)],
             'unmatched': [line._payload() for line in unmatched.sorted(lambda l: l.sequence)],
             'unmatched_total': round(sum(unmatched.mapped('amount')), 3),
             'book_only': [{
@@ -363,6 +386,9 @@ class MyAccountingBankStatementLine(models.Model):
     balance = fields.Float(string='الرصيد الجاري', digits=(16, 3))
     move_line_id = fields.Many2one('myaccounting.move.line', string='سطر القيد المطابق',
                                    ondelete='set null')
+    match_reason = fields.Char(string='سبب المطابقة')
+    match_strong = fields.Boolean(string='مطابقة بدليل',
+                                  help='رقم شيك أو مرجع بنك مذكور في القيد، لا مجرّد مبلغ.')
 
     def _payload(self):
         self.ensure_one()
@@ -376,6 +402,8 @@ class MyAccountingBankStatementLine(models.Model):
             'amount': self.amount,
             'balance': self.balance,
             'matched': bool(self.move_line_id),
+            'reason': self.match_reason or '',
+            'strong': self.match_strong,
             'move_id': move.id or False,
             'move': move.name or '',
             'move_label': self.move_line_id.name or '',

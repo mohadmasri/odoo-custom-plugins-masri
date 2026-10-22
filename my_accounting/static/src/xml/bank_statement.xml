@@ -148,6 +148,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.view === 'matched' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setView('matched')">
+                            طوبقت (<t t-esc="data.matched_count"/>)
+                            <span class="o_bs2_hint">منها <t t-esc="data.strong_count"/> بدليل</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="#" t-attf-class="nav-link {{ state.view === 'book' ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setView('book')">
                             قيود بلا حركة بنك (<t t-esc="data.book_only.length"/>)
@@ -162,6 +169,11 @@
                 </ul>
 
                 <!-- حركات البنك -->
+                <div t-if="state.view === 'matched'" class="o_bs2_note">
+                    «بدليل» تعني أن رقم الشيك أو مرجع البنك مذكور في نصّ القيد.
+                    وما عداه طوبق بالمبلغ والتاريخ وحدهما، فراجعه بعينك.
+                </div>
+
                 <table t-if="state.view !== 'book'" class="table table-bordered table-sm o_bs2_table">
                     <thead>
                         <tr>
@@ -172,12 +184,12 @@
                             <th class="text-end" style="width:110px;">وارد</th>
                             <th class="text-end" style="width:110px;">صادر</th>
                             <th class="text-end" style="width:120px;">الرصيد</th>
-                            <th style="width:150px;">القيد</th>
+                            <th style="width:140px;">القيد</th>
+                            <th style="width:210px;">لماذا طوبقت</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr t-foreach="state.view === 'all' ? data.lines : data.unmatched"
-                            t-as="line" t-key="line.id"
+                        <tr t-foreach="rows" t-as="line" t-key="line.id"
                             t-attf-class="{{ line.matched ? 'o_bs2_matched' : '' }}">
                             <td t-esc="line.date"/>
                             <td t-esc="line.label"/>
@@ -195,9 +207,16 @@
                                 </a>
                                 <span t-else="" class="text-muted small">—</span>
                             </td>
+                            <td>
+                                <span t-if="line.matched and line.strong" class="o_bs2_strongtag"
+                                      t-esc="line.reason"/>
+                                <span t-elif="line.matched" class="o_bs2_weaktag"
+                                      t-esc="line.reason"/>
+                                <span t-else="" class="text-muted small">—</span>
+                            </td>
                         </tr>
-                        <tr t-if="!(state.view === 'all' ? data.lines : data.unmatched).length">
-                            <td colspan="8" class="text-muted text-center py-2">لا حركات</td>
+                        <tr t-if="!rows.length">
+                            <td colspan="9" class="text-muted text-center py-2">لا حركات</td>
                         </tr>
                     </tbody>
                 </table>
