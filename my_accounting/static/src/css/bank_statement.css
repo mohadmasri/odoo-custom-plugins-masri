@@ -85,3 +85,14 @@
     font-size: 0.7rem;
     color: var(--o-danger, #b35c00);
 }
+
+.o_bs2_guess {
+    display: inline-block;
+    margin-inline-start: 6px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font-size: 0.7rem;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    background: var(--o-surface-2, #fdf4e6);
+    color: var(--o-danger, #b35c00);
+}

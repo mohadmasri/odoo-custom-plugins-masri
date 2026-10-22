@@ -128,6 +128,10 @@
                                         قيد <t t-esc="line.move"/>
                                     </a>
                                     <span class="o_bs2_label" t-esc="line.move_label"/>
+                                    <span t-if="line.guess" class="o_bs2_guess"
+                                          title="طوبقت بالمبلغ لا برقم الشيك — راجعها">
+                                        ترجيح بالمبلغ
+                                    </span>
                                 </t>
                                 <t t-else="">
                                     <span class="o_bs2_tag">لم تظهر</span>

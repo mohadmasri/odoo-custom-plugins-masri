@@ -33,6 +33,21 @@ CHEQUE_IN_TEXT = re.compile(r'(?:شيك|شيكات|chq|cheque)[^\d]{0,12}(\d{4,}
 MANY_CHEQUES = re.compile(r'شيكات|شكيات|من\s*\d{4,}\s*(?:الى|إلى)\s*\d{4,}|\bto\b\s*\d{4,}')
 
 
+RANGE_RE = re.compile(r'(\d{4,6})\s*(?:الى|إلى|to|-)\s*(\d{4,6})', re.IGNORECASE)
+ANY_CHEQUE_RE = re.compile(r'\b(\d{4,6})\b')
+
+
+def _mentioned_numbers(text):
+    """كل رقم شيك يذكره بند القيد، مع فكّ المدى ("من 205970 الى 205973")."""
+    plain = _plain_digits(text or '')
+    numbers = set(ANY_CHEQUE_RE.findall(plain))
+    for first, last in RANGE_RE.findall(plain):
+        start, end = int(first), int(last)
+        if 0 < end - start <= 40:
+            numbers.update(str(value) for value in range(start, end + 1))
+    return numbers
+
+
 def _cheque_numbers(text):
     """أرقام الشيكات المذكورة في نصّ القيد، بعد توحيد الأرقام العربية."""
     plain = _plain_digits(text or '')
@@ -343,15 +358,55 @@ class MyAccountingBankStatement(models.Model):
         loose.write({'move_line_id': False, 'match_reason': False,
                      'match_strong': False, 'match_state': False})
         Line = self.env['myaccounting.move.line']
-        window = timedelta(days=10)
+        # الخطوة الأولى: رقم الشيك دليل قاطع، أينما ذُكر في القيد — على بند
+        # البنك أو على بند المصروف — ومهما بَعُد تاريخ القيد، لأن القيود شهرية
+        period_from = (self.date_from or self.date_to) - timedelta(days=60)
+        period_to = (self.date_to or self.date_from) + timedelta(days=60)
+        wide = Line.search([
+            ('move_id.state', '=', 'posted'),
+            ('move_id.date', '>=', period_from),
+            ('move_id.date', '<=', period_to),
+        ])
+        by_number = {}
+        for candidate in wide:
+            for number in _mentioned_numbers(candidate.name):
+                by_number.setdefault(number, []).append(candidate)
+        used = set()
+        for statement_line in loose.sorted(lambda item: item.sequence):
+            if not statement_line.cheque:
+                continue
+            options = [item for item in by_number.get(statement_line.cheque, [])
+                       if item.id not in used
+                       and item.id not in statement_line.rejected_line_ids.ids]
+            if not options:
+                continue
+            amount = abs(statement_line.amount)
+            exact = [item for item in options
+                     if abs(abs((item.debit or 0.0) - (item.credit or 0.0)) - amount) < 0.005]
+            # بند حساب البنك أولى من بند المصروف، وإلا بقي بند البنك شاغراً
+            # فالتقطه ترجيحٌ بالمبلغ لحركة أخرى
+            chosen = sorted(exact or options,
+                            key=lambda item: 0 if item.account_id == self.account_id else 1)[0]
+            used.add(chosen.id)
+            on_bank = chosen.account_id == self.account_id
+            statement_line.write({
+                'move_line_id': chosen.id,
+                'match_reason': 'رقم الشيك %s مذكور في القيد%s'
+                                % (statement_line.cheque,
+                                   '' if on_bank else ' (على بند %s)' % chosen.account_id.name),
+                'match_strong': True,
+                'match_state': 'evidence',
+            })
+        loose = loose.filtered(lambda item: not item.move_line_id)
+
+        # الترجيح بالمبلغ وحده لا يخرج من فترة الكشف، وإلا وصل إلى شهر آخر
         candidates = Line.search([
             ('account_id', '=', self.account_id.id),
             ('move_id.state', '=', 'posted'),
-            ('move_id.date', '>=', (self.date_from or self.date_to) - window),
-            ('move_id.date', '<=', (self.date_to or self.date_from) + window),
+            ('move_id.date', '>=', self.date_from or self.date_to),
+            ('move_id.date', '<=', self.date_to or self.date_from),
         ])
-        taken = set(self.line_ids.filtered(
-            lambda item: item.match_state == 'confirmed').mapped('move_line_id').ids)
+        taken = set(self.line_ids.filtered('move_line_id').mapped('move_line_id').ids)
         for statement_line in loose.sorted(lambda item: item.sequence):
             best = None
             best_score = -1
@@ -365,8 +420,7 @@ class MyAccountingBankStatement(models.Model):
                 if abs(book - statement_line.amount) > 0.005:
                     continue
                 days = abs((candidate.move_id.date - statement_line.date).days)
-                if days > 10:
-                    continue
+                # القيود شهرية بتاريخ آخر الشهر، فالتاريخ يرجّح ولا يُقصي
                 text = candidate.name or ''
                 cheques = _cheque_numbers(text)
                 # القيد يذكر شيكاً آخر: ليس هو قطعاً
@@ -620,6 +674,8 @@ class MyAccountingBankStatementLine(models.Model):
             'amount': self.amount,
             'balance': self.balance,
             'matched': bool(self.move_line_id),
+            'guess': bool(self.move_line_id) and not self.match_strong,
+            'reason': self.match_reason or '',
             'kind': kind,
             'note': note,
             'move_id': move.id or False,
