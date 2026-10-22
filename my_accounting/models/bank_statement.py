@@ -61,6 +61,88 @@ def _to_date(text):
     return fields.Date.to_date('%s-%s-%s' % (year, month, day))
 
 
+LG_RE = re.compile(r'LOG([PT])(\d{2})\d{2}(\d{4})', re.IGNORECASE)
+LOAN_RE = re.compile(r'To Loan[:\s]*(\d+)', re.IGNORECASE)
+CHQ_RE = re.compile(r'CHQ\.?\s*NO[-\s]*(\d+)', re.IGNORECASE)
+BOOK_RE = re.compile(r'Cheque No\s*(\d+)\s*to\s*(\d+)', re.IGNORECASE)
+
+
+def _guarantee(raw):
+    found = LG_RE.search(raw or '')
+    return ' رقم %d/%s' % (int(found.group(3)), found.group(2)) if found else ''
+
+
+def _party(raw, after):
+    """اسم الطرف بعد عبارة معيّنة في نصّ البنك."""
+    lowered = (raw or '').lower()
+    position = lowered.find(after.lower())
+    if position == -1:
+        return ''
+    tail = (raw or '')[position + len(after):].strip(' -:')
+    tail = re.sub(r'\b(?:FT|MD|PD|TT|BDC|CRLC)[A-Z0-9.;]*\d[A-Z0-9.;]*', '', tail)
+    tail = NUMBER_RE.sub('', tail)
+    tail = re.sub(r'^\s*(?:To\s+Acc|From\s+Acc)\s*[-:]?\s*', '', tail,
+                  flags=re.IGNORECASE)
+    words = ' '.join(tail.split())
+    # الكشف يكرّر اسم المودِع مرّتين، فنكتفي بواحدة
+    half = len(words) // 2
+    if words[:half].strip() and words[:half].strip() == words[half:].strip():
+        words = words[:half].strip()
+    return words.strip(' -:')[:60]
+
+
+def explain(raw, amount):
+    """شرح الحركة بالعربية كما نفهمها من نصّ البنك."""
+    text = raw or ''
+    lowered = text.lower()
+    if 'cash margin' in lowered and 'refund' not in lowered:
+        return 'تأمين كفالة%s' % _guarantee(text)
+    if 'refund of cash margin' in lowered:
+        return 'مرتجع تأمين كفالة%s' % _guarantee(text)
+    if 'guarantee issuance' in lowered:
+        return 'عمولة إصدار كفالة%s' % _guarantee(text)
+    if 'repayment of commissions' in lowered:
+        return 'استرداد عمولة كفالة%s' % _guarantee(text)
+    if 'stamps charges' in lowered:
+        return 'رسوم طوابع كفالة%s' % _guarantee(text)
+    if 'loan granting facilities' in lowered:
+        return 'عمولة منح تسهيلات'
+    if 'repayment of loan dues' in lowered:
+        found = LOAN_RE.search(text)
+        return 'قسط قرض%s' % (' رقم %s' % found.group(1) if found else '')
+    if 'interest payment' in lowered:
+        return 'فائدة'
+    if 'cheque book issuance' in lowered:
+        found = BOOK_RE.search(text)
+        return 'رسوم دفتر شيكات%s' % (
+            ' (من %s إلى %s)' % (found.group(1), found.group(2)) if found else '')
+    if 'courier charges' in lowered:
+        return 'رسوم بريد'
+    found = CHQ_RE.search(text)
+    if 'outward cheque' in lowered or 'cheque deposit' in lowered:
+        return 'شيك وارد أودعتموه رقم %s' % found.group(1) if found else 'شيك وارد أودعتموه'
+    if 'cheque payment onus' in lowered:
+        return 'شيك رقم %s صُرف داخل البنك' % found.group(1) if found else 'شيك صُرف'
+    if 'inward cheque' in lowered:
+        return 'شيك رقم %s صادر منكم وصُرف' % found.group(1) if found else 'شيك صادر منكم'
+    if 'salaries transfers' in lowered:
+        return 'عمولة حوالة رواتب'
+    if 'cash deposit' in lowered:
+        party = _party(text, 'into your AC')
+        return 'إيداع نقدي%s' % (' من %s' % party if party else '')
+    if 'funds transfer to your ac' in lowered:
+        party = _party(text, 'to your AC')
+        return 'حوالة واردة%s' % (' من %s' % party if party else '')
+    if 'funds transfer from your ac' in lowered:
+        party = _party(text, 'from your AC')
+        return 'حوالة صادرة%s' % (' إلى %s' % party if party else '')
+    if 'funds transfer' in lowered:
+        return 'حوالة %s' % ('واردة' if (amount or 0) > 0 else 'صادرة')
+    if 'commission' in lowered:
+        return 'عمولة بنكية'
+    return ''
+
+
 class MyAccountingBankStatement(models.Model):
     _name = 'myaccounting.bank.statement'
     _description = 'كشف حساب بنكي'
@@ -176,6 +258,7 @@ class MyAccountingBankStatement(models.Model):
             if extra:
                 label = (label + ' ' + ' '.join(NUMBER_RE.sub('', piece) for piece in extra))
             movements.append({
+                'raw': ' '.join(body.split())[:300],
                 'date': block['date'],
                 'label': ' '.join(label.split())[:250],
                 'reference': reference,
@@ -353,11 +436,9 @@ class MyAccountingBankStatement(models.Model):
             'check': check,
             'lines': [line._payload() for line in self.line_ids.sorted(lambda l: l.sequence)],
             'matched_count': len(matched),
-            'strong_count': len(matched.filtered('match_strong')),
-            'matched': [line._payload() for line in matched.sorted(lambda l: l.sequence)],
-            'unmatched': [line._payload() for line in unmatched.sorted(lambda l: l.sequence)],
+            'unmatched_count': len(unmatched),
             'unmatched_total': round(sum(unmatched.mapped('amount')), 3),
-            'book_only': [{
+            'book_only_ignored': [{
                 'id': line.id,
                 'move_id': line.move_id.id,
                 'move': line.move_id.name or '',
@@ -479,6 +560,7 @@ class MyAccountingBankStatementLine(models.Model):
     statement_id = fields.Many2one('myaccounting.bank.statement', required=True,
                                    ondelete='cascade')
     sequence = fields.Integer(string='الترتيب')
+    raw = fields.Char(string='نصّ البنك كما هو')
     date = fields.Date(string='التاريخ')
     label = fields.Char(string='البيان')
     reference = fields.Char(string='مرجع البنك')
@@ -510,10 +592,7 @@ class MyAccountingBankStatementLine(models.Model):
             'amount': self.amount,
             'balance': self.balance,
             'matched': bool(self.move_line_id),
-            'reason': self.match_reason or '',
-            'strong': self.match_strong,
-            'state': self.match_state or '',
-            'rule': self.statement_id._rule_of(self.label),
+            'note': explain(self.raw or self.label, self.amount),
             'move_id': move.id or False,
             'move': move.name or '',
             'move_label': self.move_line_id.name or '',

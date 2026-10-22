@@ -4,16 +4,14 @@ import { Component, onWillStart, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { RefPicker } from "./balance_sheet";
 import { openRecord } from "./open_record";
 
 /**
- * كشف البنك: يُرفع ملف الكشف فيُقرأ ويُطابَق مع قيود حساب البنك،
- * ثم يُعرض ما طابق وما لم يطابق والفرق بين رصيد البنك ورصيد الدفاتر.
+ * كشف البنك: حركات الكشف بترتيبه، وأمام كل حركة القيد الذي ظهرت فيه
+ * وبيان بنده، أو — إن لم تظهر — شرحها كما نفهمها من نصّ البنك.
  */
 export class BankStatementPage extends Component {
     static template = "my_accounting.BankStatement";
-    static components = { RefPicker };
     static props = ["*"];
 
     setup() {
@@ -28,18 +26,13 @@ export class BankStatementPage extends Component {
             accountId: false,
             statements: [],
             data: null,
-            view: "unmatched",
-            accountOptions: [],
-            groupIndex: 0,
-            draft: { name: "", account_id: false, note: "" },
+            onlyMissing: false,
         });
         onWillStart(async () => {
             const banks = await this.orm.call(
                 "myaccounting.bank.statement", "get_bank_accounts", []);
             this.state.accounts = banks.accounts;
             this.state.accountId = banks.default_id;
-            this.state.accountOptions = await this.orm.call(
-                "myaccounting.bank.statement", "get_account_options", []);
             await this.refresh();
             this.state.loading = false;
         });
@@ -62,104 +55,23 @@ export class BankStatementPage extends Component {
         return this.state.data;
     }
 
-    /** الحركات المعروضة حسب التبويب المختار */
-    // ------------------------------------------------------------------
-    // الاقتراحات: تأكيد أو رفض
-    // ------------------------------------------------------------------
-
-    async confirm(line) {
-        this.state.data = await this.orm.call(
-            "myaccounting.bank.statement", "confirm_match", [line.id]);
-    }
-
-    async reject(line) {
-        this.state.data = await this.orm.call(
-            "myaccounting.bank.statement", "reject_match", [line.id]);
-    }
-
-    // ------------------------------------------------------------------
-    // تعريف المجموعات: سؤال واحد في كل مرة
-    // ------------------------------------------------------------------
-
-    get groups() {
-        return this.state.data ? this.state.data.groups : [];
-    }
-
-    get group() {
-        return this.groups[this.state.groupIndex] || null;
-    }
-
-    get unknownGroups() {
-        return this.groups.filter((item) => !item.rule);
-    }
-
-    goGroup(step) {
-        const next = this.state.groupIndex + step;
-        if (next >= 0 && next < this.groups.length) {
-            this.state.groupIndex = next;
-            this.loadDraft();
-        }
-    }
-
-    loadDraft() {
-        const group = this.group;
-        const rule = group && group.rule;
-        this.state.draft = rule
-            ? { name: rule.name, account_id: rule.account_id, note: rule.note }
-            : { name: "", account_id: false, note: "" };
-    }
-
-    editDraft(field, ev) {
-        this.state.draft[field] = ev.target.value;
-    }
-
-    onDraftAccount(token) {
-        this.state.draft.account_id = parseInt(token, 10) || false;
-    }
-
-    get draftAccountToken() {
-        return this.state.draft.account_id ? `${this.state.draft.account_id}` : "";
-    }
-
-    async saveRule() {
-        const group = this.group;
-        if (!group) {
-            return;
-        }
-        this.state.busy = true;
-        try {
-            await this.orm.call("myaccounting.bank.rule", "save_rule",
-                [group.key, { ...this.state.draft }]);
-            await this.refresh(this.state.data.id);
-            // ننتقل إلى أول مجموعة لم تُعرَّف بعد
-            const next = this.groups.findIndex((item) => !item.rule);
-            this.state.groupIndex = next === -1 ? this.state.groupIndex : next;
-            this.loadDraft();
-            this.notification.add("حُفظ التعريف.", { type: "success" });
-        } catch (error) {
-            this.notification.add(error.data?.message || "تعذّر الحفظ.", { type: "danger" });
-        } finally {
-            this.state.busy = false;
-        }
-    }
-
+    /** حركات الكشف بترتيبه، وقد تُقصر على ما لم يظهر في القيود */
     get rows() {
         const data = this.state.data;
         if (!data) {
             return [];
         }
-        if (this.state.view === "matched") {
-            return data.matched;
-        }
-        return this.state.view === "all" ? data.lines : data.unmatched;
+        return this.state.onlyMissing
+            ? data.lines.filter((line) => !line.matched)
+            : data.lines;
+    }
+
+    toggleMissing() {
+        this.state.onlyMissing = !this.state.onlyMissing;
     }
 
     onAccount(ev) {
         this.state.accountId = parseInt(ev.target.value, 10) || false;
-    }
-
-    setView(view) {
-        this.state.view = view;
     }
 
     isStatement(id) {
@@ -173,7 +85,6 @@ export class BankStatementPage extends Component {
         }
     }
 
-    /** يقرأ الملف إلى base64 ثم يرسله للخادم ليحلّله */
     async onFile(ev) {
         const file = ev.target.files && ev.target.files[0];
         if (!file) {
@@ -234,21 +145,6 @@ export class BankStatementPage extends Component {
         if (moveId) {
             openRecord(this.actionService, "myaccounting.move", moveId, isMiddleClick);
         }
-    }
-
-    /** الفرق بين رصيد البنك ورصيد الدفاتر، وما يفسّره */
-    get gap() {
-        const data = this.state.data;
-        if (!data) {
-            return { difference: 0, explained: 0, rest: 0 };
-        }
-        const difference = this.round(data.closing_balance - data.book_balance);
-        const explained = this.round(data.unmatched_total - data.book_only_total);
-        return { difference, explained, rest: this.round(difference - explained) };
-    }
-
-    round(value) {
-        return Math.round((Number(value) || 0) * 1000) / 1000;
     }
 
     fmt(value) {
