@@ -48,6 +48,16 @@ def _mentioned_numbers(text):
     return numbers
 
 
+def _mentions_guarantee(text, number, year):
+    """هل يذكر البند كفالةً بهذا الرقم؟ تُكتب "111/26" وتُكتب "26/111"."""
+    plain = _plain_digits(text or '')
+    patterns = (
+        r'(?<!\d)0*%d\s*/\s*%s(?!\d)' % (number, year),
+        r'(?<!\d)%s\s*/\s*0*%d(?!\d)' % (year, number),
+    )
+    return any(re.search(pattern, plain) for pattern in patterns)
+
+
 def _cheque_numbers(text):
     """أرقام الشيكات المذكورة في نصّ القيد، بعد توحيد الأرقام العربية."""
     plain = _plain_digits(text or '')
@@ -360,8 +370,8 @@ class MyAccountingBankStatement(models.Model):
         Line = self.env['myaccounting.move.line']
         # الخطوة الأولى: رقم الشيك دليل قاطع، أينما ذُكر في القيد — على بند
         # البنك أو على بند المصروف — ومهما بَعُد تاريخ القيد، لأن القيود شهرية
-        period_from = (self.date_from or self.date_to) - timedelta(days=60)
-        period_to = (self.date_to or self.date_from) + timedelta(days=60)
+        period_from = (self.date_from or self.date_to) - timedelta(days=120)
+        period_to = (self.date_to or self.date_from) + timedelta(days=120)
         wide = Line.search([
             ('move_id.state', '=', 'posted'),
             ('move_id.date', '>=', period_from),
@@ -394,6 +404,38 @@ class MyAccountingBankStatement(models.Model):
                 'match_reason': 'رقم الشيك %s مذكور في القيد%s'
                                 % (statement_line.cheque,
                                    '' if on_bank else ' (على بند %s)' % chosen.account_id.name),
+                'match_strong': True,
+                'match_state': 'evidence',
+            })
+        loose = loose.filtered(lambda item: not item.move_line_id)
+
+        # الخطوة الثانية: رقم الكفالة من مرجع البنك. وحركات الكفالة
+        # الواحدة (تأمين + طوابع + عمولة) تُسجَّل عندك في بند واحد، فيجوز
+        # أن تشير عدّة حركات إلى البند نفسه — بخلاف الشيكات.
+        for statement_line in loose.sorted(lambda item: item.sequence):
+            text = statement_line.raw or statement_line.label or ''
+            found = LG_RE.search(text)
+            if not found:
+                continue
+            year, number = found.group(2), int(found.group(3))
+            lowered = text.lower()
+            back = 'refund' in lowered or 'repayment of commissions' in lowered
+            options = [item for item in wide
+                       if _mentions_guarantee(item.name, number, year)
+                       and item.id not in statement_line.rejected_line_ids.ids]
+            if not options:
+                continue
+
+            def rank(item, back=back):
+                name = item.name or ''
+                return (0 if item.account_id == self.account_id else 1,
+                        0 if ('مرتجع' in name) == back else 1,
+                        item.id)
+
+            chosen = sorted(options, key=rank)[0]
+            statement_line.write({
+                'move_line_id': chosen.id,
+                'match_reason': 'رقم الكفالة %d/%s مذكور في القيد' % (number, year),
                 'match_strong': True,
                 'match_state': 'evidence',
             })
