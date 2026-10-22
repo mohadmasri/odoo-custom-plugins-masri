@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.BankStatement">
+        <div class="o_bank_statement p-3">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="m-0">كشف البنك</h2>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" style="width:200px;"
+                            t-att-disabled="state.busy"
+                            t-on-change="(ev) => this.onAccount(ev)">
+                        <option t-foreach="state.accounts" t-as="account" t-key="account.id"
+                                t-att-value="account.id"
+                                t-att-selected="account.id === state.accountId">
+                            <t t-esc="account.code"/> — <t t-esc="account.name"/>
+                        </option>
+                    </select>
+                    <label class="btn btn-primary btn-sm mb-0">
+                        <i class="fa fa-upload me-1"/> ارفع كشفاً (PDF)
+                        <input type="file" accept=".pdf" class="d-none"
+                               t-att-disabled="state.busy"
+                               t-on-change="(ev) => this.onFile(ev)"/>
+                    </label>
+                </div>
+            </div>
+
+            <div t-if="state.statements.length" class="o_bs2_bar">
+                <label class="form-label small mb-0">كشف محفوظ</label>
+                <select class="form-select form-select-sm" style="width:340px;"
+                        t-on-change="(ev) => this.openStatement(ev)">
+                    <option t-foreach="state.statements" t-as="item" t-key="item.id"
+                            t-att-value="item.id" t-att-selected="isStatement(item.id)">
+                        <t t-esc="item.name"/> — <t t-esc="item.date_from"/> ←
+                        <t t-esc="item.date_to"/> (<t t-esc="item.lines"/> حركة)
+                    </option>
+                </select>
+                <button t-if="data" class="btn btn-sm btn-outline-secondary"
+                        t-att-disabled="state.busy" t-on-click="() => this.rematch()">
+                    أعد المطابقة
+                </button>
+                <button t-if="data" class="btn btn-sm btn-link text-danger"
+                        t-att-disabled="state.busy" t-on-click="() => this.deleteStatement()">
+                    احذف الكشف
+                </button>
+            </div>
+
+            <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
+            <div t-elif="state.busy" class="text-muted py-5 text-center">يُقرأ الكشف...</div>
+
+            <div t-elif="!data" class="text-muted py-5 text-center">
+                لا كشف بعد. نزّل كشف الحساب من البنك وارفعه هنا.
+            </div>
+
+            <t t-else="">
+                <div class="o_bs2_head">
+                    <div>
+                        <b t-esc="data.name"/> ·
+                        حساب <t t-esc="data.bank_account_number"/> ·
+                        <t t-esc="data.iban"/>
+                    </div>
+                    <div class="small text-muted">
+                        من <t t-esc="data.date_from"/> إلى <t t-esc="data.date_to"/> ·
+                        مقابل حساب <t t-esc="data.account"/>
+                    </div>
+                </div>
+
+                <div class="o_bs2_cards">
+                    <!-- التحقّق من القراءة -->
+                    <table class="table table-bordered table-sm o_bs2_card">
+                        <thead>
+                            <tr><th colspan="3">قراءة الملف</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>الوارد</td>
+                                <td class="text-end" t-esc="fmt(data.check.money_in)"/>
+                                <td class="text-center">
+                                    <span t-if="data.check.in_ok" class="o_bs2_ok">مطابق</span>
+                                    <span t-else="" class="o_bs2_bad">
+                                        الكشف: <t t-esc="fmt(data.check.stated_in)"/>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>الصادر</td>
+                                <td class="text-end" t-esc="fmt(data.check.money_out)"/>
+                                <td class="text-center">
+                                    <span t-if="data.check.out_ok" class="o_bs2_ok">مطابق</span>
+                                    <span t-else="" class="o_bs2_bad">
+                                        الكشف: <t t-esc="fmt(data.check.stated_out)"/>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>الرصيد الختامي</td>
+                                <td class="text-end" t-esc="fmt(data.check.computed)"/>
+                                <td class="text-center">
+                                    <span t-if="data.check.closing_ok" class="o_bs2_ok">مطابق</span>
+                                    <span t-else="" class="o_bs2_bad">
+                                        الكشف: <t t-esc="fmt(data.check.closing)"/>
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- المطابقة -->
+                    <table class="table table-bordered table-sm o_bs2_card">
+                        <thead>
+                            <tr><th colspan="2">المطابقة</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>رصيد البنك في <t t-esc="data.date_to"/></td>
+                                <td class="text-end" t-esc="fmt(data.closing_balance)"/>
+                            </tr>
+                            <tr>
+                                <td>رصيد الدفاتر (حساب <t t-esc="data.account"/>)</td>
+                                <td class="text-end" t-esc="fmt(data.book_balance)"/>
+                            </tr>
+                            <tr class="o_bs2_strong">
+                                <td>الفرق</td>
+                                <td class="text-end" t-esc="fmt(gap.difference)"/>
+                            </tr>
+                            <tr>
+                                <td>
+                                    يفسّره: <t t-esc="data.unmatched.length"/> حركة بنك بلا قيد
+                                    <t t-if="data.book_only.length">
+                                        و<t t-esc="data.book_only.length"/> قيد بلا حركة بنك
+                                    </t>
+                                </td>
+                                <td class="text-end" t-esc="fmt(gap.explained)"/>
+                            </tr>
+                            <tr t-attf-class="{{ gap.rest ? 'o_bs2_warn' : '' }}">
+                                <td>يبقى بلا تفسير</td>
+                                <td class="text-end" t-esc="fmt(gap.rest)"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <ul class="nav nav-tabs mt-3 mb-2">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.view === 'unmatched' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setView('unmatched')">
+                            بلا قيد (<t t-esc="data.unmatched.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.view === 'book' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setView('book')">
+                            قيود بلا حركة بنك (<t t-esc="data.book_only.length"/>)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.view === 'all' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setView('all')">
+                            كل الحركات (<t t-esc="data.lines.length"/>)
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- حركات البنك -->
+                <table t-if="state.view !== 'book'" class="table table-bordered table-sm o_bs2_table">
+                    <thead>
+                        <tr>
+                            <th style="width:92px;">التاريخ</th>
+                            <th>البيان</th>
+                            <th style="width:120px;">مرجع البنك</th>
+                            <th style="width:80px;">الشيك</th>
+                            <th class="text-end" style="width:110px;">وارد</th>
+                            <th class="text-end" style="width:110px;">صادر</th>
+                            <th class="text-end" style="width:120px;">الرصيد</th>
+                            <th style="width:150px;">القيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.view === 'all' ? data.lines : data.unmatched"
+                            t-as="line" t-key="line.id"
+                            t-attf-class="{{ line.matched ? 'o_bs2_matched' : '' }}">
+                            <td t-esc="line.date"/>
+                            <td t-esc="line.label"/>
+                            <td class="small text-muted" t-esc="line.reference"/>
+                            <td t-esc="line.cheque"/>
+                            <td class="text-end"
+                                t-esc="line.amount > 0 ? fmt(line.amount) : ''"/>
+                            <td class="text-end"
+                                t-esc="line.amount &lt; 0 ? fmt(-line.amount) : ''"/>
+                            <td class="text-end" t-esc="fmt(line.balance)"/>
+                            <td>
+                                <a t-if="line.matched" href="#" class="o_bs2_link"
+                                   t-custom-click="(ev, mid) => this.openMove(line.move_id, mid)">
+                                    <t t-esc="line.move"/>
+                                </a>
+                                <span t-else="" class="text-muted small">—</span>
+                            </td>
+                        </tr>
+                        <tr t-if="!(state.view === 'all' ? data.lines : data.unmatched).length">
+                            <td colspan="8" class="text-muted text-center py-2">لا حركات</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- قيود بلا حركة بنك -->
+                <table t-else="" class="table table-bordered table-sm o_bs2_table">
+                    <thead>
+                        <tr>
+                            <th style="width:92px;">التاريخ</th>
+                            <th style="width:110px;">القيد</th>
+                            <th>البيان</th>
+                            <th class="text-end" style="width:120px;">المبلغ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="data.book_only" t-as="line" t-key="line.id">
+                            <td t-esc="line.date"/>
+                            <td>
+                                <a href="#" class="o_bs2_link"
+                                   t-custom-click="(ev, mid) => this.openMove(line.move_id, mid)">
+                                    <t t-esc="line.move"/>
+                                </a>
+                            </td>
+                            <td t-esc="line.label"/>
+                            <td class="text-end" t-esc="fmt(line.amount)"/>
+                        </tr>
+                        <tr t-if="!data.book_only.length">
+                            <td colspan="4" class="text-muted text-center py-2">
+                                كل قيود حساب البنك في هذه الفترة لها ما يقابلها في الكشف.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </div>
+    </t>
+
+</templates>

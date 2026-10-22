@@ -1,0 +1,74 @@
+.o_bank_statement {
+    overflow: auto;
+    height: 100%;
+}
+
+.o_bs2_bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+
+.o_bs2_head {
+    margin-bottom: 12px;
+}
+
+.o_bs2_cards {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.o_bs2_card {
+    flex: 1 1 360px;
+    max-width: 520px;
+}
+
+.o_bs2_card th {
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_bs2_card td {
+    padding: 3px 8px;
+}
+
+.o_bs2_strong td {
+    font-weight: 700;
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
+}
+
+.o_bs2_warn td {
+    font-weight: 700;
+    background: var(--o-surface-2, #fdf1f1);
+}
+
+.o_bs2_ok {
+    font-size: 0.8rem;
+    color: var(--body-color, #212529);
+}
+
+.o_bs2_bad {
+    font-size: 0.8rem;
+    color: var(--o-danger, #c0392b);
+}
+
+.o_bs2_table td,
+.o_bs2_table th {
+    padding: 2px 6px;
+    vertical-align: middle;
+}
+
+.o_bs2_table th {
+    background: var(--o-surface-2, #f2f4f7);
+}
+
+.o_bs2_matched td {
+    color: var(--gray-600, #6c757d);
+}
+
+.o_bs2_link {
+    cursor: pointer;
+}
