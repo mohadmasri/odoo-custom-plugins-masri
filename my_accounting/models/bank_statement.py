@@ -29,6 +29,24 @@ PERIOD_RE = re.compile(r'(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})')
 ARABIC_DIGITS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 
 
+CHEQUE_IN_TEXT = re.compile(r'(?:شيك|شيكات|chq|cheque)[^\d]{0,12}(\d{4,})', re.IGNORECASE)
+MANY_CHEQUES = re.compile(r'شيكات|شكيات|من\s*\d{4,}\s*(?:الى|إلى)\s*\d{4,}|\bto\b\s*\d{4,}')
+
+
+def _cheque_numbers(text):
+    """أرقام الشيكات المذكورة في نصّ القيد، بعد توحيد الأرقام العربية."""
+    plain = _plain_digits(text or '')
+    return set(CHEQUE_IN_TEXT.findall(plain))
+
+
+def _is_lump(text):
+    """سطر يجمع عدّة شيكات ("شيكات"، "من 205970 الى 205975") لا يُطابَق واحداً بواحد."""
+    plain = _plain_digits(text or '')
+    if MANY_CHEQUES.search(plain):
+        return True
+    return len(set(re.findall(r'\b\d{5,6}\b', plain))) > 1
+
+
 def _plain_digits(text):
     """يوحّد الأرقام العربية باللاتينية ليُقارن ما كُتب بهذه وتلك."""
     return (text or '').translate(ARABIC_DIGITS)
@@ -223,8 +241,10 @@ class MyAccountingBankStatement(models.Model):
     def match(self):
         """يربط كل حركة بنك بسطر قيد على حساب البنك، إن وُجد ما يطابقه."""
         self.ensure_one()
-        self.line_ids.write({'move_line_id': False, 'match_reason': False,
-                             'match_strong': False})
+        # المؤكَّد بيد المستخدم لا تمسّه إعادة المطابقة
+        loose = self.line_ids.filtered(lambda item: item.match_state != 'confirmed')
+        loose.write({'move_line_id': False, 'match_reason': False,
+                     'match_strong': False, 'match_state': False})
         Line = self.env['myaccounting.move.line']
         window = timedelta(days=10)
         candidates = Line.search([
@@ -233,13 +253,16 @@ class MyAccountingBankStatement(models.Model):
             ('move_id.date', '>=', (self.date_from or self.date_to) - window),
             ('move_id.date', '<=', (self.date_to or self.date_from) + window),
         ])
-        taken = set()
-        for statement_line in self.line_ids.sorted(lambda item: item.sequence):
+        taken = set(self.line_ids.filtered(
+            lambda item: item.match_state == 'confirmed').mapped('move_line_id').ids)
+        for statement_line in loose.sorted(lambda item: item.sequence):
             best = None
             best_score = -1
             best_reason, best_strong = '', False
+            rejected = set(statement_line.rejected_line_ids.ids)
+            ties = 0
             for candidate in candidates:
-                if candidate.id in taken:
+                if candidate.id in taken or candidate.id in rejected:
                     continue
                 book = round((candidate.debit or 0.0) - (candidate.credit or 0.0), 3)
                 if abs(book - statement_line.amount) > 0.005:
@@ -247,29 +270,62 @@ class MyAccountingBankStatement(models.Model):
                 days = abs((candidate.move_id.date - statement_line.date).days)
                 if days > 10:
                     continue
-                score = 100 - days
-                text = _plain_digits(candidate.name or '')
-                reason, strong = 'المبلغ والتاريخ فقط', False
-                if statement_line.cheque and statement_line.cheque in text:
-                    score += 100
+                text = candidate.name or ''
+                cheques = _cheque_numbers(text)
+                # القيد يذكر شيكاً آخر: ليس هو قطعاً
+                if statement_line.cheque and cheques and statement_line.cheque not in cheques:
+                    continue
+                strong = False
+                if statement_line.cheque and statement_line.cheque in cheques:
+                    score = 1000 - days
                     reason, strong = 'رقم الشيك %s في القيد' % statement_line.cheque, True
-                elif statement_line.reference and statement_line.reference in (
-                        candidate.name or ''):
-                    score += 60
+                elif statement_line.reference and statement_line.reference in text:
+                    score = 900 - days
                     reason, strong = 'مرجع البنك في القيد', True
-                elif days == 0:
-                    reason = 'المبلغ ونفس اليوم'
+                elif _is_lump(text):
+                    # سطر يجمع عدّة شيكات لا يُطابَق واحداً بواحد
+                    continue
+                else:
+                    score = 100 - days
+                    reason = 'المبلغ ونفس اليوم' if days == 0 else 'المبلغ والتاريخ فقط'
                 if score > best_score:
                     best, best_score = candidate, score
                     best_reason, best_strong = reason, strong
-            if best is not None:
-                taken.add(best.id)
+                    ties = 1
+                elif score == best_score:
+                    ties += 1
+            if best is None:
+                continue
+            if not best_strong and ties > 1:
+                # مرشّحان متساويان بلا دليل: لا نختار، نتركه للمستخدم
                 statement_line.write({
-                    'move_line_id': best.id,
-                    'match_reason': best_reason,
-                    'match_strong': best_strong,
+                    'match_reason': 'أكثر من قيد يطابق المبلغ — اختر بنفسك',
+                    'match_state': False,
                 })
+                continue
+            taken.add(best.id)
+            statement_line.write({
+                'move_line_id': best.id,
+                'match_reason': best_reason,
+                'match_strong': best_strong,
+                'match_state': 'evidence' if best_strong else 'suggested',
+            })
         return True
+
+    @api.model
+    def confirm_match(self, line_id):
+        line = self.env['myaccounting.bank.statement.line'].browse(int(line_id))
+        line.match_state = 'confirmed'
+        return line.statement_id._payload()
+
+    @api.model
+    def reject_match(self, line_id):
+        line = self.env['myaccounting.bank.statement.line'].browse(int(line_id))
+        if line.move_line_id:
+            line.rejected_line_ids = [(4, line.move_line_id.id)]
+        line.write({'move_line_id': False, 'match_reason': False,
+                    'match_strong': False, 'match_state': False})
+        return line.statement_id._payload()
 
     # ------------------------------------------------------------------
     # العرض
@@ -312,7 +368,37 @@ class MyAccountingBankStatement(models.Model):
             'book_only_total': round(sum((line.debit or 0.0) - (line.credit or 0.0)
                                          for line in book_only), 3),
             'book_balance': self._book_balance(),
+            'groups': self._groups(),
         }
+
+    def _rule_of(self, label):
+        rules = self.env['myaccounting.bank.rule'].get_rules()
+        from .bank_rule import normalize_key
+        return rules.get(normalize_key(label), {}).get('name', '')
+
+    def _groups(self):
+        """الحركات غير المطابَقة مجموعةً بنصّها، لتُعرَّف مرة واحدة."""
+        self.ensure_one()
+        from .bank_rule import normalize_key
+        rules = self.env['myaccounting.bank.rule'].get_rules()
+        groups = {}
+        for line in self.line_ids:
+            if line.move_line_id:
+                continue
+            key = normalize_key(line.label)
+            entry = groups.setdefault(key, {
+                'key': key, 'count': 0, 'total': 0.0, 'samples': [],
+                'rule': rules.get(key) or False,
+            })
+            entry['count'] += 1
+            entry['total'] = round(entry['total'] + line.amount, 3)
+            if len(entry['samples']) < 3:
+                entry['samples'].append({
+                    'date': fields.Date.to_string(line.date),
+                    'label': line.label or '',
+                    'amount': line.amount,
+                })
+        return sorted(groups.values(), key=lambda item: -item['count'])
 
     def _book_lines(self):
         self.ensure_one()
@@ -364,6 +450,22 @@ class MyAccountingBankStatement(models.Model):
             'default_id': last.account_id.id if last else (accounts[:1].id or False),
         }
 
+    @api.model
+    def get_account_options(self):
+        """كل الحسابات لمنتقي "الحساب المقابل" في تعريف الحركات."""
+        accounts = self.env['myaccounting.account'].search([], order='code')
+        seen = {}
+        for account in accounts:
+            seen[account.name] = seen.get(account.name, 0) + 1
+        options = []
+        for account in accounts:
+            display = account.name or account.code or ''
+            if seen.get(account.name, 0) > 1 and account.parent_id:
+                display = '%s / %s' % (account.name, account.parent_id.name)
+            options.append({'token': str(account.id), 'display': display,
+                            'hint': account.code or ''})
+        return options
+
     def delete_statement(self):
         self.unlink()
         return True
@@ -389,6 +491,12 @@ class MyAccountingBankStatementLine(models.Model):
     match_reason = fields.Char(string='سبب المطابقة')
     match_strong = fields.Boolean(string='مطابقة بدليل',
                                   help='رقم شيك أو مرجع بنك مذكور في القيد، لا مجرّد مبلغ.')
+    match_state = fields.Selection(
+        [('evidence', 'بدليل'), ('suggested', 'مقترح'), ('confirmed', 'مؤكَّد')],
+        string='حال المطابقة')
+    rejected_line_ids = fields.Many2many(
+        'myaccounting.move.line', 'myaccounting_bank_line_rejected_rel',
+        'statement_line_id', 'move_line_id', string='اقتراحات مرفوضة')
 
     def _payload(self):
         self.ensure_one()
@@ -404,6 +512,8 @@ class MyAccountingBankStatementLine(models.Model):
             'matched': bool(self.move_line_id),
             'reason': self.match_reason or '',
             'strong': self.match_strong,
+            'state': self.match_state or '',
+            'rule': self.statement_id._rule_of(self.label),
             'move_id': move.id or False,
             'move': move.name or '',
             'move_label': self.move_line_id.name or '',

@@ -21,3 +21,4 @@ from . import ir_http
 from . import balance_sheet
 from . import statement_formula
 from . import bank_statement
+from . import bank_rule

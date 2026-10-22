@@ -161,6 +161,15 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.view === 'teach' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setView('teach')">
+                            تعريف الحركات
+                            <span t-if="unknownGroups.length" class="o_bs2_hint">
+                                <t t-esc="unknownGroups.length"/> بلا تعريف
+                            </span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="#" t-attf-class="nav-link {{ state.view === 'all' ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setView('all')">
                             كل الحركات (<t t-esc="data.lines.length"/>)
@@ -169,12 +178,92 @@
                 </ul>
 
                 <!-- حركات البنك -->
+                <!-- تعريف الحركات: مجموعة واحدة في كل مرة -->
+                <div t-if="state.view === 'teach'" class="o_bs2_teach">
+                    <div t-if="!group" class="text-muted py-4 text-center">
+                        لا حركات بلا قيد في هذا الكشف.
+                    </div>
+                    <t t-else="">
+                        <div class="o_bs2_teach_nav">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    t-att-disabled="state.groupIndex === 0"
+                                    t-on-click="() => this.goGroup(-1)">السابقة</button>
+                            <span class="small text-muted">
+                                مجموعة <t t-esc="state.groupIndex + 1"/> من
+                                <t t-esc="groups.length"/>
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    t-att-disabled="state.groupIndex >= groups.length - 1"
+                                    t-on-click="() => this.goGroup(1)">التالية</button>
+                        </div>
+
+                        <div class="o_bs2_teach_card">
+                            <div class="o_bs2_teach_key" dir="ltr" t-esc="group.key"/>
+                            <div class="small text-muted mb-2">
+                                <t t-esc="group.count"/> حركة · مجموعها
+                                <t t-esc="fmt(group.total)"/>
+                                <span t-if="group.rule" class="o_bs2_strongtag ms-2">
+                                    معرَّفة: <t t-esc="group.rule.name"/>
+                                </span>
+                            </div>
+
+                            <table class="table table-sm o_bs2_table mb-3">
+                                <tbody>
+                                    <tr t-foreach="group.samples" t-as="sample"
+                                        t-key="sample.date + sample.label + sample.amount">
+                                        <td style="width:92px;" t-esc="sample.date"/>
+                                        <td dir="ltr" t-esc="sample.label"/>
+                                        <td class="text-end" style="width:120px;"
+                                            t-esc="fmt(sample.amount)"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div class="o_bs2_teach_form">
+                                <label class="form-label small mb-1">ما هذه الحركة عندك؟</label>
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="مثلاً: تأمين كفالة"
+                                       t-att-value="state.draft.name"
+                                       t-att-disabled="state.busy"
+                                       t-on-change="(ev) => this.editDraft('name', ev)"/>
+
+                                <label class="form-label small mb-1 mt-2">
+                                    في أي حساب تسجّلها؟
+                                </label>
+                                <RefPicker value="draftAccountToken"
+                                           options="state.accountOptions"
+                                           disabled="state.busy"
+                                           placeholder="'اكتب اسم الحساب...'"
+                                           onSelect="(token) => this.onDraftAccount(token)"/>
+
+                                <label class="form-label small mb-1 mt-2">ملاحظة (اختياري)</label>
+                                <input type="text" class="form-control form-control-sm"
+                                       t-att-value="state.draft.note"
+                                       t-att-disabled="state.busy"
+                                       t-on-change="(ev) => this.editDraft('note', ev)"/>
+
+                                <div class="mt-3 d-flex gap-2">
+                                    <button class="btn btn-sm btn-primary"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.saveRule()">
+                                        احفظ وانتقل للتالية
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.goGroup(1)">تخطَّ</button>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+
                 <div t-if="state.view === 'matched'" class="o_bs2_note">
                     «بدليل» تعني أن رقم الشيك أو مرجع البنك مذكور في نصّ القيد.
                     وما عداه طوبق بالمبلغ والتاريخ وحدهما، فراجعه بعينك.
                 </div>
 
-                <table t-if="state.view !== 'book'" class="table table-bordered table-sm o_bs2_table">
+                <table t-if="state.view !== 'book' and state.view !== 'teach'"
+                       class="table table-bordered table-sm o_bs2_table">
                     <thead>
                         <tr>
                             <th style="width:92px;">التاريخ</th>
@@ -186,6 +275,7 @@
                             <th class="text-end" style="width:120px;">الرصيد</th>
                             <th style="width:140px;">القيد</th>
                             <th style="width:210px;">لماذا طوبقت</th>
+                            <th style="width:86px;"/>
                         </tr>
                     </thead>
                     <tbody>
@@ -208,21 +298,42 @@
                                 <span t-else="" class="text-muted small">—</span>
                             </td>
                             <td>
-                                <span t-if="line.matched and line.strong" class="o_bs2_strongtag"
+                                <span t-if="line.state === 'confirmed'" class="o_bs2_strongtag">
+                                    مؤكَّد — <t t-esc="line.reason"/>
+                                </span>
+                                <span t-elif="line.strong" class="o_bs2_strongtag"
                                       t-esc="line.reason"/>
                                 <span t-elif="line.matched" class="o_bs2_weaktag"
                                       t-esc="line.reason"/>
+                                <span t-elif="line.reason" class="o_bs2_weaktag"
+                                      t-esc="line.reason"/>
                                 <span t-else="" class="text-muted small">—</span>
+                            </td>
+                            <td class="text-center">
+                                <t t-if="line.state === 'suggested'">
+                                    <button class="btn btn-sm btn-link text-success p-0 me-1"
+                                            title="أكّد المطابقة"
+                                            t-on-click="() => this.confirm(line)">
+                                        <i class="fa fa-check"/>
+                                    </button>
+                                    <button class="btn btn-sm btn-link text-danger p-0"
+                                            title="ارفض الاقتراح"
+                                            t-on-click="() => this.reject(line)">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </t>
+                                <span t-elif="line.rule" class="o_bs2_hint" t-esc="line.rule"/>
                             </td>
                         </tr>
                         <tr t-if="!rows.length">
-                            <td colspan="9" class="text-muted text-center py-2">لا حركات</td>
+                            <td colspan="10" class="text-muted text-center py-2">لا حركات</td>
                         </tr>
                     </tbody>
                 </table>
 
                 <!-- قيود بلا حركة بنك -->
-                <table t-else="" class="table table-bordered table-sm o_bs2_table">
+                <table t-elif="state.view === 'book'"
+                       class="table table-bordered table-sm o_bs2_table">
                     <thead>
                         <tr>
                             <th style="width:92px;">التاريخ</th>

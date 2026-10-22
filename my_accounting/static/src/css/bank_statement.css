@@ -103,3 +103,32 @@
     background: var(--o-surface-2, #fdf4e6);
     color: var(--o-danger, #b35c00);
 }
+
+/* تعريف الحركات */
+.o_bs2_teach {
+    max-width: 760px;
+}
+
+.o_bs2_teach_nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.o_bs2_teach_card {
+    padding: 14px;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 10px;
+    background: var(--o-surface, #fff);
+}
+
+.o_bs2_teach_key {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.o_bs2_teach_form {
+    max-width: 420px;
+}
