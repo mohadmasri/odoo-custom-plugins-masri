@@ -5,6 +5,7 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { openRecord } from "./open_record";
+import { usePrintPageSize } from "./print_page_size";
 
 /**
  * كشف البنك: حركات الكشف بترتيبه، وأمام كل حركة القيد الذي ظهرت فيه
@@ -19,6 +20,7 @@ export class BankStatementPage extends Component {
         this.actionService = useService("action");
         this.dialog = useService("dialog");
         this.notification = useService("notification");
+        this.printPage = usePrintPageSize("A4 portrait", "8mm");
         this.state = useState({
             loading: true,
             busy: false,
@@ -39,11 +41,13 @@ export class BankStatementPage extends Component {
         });
     }
 
+    /** كشوف الحساب المختار، وآخرها معروضاً */
     async refresh(statementId) {
+        const account = this.state.accountId;
         const [statements, data] = await Promise.all([
-            this.orm.call("myaccounting.bank.statement", "get_statements", []),
+            this.orm.call("myaccounting.bank.statement", "get_statements", [account]),
             this.orm.call("myaccounting.bank.statement", "get_statement",
-                [statementId || false]),
+                [statementId || false, account]),
         ]);
         this.state.statements = statements;
         this.state.data = data || null;
@@ -72,6 +76,11 @@ export class BankStatementPage extends Component {
         return this.state.data ? this.state.data.kinds : [];
     }
 
+    get kindLabel() {
+        const found = this.kinds.find((item) => item.key === this.state.kind);
+        return found ? found.label : "";
+    }
+
     setKind(kind) {
         this.state.kind = kind;
     }
@@ -84,8 +93,21 @@ export class BankStatementPage extends Component {
         this.state.onlyMissing = !this.state.onlyMissing;
     }
 
-    onAccount(ev) {
+    async onAccount(ev) {
         this.state.accountId = parseInt(ev.target.value, 10) || false;
+        this.state.kind = "";
+        await this.refresh();
+    }
+
+    get accountName() {
+        const found = this.state.accounts.find(
+            (item) => item.id === this.state.accountId);
+        return found ? found.name : "";
+    }
+
+    print() {
+        this.printPage.enable();
+        window.print();
     }
 
     isStatement(id) {

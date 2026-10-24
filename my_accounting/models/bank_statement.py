@@ -182,6 +182,26 @@ def read_line(raw, amount):
     return 'other', ''
 
 
+# الحسابات التي يُرفع لها كشف بنك. تُعلَّم مرة واحدة ثم تُدار من بطاقة الحساب.
+DEFAULT_BANK_CODES = ('101', '648', '651')
+
+
+class MyAccountingAccountBank(models.Model):
+    _inherit = 'myaccounting.account'
+
+    is_bank = fields.Boolean(
+        string='حساب بنك', index=True,
+        help='يظهر في صفحة كشف البنك ليُرفع له كشف ويُطابَق معه.')
+
+    @api.model
+    def _ensure_bank_accounts(self):
+        banks = self.search([('is_bank', '=', True)])
+        if not banks:
+            banks = self.search([('code', 'in', list(DEFAULT_BANK_CODES))])
+            banks.write({'is_bank': True})
+        return banks.sorted(lambda account: account.code or '')
+
+
 class MyAccountingBankStatement(models.Model):
     _name = 'myaccounting.bank.statement'
     _description = 'كشف حساب بنكي'
@@ -627,12 +647,17 @@ class MyAccountingBankStatement(models.Model):
         return round((self.account_id.opening_balance or 0.0) + movement, 3)
 
     @api.model
-    def get_statement(self, statement_id=False):
-        statement = self.browse(int(statement_id)) if statement_id else self.search([], limit=1)
+    def get_statement(self, statement_id=False, account_id=False):
+        if statement_id:
+            statement = self.browse(int(statement_id))
+        else:
+            domain = [('account_id', '=', int(account_id))] if account_id else []
+            statement = self.search(domain, limit=1)
         return statement._payload() if statement else False
 
     @api.model
-    def get_statements(self):
+    def get_statements(self, account_id=False):
+        domain = [('account_id', '=', int(account_id))] if account_id else []
         return [{
             'id': statement.id,
             'name': statement.name,
@@ -640,18 +665,22 @@ class MyAccountingBankStatement(models.Model):
             'date_from': statement.date_from and fields.Date.to_string(statement.date_from) or '',
             'date_to': statement.date_to and fields.Date.to_string(statement.date_to) or '',
             'lines': len(statement.line_ids),
-        } for statement in self.search([], limit=50)]
+        } for statement in self.search(domain, limit=50)]
 
     @api.model
     def get_bank_accounts(self):
-        """الحسابات التي تصلح أن تكون حساب بنك: الرئيسية منها."""
-        accounts = self.env['myaccounting.account'].search(
-            [('parent_id', '=', False)], order='code')
+        """حسابات البنوك التي يُرفع لها كشف."""
+        accounts = self.env['myaccounting.account']._ensure_bank_accounts()
         last = self.search([], limit=1)
+        default_id = last.account_id.id if last else False
+        if default_id not in accounts.ids:
+            default_id = accounts[:1].id or False
         return {
             'accounts': [{'id': account.id, 'code': account.code or '',
-                          'name': account.name or ''} for account in accounts],
-            'default_id': last.account_id.id if last else (accounts[:1].id or False),
+                          'name': account.name or '',
+                          'statements': self.search_count([('account_id', '=', account.id)])}
+                         for account in accounts],
+            'default_id': default_id,
         }
 
     @api.model

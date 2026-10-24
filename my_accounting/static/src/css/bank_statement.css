@@ -96,3 +96,59 @@
     background: var(--o-surface-2, #fdf4e6);
     color: var(--o-danger, #b35c00);
 }
+
+.o_bs2_print_title {
+    display: none;
+}
+
+@media print {
+    .o_bank_statement {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    .o_bs2_print_title {
+        display: block;
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .o_bank_statement td,
+    .o_bank_statement th {
+        color: #000 !important;
+    }
+
+    .o_bs2_table {
+        font-size: 8.5px;
+        width: 100% !important;
+        table-layout: fixed;
+    }
+
+    .o_bs2_table td,
+    .o_bs2_table th {
+        padding: 1px 3px !important;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .o_bs2_table thead {
+        display: table-header-group;
+    }
+
+    .o_bs2_table tr {
+        break-inside: avoid;
+    }
+
+    .o_bs2_raw {
+        font-size: 8px;
+    }
+
+    .o_bs2_tag,
+    .o_bs2_guess {
+        border: 0;
+        padding: 0;
+        background: transparent;
+    }
+}

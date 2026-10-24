@@ -4,7 +4,7 @@
     <t t-name="my_accounting.BankStatement">
         <div class="o_bank_statement p-3">
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
                 <h2 class="m-0">كشف البنك</h2>
                 <div class="d-flex gap-2 align-items-center">
                     <select class="form-select form-select-sm" style="width:200px;"
@@ -22,10 +22,14 @@
                                t-att-disabled="state.busy"
                                t-on-change="(ev) => this.onFile(ev)"/>
                     </label>
+                    <button t-if="data" class="btn btn-secondary btn-sm"
+                            t-on-click="() => this.print()">
+                        <i class="fa fa-print me-1"/> طباعة
+                    </button>
                 </div>
             </div>
 
-            <div t-if="state.statements.length" class="o_bs2_bar">
+            <div t-if="state.statements.length" class="o_bs2_bar no-print">
                 <label class="form-label small mb-0">كشف محفوظ</label>
                 <select class="form-select form-select-sm" style="width:340px;"
                         t-on-change="(ev) => this.openStatement(ev)">
@@ -53,6 +57,12 @@
 
             <t t-else="">
                 <div class="o_bs2_head">
+                    <div class="o_bs2_print_title">
+                        كشف البنك — <t t-esc="data.account"/>
+                        <span t-if="state.kind" class="o_bs2_print_kind">
+                            · <t t-esc="kindLabel"/>
+                        </span>
+                    </div>
                     <div>
                         <b t-esc="data.name"/> · حساب <t t-esc="data.bank_account_number"/> ·
                         من <t t-esc="data.date_from"/> إلى <t t-esc="data.date_to"/>
@@ -72,7 +82,7 @@
                     </div>
                 </div>
 
-                <ul class="nav nav-tabs mb-2">
+                <ul class="nav nav-tabs mb-2 no-print">
                     <li class="nav-item">
                         <a href="#" t-attf-class="nav-link {{ isKind('') ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setKind('')">
@@ -91,7 +101,7 @@
                     </li>
                 </ul>
 
-                <div class="o_bs2_bar">
+                <div class="o_bs2_bar no-print">
                     <label class="form-check-label small">
                         <input type="checkbox" class="form-check-input me-1"
                                t-att-checked="state.onlyMissing"
