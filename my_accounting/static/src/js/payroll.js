@@ -204,17 +204,51 @@ export class Payroll extends Component {
         this.state.data.lines = clone(this.saved.lines);
     }
 
-    /** مجاميع الكشف محسوبةً على الشاشة، فتتحرّك مع التعديل قبل الحفظ */
-    get totals() {
+    sumOf(lines) {
         const keys = ["basic_salary", "allowance", "gross", "social_base",
                       "employee_social", "employer_social", "income_tax", "pension",
                       "other_deduction", "total_deduction", "net"];
-        const lines = this.state.data ? this.state.data.lines : [];
         const totals = {};
         for (const key of keys) {
             totals[key] = this.round(lines.reduce((sum, line) => sum + (line[key] || 0), 0));
         }
         return totals;
+    }
+
+    /** مجاميع الكشف محسوبةً على الشاشة، فتتحرّك مع التعديل قبل الحفظ */
+    get totals() {
+        return this.sumOf(this.state.data ? this.state.data.lines : []);
+    }
+
+    /** بنود الشهر مقسومةً على الكشوف بترتيبها، وبلا كشف في آخرها */
+    get sheetSections() {
+        const lines = this.state.data ? this.state.data.lines : [];
+        const order = this.state.groups.map((group) => group.id);
+        const buckets = new Map();
+        for (const line of lines) {
+            const id = line.group_id || false;
+            if (!buckets.has(id)) {
+                buckets.set(id, []);
+            }
+            buckets.get(id).push(line);
+        }
+        const rank = (id) => {
+            if (id === false) {
+                return 9999;
+            }
+            const index = order.indexOf(id);
+            return index < 0 ? 9998 : index;
+        };
+        return [...buckets.keys()].sort((a, b) => rank(a) - rank(b)).map((id) => {
+            const group = this.state.groups.find((item) => item.id === id);
+            const own = buckets.get(id);
+            return {
+                key: id === false ? "none" : `g${id}`,
+                name: group ? group.name : "بلا كشف",
+                lines: own,
+                totals: this.sumOf(own),
+            };
+        });
     }
 
     async postPayroll() {

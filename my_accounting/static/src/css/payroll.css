@@ -118,6 +118,8 @@
 
     .o_pr_table {
         font-size: 9px;
+        table-layout: auto !important;
+        min-width: 0 !important;
         width: 100% !important;
     }
 
@@ -132,6 +134,16 @@
 
     .o_pr_calc {
         background: transparent;
+    }
+
+    /* عنوان الكشف لا يُترك وحده في آخر الصفحة */
+    .o_pr_section {
+        break-inside: avoid;
+        break-after: avoid;
+    }
+
+    .o_pr_subtotal {
+        break-inside: avoid;
     }
 }
 
@@ -163,4 +175,53 @@
 
 .o_pr_wide {
     max-width: 900px;
+}
+
+/* الأعمدة بعرضها المكتوب لا بما يقسمه المتصفّح، والجدول يُمرَّر أفقياً */
+.o_pr_table {
+    table-layout: fixed;
+}
+
+.o_pr_month {
+    min-width: 1226px;
+}
+
+.o_pr_emp {
+    min-width: 1520px;
+}
+
+.o_pr_table th {
+    white-space: normal;
+    line-height: 1.2;
+}
+
+.o_pr_section td {
+    font-weight: 700;
+    background: var(--o-surface-2, #eef1f5);
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
+}
+
+.o_pr_subtotal td {
+    font-weight: 600;
+    background: var(--o-surface-2, #f7f8fa);
+}
+
+/* خانة الاختيار داخل الجداول: تملأ عمودها، وقائمتها أوسع منه لتُقرأ الأسماء */
+.o_pr_table .o_bs_picker {
+    width: 100%;
+}
+
+.o_pr_table .o_bs_picker_menu {
+    width: 340px;
+    max-width: 70vw;
+}
+
+.o_pr_table .o_bs_picker_item > span:first-child {
+    overflow-wrap: anywhere;
+}
+
+/* الأرقام لا تُقصّ في خاناتها */
+.o_pr_table input.form-control-sm {
+    padding-inline: 4px;
+    min-width: 0;
 }

@@ -110,25 +110,32 @@
                                 t-on-click="() => this.deletePayroll()">احذف الكشف</button>
                     </div>
 
-                    <table class="table table-bordered table-sm o_pr_table">
+                    <table class="table table-bordered table-sm o_pr_table o_pr_month">
                         <thead>
                             <tr>
-                                <th style="width:150px;">الموظف</th>
-                                <th class="text-end">الأساسي</th>
-                                <th class="text-end">العلاوات</th>
-                                <th class="text-end">الإجمالي</th>
-                                <th class="text-end">الخاضع للضمان</th>
-                                <th class="text-end">ضمان الموظف</th>
-                                <th class="text-end">ضريبة الدخل</th>
-                                <th class="text-end">صندوق التقاعد</th>
-                                <th class="text-end">استقطاعات أخرى</th>
-                                <th class="text-end">مجموع الاستقطاع</th>
-                                <th class="text-end">الصافي</th>
-                                <th class="text-end">ضمان الشركة</th>
+                                <th style="width:170px;">الموظف</th>
+                                <th class="text-end" style="width:96px;">الأساسي</th>
+                                <th class="text-end" style="width:96px;">العلاوات</th>
+                                <th class="text-end" style="width:96px;">الإجمالي</th>
+                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
+                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
+                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
+                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
+                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
+                                <th class="text-end" style="width:96px;">الصافي</th>
+                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr t-foreach="data.lines" t-as="line" t-key="line.id">
+                        <!-- كل كشف في جسم جدول خاص: عنوانه وبنوده ومجاميعه -->
+                        <tbody t-foreach="sheetSections" t-as="section" t-key="section.key">
+                            <tr class="o_pr_section">
+                                <td colspan="12">
+                                    <t t-esc="section.name"/>
+                                    <span class="o_pr_count" t-esc="section.lines.length"/>
+                                </td>
+                            </tr>
+                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
                                 <td>
                                     <t t-esc="line.employee"/>
                                     <div t-if="line.job_title" class="o_pr_job"
@@ -173,7 +180,23 @@
                                     <td class="text-end" t-esc="fmt(line.employer_social)"/>
                                 </t>
                             </tr>
-                            <tr t-if="!data.lines.length">
+                            <tr t-if="sheetSections.length > 1" class="o_pr_subtotal">
+                                <td>مجموع <t t-esc="section.name"/></td>
+                                <td class="text-end" t-esc="fmt(section.totals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.gross)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.social_base)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.pension)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.net)"/>
+                                <td class="text-end" t-esc="fmt(section.totals.employer_social)"/>
+                            </tr>
+                        </tbody>
+                        <tbody t-if="!data.lines.length">
+                            <tr>
                                 <td colspan="12" class="text-muted text-center py-2">
                                     لا بنود. أضف موظفين ثم «أعد البناء».
                                 </td>
@@ -181,7 +204,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="o_pr_total">
-                                <td>المجموع</td>
+                                <td>مجموع الكشف</td>
                                 <td class="text-end" t-esc="fmt(totals.basic_salary)"/>
                                 <td class="text-end" t-esc="fmt(totals.allowance)"/>
                                 <td class="text-end" t-esc="fmt(totals.gross)"/>
@@ -250,24 +273,24 @@
                     وما يُكتب على بطاقةٍ هنا يغلب حساب الكشف.
                 </div>
 
-                <table class="table table-bordered table-sm o_pr_table">
+                <table class="table table-bordered table-sm o_pr_table o_pr_emp">
                     <thead>
                         <tr>
-                            <th style="width:64px;">ترتيب</th>
-                            <th style="width:150px;">الاسم</th>
-                            <th style="width:160px;">الكشف</th>
-                            <th style="width:130px;">المسمّى</th>
-                            <th class="text-end" style="width:110px;">الأساسي</th>
-                            <th class="text-end" style="width:100px;">العلاوات</th>
-                            <th style="width:70px;">ضمان</th>
-                            <th class="text-end" style="width:120px;">الخاضع للضمان</th>
-                            <th class="text-end" style="width:100px;">ضريبة</th>
-                            <th class="text-end" style="width:100px;">تقاعد</th>
-                            <th class="text-end" style="width:100px;">استقطاع</th>
-                            <th style="width:190px;">حساب المصروف</th>
-                            <th style="width:190px;">يُدفع من</th>
-                            <th style="width:70px;">فعّال</th>
-                            <th style="width:44px;"/>
+                            <th style="width:60px;">ترتيب</th>
+                            <th style="width:170px;">الاسم</th>
+                            <th style="width:140px;">الكشف</th>
+                            <th style="width:110px;">المسمّى</th>
+                            <th class="text-end" style="width:96px;">الأساسي</th>
+                            <th class="text-end" style="width:96px;">العلاوات</th>
+                            <th class="text-center" style="width:56px;">ضمان</th>
+                            <th class="text-end" style="width:96px;">الخاضع للضمان</th>
+                            <th class="text-end" style="width:96px;">ضريبة</th>
+                            <th class="text-end" style="width:96px;">تقاعد</th>
+                            <th class="text-end" style="width:96px;">استقطاع</th>
+                            <th style="width:170px;">حساب المصروف</th>
+                            <th style="width:170px;">يُدفع من</th>
+                            <th class="text-center" style="width:56px;">فعّال</th>
+                            <th style="width:40px;"/>
                         </tr>
                     </thead>
                     <tbody>
