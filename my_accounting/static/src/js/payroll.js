@@ -60,6 +60,7 @@ export class Payroll extends Component {
             employees: [],
             groups: [],
             sheet: "all",
+            monthSheet: "all",
             settings: null,
             accountOptions: [],
             newYear: `${today.getFullYear()}`,
@@ -82,6 +83,10 @@ export class Payroll extends Component {
         this.state.payrolls = payrolls;
         this.state.data = data || null;
         this.saved.lines = data ? clone(data.lines) : [];
+        // كشف الشهر الجديد قد لا يحوي الكشف المختار، فنعود إلى عرض الكل
+        if (this.state.monthSheet !== "all" && !this.visibleSections.length) {
+            this.state.monthSheet = "all";
+        }
     }
 
     async loadSettings() {
@@ -218,6 +223,41 @@ export class Payroll extends Component {
     /** مجاميع الكشف محسوبةً على الشاشة، فتتحرّك مع التعديل قبل الحفظ */
     get totals() {
         return this.sumOf(this.state.data ? this.state.data.lines : []);
+    }
+
+    setMonthSheet(sheet) {
+        this.state.monthSheet = sheet;
+    }
+
+    /** الكشف المعروض من الشهر: الكل أو واحد بعينه */
+    get visibleSections() {
+        const sheet = this.state.monthSheet;
+        if (sheet === "all") {
+            return this.sheetSections;
+        }
+        return this.sheetSections.filter(
+            (section) => section.key === (sheet === "none" ? "none" : `g${sheet}`));
+    }
+
+    /** مجاميع ما هو معروض، فيطبع الكشف الواحد مجموعه هو */
+    get visibleTotals() {
+        return this.sumOf(this.visibleSections.flatMap((section) => section.lines));
+    }
+
+    get visibleCount() {
+        return this.visibleSections.reduce(
+            (sum, section) => sum + section.lines.length, 0);
+    }
+
+    get monthLabel() {
+        const section = this.state.monthSheet === "all" ? null : this.visibleSections[0];
+        return section ? section.name : "";
+    }
+
+    monthCountOf(id) {
+        const section = this.sheetSections.find(
+            (item) => item.key === (id === false ? "none" : `g${id}`));
+        return section ? section.lines.length : 0;
     }
 
     /** بنود الشهر مقسومةً على الكشوف بترتيبها، وبلا كشف في آخرها */

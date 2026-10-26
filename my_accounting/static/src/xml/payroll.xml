@@ -69,9 +69,10 @@
                     <div class="o_pr_head">
                         <div class="o_pr_print_title">
                             كشف رواتب <t t-esc="data.month_label"/> <t t-esc="data.year"/>
+                            <t t-if="monthLabel"> — <t t-esc="monthLabel"/></t>
                         </div>
                         <div class="small text-muted">
-                            <t t-esc="data.lines.length"/> موظفاً ·
+                            <t t-esc="visibleCount"/> موظفاً ·
                             <t t-if="data.state === 'posted'">
                                 مُرحَّل إلى
                                 <a href="#" class="o_pr_link"
@@ -110,6 +111,34 @@
                                 t-on-click="() => this.deletePayroll()">احذف الكشف</button>
                     </div>
 
+                    <!-- كشوف الشهر تبويباتٍ: واحدٌ منها أو عرض الكل -->
+                    <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
+                        t-if="sheetSections.length > 1">
+                        <li class="nav-item">
+                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'all' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setMonthSheet('all')">
+                                عرض الكل
+                                <span class="badge rounded-pill" t-esc="data.lines.length"/>
+                            </a>
+                        </li>
+                        <t t-foreach="state.groups" t-as="group" t-key="group.id">
+                            <li class="nav-item" t-if="monthCountOf(group.id)">
+                                <a href="#" t-attf-class="nav-link {{ state.monthSheet === group.id ? 'active' : '' }}"
+                                   t-on-click.prevent="() => this.setMonthSheet(group.id)">
+                                    <t t-esc="group.name"/>
+                                    <span class="badge rounded-pill" t-esc="monthCountOf(group.id)"/>
+                                </a>
+                            </li>
+                        </t>
+                        <li class="nav-item" t-if="monthCountOf(false)">
+                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'none' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setMonthSheet('none')">
+                                بلا كشف
+                                <span class="badge rounded-pill" t-esc="monthCountOf(false)"/>
+                            </a>
+                        </li>
+                    </ul>
+
                     <table class="table table-bordered table-sm o_pr_table o_pr_month">
                         <thead>
                             <tr>
@@ -128,8 +157,8 @@
                             </tr>
                         </thead>
                         <!-- كل كشف في جسم جدول خاص: عنوانه وبنوده ومجاميعه -->
-                        <tbody t-foreach="sheetSections" t-as="section" t-key="section.key">
-                            <tr class="o_pr_section">
+                        <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
+                            <tr class="o_pr_section" t-if="visibleSections.length > 1">
                                 <td colspan="12">
                                     <t t-esc="section.name"/>
                                     <span class="o_pr_count" t-esc="section.lines.length"/>
@@ -180,7 +209,7 @@
                                     <td class="text-end" t-esc="fmt(line.employer_social)"/>
                                 </t>
                             </tr>
-                            <tr t-if="sheetSections.length > 1" class="o_pr_subtotal">
+                            <tr t-if="visibleSections.length > 1" class="o_pr_subtotal">
                                 <td>مجموع <t t-esc="section.name"/></td>
                                 <td class="text-end" t-esc="fmt(section.totals.basic_salary)"/>
                                 <td class="text-end" t-esc="fmt(section.totals.allowance)"/>
@@ -202,20 +231,30 @@
                                 </td>
                             </tr>
                         </tbody>
+                        <tbody t-elif="!visibleSections.length">
+                            <tr>
+                                <td colspan="12" class="text-muted text-center py-2">
+                                    لا بنود في هذا الكشف.
+                                </td>
+                            </tr>
+                        </tbody>
                         <tfoot>
                             <tr class="o_pr_total">
-                                <td>مجموع الكشف</td>
-                                <td class="text-end" t-esc="fmt(totals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(totals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(totals.gross)"/>
-                                <td class="text-end" t-esc="fmt(totals.social_base)"/>
-                                <td class="text-end" t-esc="fmt(totals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(totals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(totals.pension)"/>
-                                <td class="text-end" t-esc="fmt(totals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(totals.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(totals.net)"/>
-                                <td class="text-end" t-esc="fmt(totals.employer_social)"/>
+                                <td>
+                                    <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
+                                    <t t-else="">مجموع الكشف</t>
+                                </td>
+                                <td class="text-end" t-esc="fmt(visibleTotals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.gross)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.social_base)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.pension)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.net)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.employer_social)"/>
                             </tr>
                         </tfoot>
                     </table>
