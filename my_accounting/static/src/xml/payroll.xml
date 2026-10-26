@@ -219,11 +219,43 @@
                     <span t-if="employeesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
                 </div>
 
+                <!-- كشوف الموظفين كتبويبات ملف الرواتب نفسها -->
+                <ul class="nav nav-pills o_pr_sheets mb-2">
+                    <li class="nav-item">
+                        <a href="#" t-attf-class="nav-link {{ state.sheet === 'all' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setSheet('all')">
+                            عرض الكل
+                            <span class="badge rounded-pill" t-esc="state.employees.length"/>
+                        </a>
+                    </li>
+                    <li class="nav-item" t-foreach="state.groups" t-as="group" t-key="group.id">
+                        <a href="#" t-attf-class="nav-link {{ state.sheet === group.id ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setSheet(group.id)">
+                            <t t-esc="group.name"/>
+                            <span class="badge rounded-pill" t-esc="countOf(group.id)"/>
+                        </a>
+                    </li>
+                    <li class="nav-item" t-if="countOf(false)">
+                        <a href="#" t-attf-class="nav-link {{ state.sheet === 'none' ? 'active' : '' }}"
+                           t-on-click.prevent="() => this.setSheet('none')">
+                            بلا كشف
+                            <span class="badge rounded-pill" t-esc="countOf(false)"/>
+                        </a>
+                    </li>
+                </ul>
+                <div t-if="currentGroup" class="o_pr_note small text-muted mb-2">
+                    كشف <b t-esc="currentGroup.name"/>:
+                    المصروف على <b t-esc="currentGroup.account or 'حساب الرواتب العام'"/>،
+                    والصافي يُدفع من <b t-esc="currentGroup.payment_account or 'حساب الدفع العام'"/>.
+                    وما يُكتب على بطاقةٍ هنا يغلب حساب الكشف.
+                </div>
+
                 <table class="table table-bordered table-sm o_pr_table">
                     <thead>
                         <tr>
                             <th style="width:64px;">ترتيب</th>
                             <th style="width:150px;">الاسم</th>
+                            <th style="width:160px;">الكشف</th>
                             <th style="width:130px;">المسمّى</th>
                             <th class="text-end" style="width:110px;">الأساسي</th>
                             <th class="text-end" style="width:100px;">العلاوات</th>
@@ -239,7 +271,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr t-foreach="state.employees" t-as="employee" t-key="employee_index">
+                        <tr t-foreach="visibleEmployees" t-as="employee" t-key="employee._k">
                             <td>
                                 <input type="number" class="form-control form-control-sm"
                                        t-att-value="employee.sequence"
@@ -249,6 +281,13 @@
                                 <input type="text" class="form-control form-control-sm"
                                        t-att-value="employee.name"
                                        t-on-change="(ev) => this.editEmployee(employee, 'name', ev)"/>
+                            </td>
+                            <td>
+                                <RefPicker value="groupToken(employee)"
+                                           options="groupOptions"
+                                           disabled="state.busy"
+                                           placeholder="'بلا كشف'"
+                                           onSelect="(token) => this.onEmployeeGroup(employee, token)"/>
                             </td>
                             <td>
                                 <input type="text" class="form-control form-control-sm"
@@ -277,14 +316,14 @@
                                 <RefPicker value="accountToken(employee)"
                                            options="state.accountOptions"
                                            disabled="state.busy"
-                                           placeholder="'حساب الرواتب العام'"
+                                           placeholder="placeholderAccount(employee)"
                                            onSelect="(token) => this.onEmployeeAccount(employee, token)"/>
                             </td>
                             <td>
                                 <RefPicker value="paymentToken(employee)"
                                            options="state.accountOptions"
                                            disabled="state.busy"
-                                           placeholder="'حساب الدفع العام'"
+                                           placeholder="placeholderPayment(employee)"
                                            onSelect="(token) => this.onEmployeePayment(employee, token)"/>
                             </td>
                             <td class="text-center">
@@ -295,18 +334,33 @@
                             <td class="text-center">
                                 <button class="btn btn-sm btn-link text-danger p-0"
                                         title="حذف الموظف"
-                                        t-on-click="() => this.removeEmployee(employee_index)">
+                                        t-on-click="() => this.removeEmployee(employee)">
                                     <i class="fa fa-trash"/>
                                 </button>
                             </td>
                         </tr>
-                        <tr t-if="!state.employees.length">
-                            <td colspan="14" class="text-muted text-center py-2">لا موظفين بعد</td>
+                        <tr t-if="!visibleEmployees.length">
+                            <td colspan="15" class="text-muted text-center py-2">لا موظفين في هذا الكشف</td>
                         </tr>
                     </tbody>
+                    <tfoot t-if="visibleEmployees.length">
+                        <tr class="o_pr_total">
+                            <td colspan="3">المجاميع</td>
+                            <td/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.basic_salary)"/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.allowance)"/>
+                            <td/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.social_base)"/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.income_tax)"/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.pension)"/>
+                            <td class="text-end" t-esc="fmt(employeeTotals.other_deduction)"/>
+                            <td colspan="4"/>
+                        </tr>
+                    </tfoot>
                 </table>
                 <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.addEmployee()">
                     <i class="fa fa-plus me-1"/> موظف
+                    <t t-if="currentGroup"> في <t t-esc="currentGroup.name"/></t>
                 </button>
             </t>
 
@@ -346,6 +400,78 @@
                                    placeholder="'اكتب اسم الحساب...'"
                                    onSelect="(token) => this.onSettingAccount(entry, token)"/>
                     </div>
+                </div>
+
+                <!-- الكشوف: تبويبات الموظفين، ولكل كشف حسابه وجهة دفعه -->
+                <div class="o_pr_bar mt-3">
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !groupsDirty"
+                            t-on-click="() => this.saveGroups()">حفظ الكشوف</button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy or !groupsDirty"
+                            t-on-click="() => this.cancelGroups()">إلغاء</button>
+                    <span t-if="groupsDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                </div>
+                <div class="o_pr_panel o_pr_wide">
+                    <div class="small text-muted mb-2">
+                        الكشوف هي تبويبات الموظفين. ما يُكتب هنا من حساب مصروف أو جهة
+                        دفع يرثه كل موظف في الكشف، إلا من كُتب على بطاقته غيره.
+                    </div>
+                    <table class="table table-bordered table-sm o_pr_table" style="max-width:860px;">
+                        <thead>
+                            <tr>
+                                <th style="width:64px;">ترتيب</th>
+                                <th style="width:190px;">الكشف</th>
+                                <th style="width:220px;">حساب المصروف</th>
+                                <th style="width:220px;">يُدفع من</th>
+                                <th style="width:70px;">موظفون</th>
+                                <th style="width:44px;"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.groups" t-as="group" t-key="group._k">
+                                <td>
+                                    <input type="number" class="form-control form-control-sm"
+                                           t-att-value="group.sequence"
+                                           t-on-change="(ev) => this.editGroup(group, 'sequence', ev)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           t-att-value="group.name"
+                                           t-on-change="(ev) => this.editGroup(group, 'name', ev)"/>
+                                </td>
+                                <td>
+                                    <RefPicker value="groupAccountToken(group)"
+                                               options="state.accountOptions"
+                                               disabled="state.busy"
+                                               placeholder="'حساب الرواتب العام'"
+                                               onSelect="(token) => this.onGroupAccount(group, token)"/>
+                                </td>
+                                <td>
+                                    <RefPicker value="groupPaymentToken(group)"
+                                               options="state.accountOptions"
+                                               disabled="state.busy"
+                                               placeholder="'حساب الدفع العام'"
+                                               onSelect="(token) => this.onGroupPayment(group, token)"/>
+                                </td>
+                                <td class="text-center" t-esc="countOf(group.id)"/>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-link text-danger p-0"
+                                            title="حذف الكشف"
+                                            t-on-click="() => this.removeGroup(group)">
+                                        <i class="fa fa-trash"/>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr t-if="!state.groups.length">
+                                <td colspan="6" class="text-muted text-center py-2">لا كشوف بعد</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-on-click="() => this.addGroup()">
+                        <i class="fa fa-plus me-1"/> كشف
+                    </button>
                 </div>
             </t>
         </div>

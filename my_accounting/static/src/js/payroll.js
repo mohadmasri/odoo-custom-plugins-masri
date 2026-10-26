@@ -18,6 +18,18 @@ function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
+let uid = 0;
+
+/** مفتاح ثابت لكل صف: الصفوف تُرشَّح بين التبويبات، فلا يصلح الفهرس مفتاحاً */
+function keyed(items) {
+    for (const item of items) {
+        if (!item._k) {
+            item._k = item.id ? `id${item.id}` : `new${++uid}`;
+        }
+    }
+    return items;
+}
+
 function same(first, second) {
     return JSON.stringify(first) === JSON.stringify(second);
 }
@@ -37,7 +49,7 @@ export class Payroll extends Component {
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.months = MONTHS;
-        this.saved = { employees: [], lines: [], settings: null };
+        this.saved = { employees: [], lines: [], settings: null, groups: [] };
         const today = new Date();
         this.state = useState({
             loading: true,
@@ -46,6 +58,8 @@ export class Payroll extends Component {
             payrolls: [],
             data: null,
             employees: [],
+            groups: [],
+            sheet: "all",
             settings: null,
             accountOptions: [],
             newYear: `${today.getFullYear()}`,
@@ -71,14 +85,21 @@ export class Payroll extends Component {
     }
 
     async loadSettings() {
-        const [employees, settings] = await Promise.all([
+        const [employees, settings, groups] = await Promise.all([
             this.orm.call("myaccounting.employee", "get_employees", []),
             this.orm.call("myaccounting.payroll.settings", "get_settings", []),
+            this.orm.call("myaccounting.payroll.group", "get_groups", []),
         ]);
-        this.state.employees = employees;
+        this.state.employees = keyed(employees);
         this.state.settings = settings;
-        this.saved.employees = clone(employees);
+        this.state.groups = keyed(groups);
+        this.saved.employees = clone(this.state.employees);
         this.saved.settings = clone(settings);
+        this.saved.groups = clone(this.state.groups);
+        if (this.state.sheet !== "all" && this.state.sheet !== "none"
+                && !groups.some((group) => group.id === this.state.sheet)) {
+            this.state.sheet = "all";
+        }
     }
 
     get data() {
@@ -263,6 +284,68 @@ export class Payroll extends Component {
         employee.gross = this.round(employee.basic_salary + employee.allowance);
     }
 
+    setSheet(sheet) {
+        this.state.sheet = sheet;
+    }
+
+    /** موظفو الكشف المعروض: «عرض الكل» أو كشفٌ بعينه أو بلا كشف */
+    get visibleEmployees() {
+        const sheet = this.state.sheet;
+        if (sheet === "all") {
+            return this.state.employees;
+        }
+        if (sheet === "none") {
+            return this.state.employees.filter((employee) => !employee.group_id);
+        }
+        return this.state.employees.filter((employee) => employee.group_id === sheet);
+    }
+
+    get currentGroup() {
+        return this.state.groups.find((group) => group.id === this.state.sheet) || null;
+    }
+
+    countOf(groupId) {
+        return this.state.employees.filter(
+            (employee) => (employee.group_id || false) === groupId).length;
+    }
+
+    get employeeTotals() {
+        const keys = ["basic_salary", "allowance", "social_base", "income_tax",
+                      "pension", "other_deduction"];
+        const totals = {};
+        for (const key of keys) {
+            totals[key] = this.round(this.visibleEmployees.reduce(
+                (sum, employee) => sum + (employee[key] || 0), 0));
+        }
+        return totals;
+    }
+
+    /** خيارات الكشوف للاختيار: المحفوظة منها فقط، فهي وحدها لها معرّف */
+    get groupOptions() {
+        return this.state.groups
+            .filter((group) => group.id)
+            .map((group) => ({ token: `${group.id}`, display: group.name, hint: "" }));
+    }
+
+    groupToken(employee) {
+        return employee.group_id ? `${employee.group_id}` : "";
+    }
+
+    onEmployeeGroup(employee, token) {
+        employee.group_id = parseInt(token, 10) || false;
+    }
+
+    /** الفارغ يرث حساب كشفه، فنُظهر في الحقل ما سيورثه */
+    placeholderAccount(employee) {
+        const group = this.state.groups.find((item) => item.id === employee.group_id);
+        return (group && group.account) || "حساب الرواتب العام";
+    }
+
+    placeholderPayment(employee) {
+        const group = this.state.groups.find((item) => item.id === employee.group_id);
+        return (group && group.payment_account) || "حساب الدفع العام";
+    }
+
     onEmployeeAccount(employee, token) {
         employee.account_id = parseInt(token, 10) || false;
     }
@@ -280,17 +363,22 @@ export class Payroll extends Component {
     }
 
     addEmployee() {
-        this.state.employees.push({
+        const group = this.currentGroup;
+        this.state.employees.push(keyed([{
             id: false, name: "موظف جديد", sequence: 10 * (this.state.employees.length + 1),
+            group_id: group ? group.id : false, group: group ? group.name : "",
             job_title: "", hire_date: "", active: true, basic_salary: 0, allowance: 0,
             gross: 0, social_security: true, social_base: 0, income_tax: 0,
             pension: 0, other_deduction: 0, account_id: false, account: "",
             payment_account_id: false, payment_account: "", note: "",
-        });
+        }])[0]);
     }
 
-    removeEmployee(index) {
-        this.state.employees.splice(index, 1);
+    removeEmployee(employee) {
+        const index = this.state.employees.indexOf(employee);
+        if (index >= 0) {
+            this.state.employees.splice(index, 1);
+        }
     }
 
     async saveEmployees() {
@@ -304,6 +392,73 @@ export class Payroll extends Component {
 
     cancelEmployees() {
         this.state.employees = clone(this.saved.employees);
+    }
+
+    // ------------------------------------------------------------------
+    // الكشوف
+    // ------------------------------------------------------------------
+
+    get groupsDirty() {
+        return !same(this.state.groups, this.saved.groups);
+    }
+
+    editGroup(group, field, ev) {
+        group[field] = field === "sequence"
+            ? parseInt(ev.target.value, 10) || 0
+            : ev.target.value;
+    }
+
+    groupAccountToken(group) {
+        return group.account_id ? `${group.account_id}` : "";
+    }
+
+    onGroupAccount(group, token) {
+        const id = parseInt(token, 10) || false;
+        group.account_id = id;
+        group.account = this.accountName(id);
+    }
+
+    groupPaymentToken(group) {
+        return group.payment_account_id ? `${group.payment_account_id}` : "";
+    }
+
+    onGroupPayment(group, token) {
+        const id = parseInt(token, 10) || false;
+        group.payment_account_id = id;
+        group.payment_account = this.accountName(id);
+    }
+
+    accountName(id) {
+        const found = this.state.accountOptions.find((item) => item.token === `${id}`);
+        return found ? found.display : "";
+    }
+
+    addGroup() {
+        this.state.groups.push(keyed([{
+            id: false, name: "كشف جديد", sequence: 10 * (this.state.groups.length + 1),
+            account_id: false, account: "", payment_account_id: false,
+            payment_account: "", count: 0,
+        }])[0]);
+    }
+
+    removeGroup(group) {
+        const index = this.state.groups.indexOf(group);
+        if (index >= 0) {
+            this.state.groups.splice(index, 1);
+        }
+    }
+
+    async saveGroups() {
+        await this.withBusy(async () => {
+            await this.orm.call("myaccounting.payroll.group", "save_groups",
+                [clone(this.state.groups)]);
+            await this.loadSettings();
+            this.notification.add("حُفظت الكشوف.", { type: "success" });
+        });
+    }
+
+    cancelGroups() {
+        this.state.groups = clone(this.saved.groups);
     }
 
     // ------------------------------------------------------------------

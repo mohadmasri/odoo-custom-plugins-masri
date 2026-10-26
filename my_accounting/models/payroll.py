@@ -91,6 +91,75 @@ class MyAccountingPayrollSettings(models.Model):
         return self.get_settings()
 
 
+class MyAccountingPayrollGroup(models.Model):
+    """كشف رواتب: مجموعة موظفين لها حساب مصروفها وجهة دفعها.
+
+    هي تبويبات ملف الرواتب نفسها (المكتب، العجزة، كل مشروع على حدة)، فما
+    يميّز المشروع — حساب مصروفه ومن يصرف صافيه — يُكتب مرةً على الكشف لا
+    على كل بطاقة.
+    """
+    _name = 'myaccounting.payroll.group'
+    _description = 'كشف رواتب (مجموعة موظفين)'
+    _order = 'sequence, id'
+
+    name = fields.Char(string='الكشف', required=True)
+    sequence = fields.Integer(string='الترتيب', default=10)
+    account_id = fields.Many2one('myaccounting.account', string='حساب المصروف',
+                                 help='اتركه فارغاً ليُستعمل حساب مصروف الرواتب العام.')
+    payment_account_id = fields.Many2one(
+        'myaccounting.account', string='يُدفع من',
+        help='اتركه فارغاً ليُستعمل حساب الدفع العام.')
+    employee_ids = fields.One2many('myaccounting.employee', 'group_id',
+                                   string='الموظفون')
+
+    def _payload(self):
+        self.ensure_one()
+        return {
+            'id': self.id,
+            'name': self.name or '',
+            'sequence': self.sequence,
+            'account_id': self.account_id.id or False,
+            'account': self.account_id.name or '',
+            'payment_account_id': self.payment_account_id.id or False,
+            'payment_account': self.payment_account_id.name or '',
+            'count': len(self.with_context(active_test=False).employee_ids),
+        }
+
+    @api.model
+    def get_groups(self):
+        return [group._payload() for group in self.search([])]
+
+    @api.model
+    def save_groups(self, items):
+        """يحفظ الكشوف كاملةً: ما حُذف يُحذف وما استجدّ يُنشأ."""
+        existing = {group.id: group for group in self.search([])}
+        kept = set()
+        for item in items or []:
+            name = (item.get('name') or '').strip()
+            if not name:
+                raise UserError('لا بدّ للكشف من اسم.')
+            data = {
+                'name': name,
+                'sequence': int(item.get('sequence') or 10),
+                'account_id': int(item['account_id']) if item.get('account_id') else False,
+                'payment_account_id': int(item['payment_account_id'])
+                                      if item.get('payment_account_id') else False,
+            }
+            group = existing.get(item.get('id'))
+            if group:
+                group.write(data)
+                kept.add(group.id)
+            else:
+                kept.add(self.create(data).id)
+        gone = self.browse([key for key in existing if key not in kept])
+        for group in gone:
+            if group.with_context(active_test=False).employee_ids:
+                raise UserError('في كشف «%s» موظفون، فانقلهم قبل حذفه.' % group.name)
+        if gone:
+            gone.unlink()
+        return self.get_groups()
+
+
 class MyAccountingEmployee(models.Model):
     _name = 'myaccounting.employee'
     _description = 'موظف'
@@ -98,6 +167,8 @@ class MyAccountingEmployee(models.Model):
 
     name = fields.Char(string='الاسم', required=True)
     sequence = fields.Integer(string='الترتيب', default=10)
+    group_id = fields.Many2one('myaccounting.payroll.group', string='الكشف',
+                               ondelete='restrict')
     job_title = fields.Char(string='المسمّى الوظيفي')
     hire_date = fields.Date(string='تاريخ التعيين')
     active = fields.Boolean(string='على رأس عمله', default=True)
@@ -119,6 +190,16 @@ class MyAccountingEmployee(models.Model):
              'على من يصرفها (موفق هويدي مثلاً) لا على البنك.')
     note = fields.Char(string='ملاحظة')
 
+    def _expense_account(self):
+        """حساب مصروف الراتب: ما على البطاقة، وإلا ما على كشفها."""
+        self.ensure_one()
+        return self.account_id or self.group_id.account_id
+
+    def _payment_account(self):
+        """جهة دفع الصافي: ما على البطاقة، وإلا ما على كشفها."""
+        self.ensure_one()
+        return self.payment_account_id or self.group_id.payment_account_id
+
     def _payload(self):
         self.ensure_one()
         gross = round((self.basic_salary or 0.0) + (self.allowance or 0.0), 3)
@@ -126,6 +207,8 @@ class MyAccountingEmployee(models.Model):
             'id': self.id,
             'name': self.name or '',
             'sequence': self.sequence,
+            'group_id': self.group_id.id or False,
+            'group': self.group_id.name or '',
             'job_title': self.job_title or '',
             'hire_date': self.hire_date and fields.Date.to_string(self.hire_date) or '',
             'active': self.active,
@@ -162,6 +245,7 @@ class MyAccountingEmployee(models.Model):
             data = {
                 'name': name,
                 'sequence': int(item.get('sequence') or 10),
+                'group_id': int(item['group_id']) if item.get('group_id') else False,
                 'job_title': item.get('job_title') or '',
                 'hire_date': item.get('hire_date') or False,
                 'active': bool(item.get('active', True)),
@@ -304,8 +388,9 @@ class MyAccountingPayroll(models.Model):
                 'income_tax': employee.income_tax,
                 'pension': employee.pension,
                 'other_deduction': employee.other_deduction,
-                'account_id': employee.account_id.id or False,
-                'payment_account_id': employee.payment_account_id.id or False,
+                'group_id': employee.group_id.id or False,
+                'account_id': employee._expense_account().id or False,
+                'payment_account_id': employee._payment_account().id or False,
             })
         return self._payload()
 
@@ -464,6 +549,7 @@ class MyAccountingPayrollLine(models.Model):
     income_tax = fields.Float(string='ضريبة الدخل', digits=(16, 3))
     pension = fields.Float(string='صندوق التقاعد', digits=(16, 3))
     other_deduction = fields.Float(string='استقطاعات أخرى', digits=(16, 3))
+    group_id = fields.Many2one('myaccounting.payroll.group', string='الكشف')
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف')
     payment_account_id = fields.Many2one('myaccounting.account', string='يُدفع من')
 
@@ -490,4 +576,6 @@ class MyAccountingPayrollLine(models.Model):
             'net': round(gross - deduction, 3),
             'account': self.account_id.name or '',
             'payment_account': self.payment_account_id.name or '',
+            'group_id': self.group_id.id or False,
+            'group': self.group_id.name or '',
         }

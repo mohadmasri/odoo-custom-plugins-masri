@@ -134,3 +134,33 @@
         background: transparent;
     }
 }
+
+/* تبويبات الكشوف داخل صفحة الموظفين */
+.o_pr_sheets {
+    gap: 6px;
+    border-bottom: 1px solid var(--o-surface-border, #dee2e6);
+    padding-bottom: 8px;
+}
+
+.o_pr_sheets .nav-link {
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    color: var(--o-body-color, #374151);
+    background: var(--o-surface-2, #f2f3f5);
+}
+
+.o_pr_sheets .nav-link.active {
+    color: #fff;
+}
+
+.o_pr_sheets .badge {
+    margin-inline-start: 6px;
+    background: rgba(0, 0, 0, 0.12);
+    color: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.o_pr_wide {
+    max-width: 900px;
+}
