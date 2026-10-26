@@ -1,0 +1,136 @@
+.o_payroll {
+    overflow: auto;
+    height: 100%;
+}
+
+.o_pr_bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.o_pr_sep {
+    width: 1px;
+    height: 20px;
+    background: var(--o-surface-border, #dee2e6);
+    margin: 0 4px;
+}
+
+.o_pr_dirty {
+    font-size: 0.8rem;
+    color: var(--o-danger, #c0392b);
+}
+
+.o_pr_count {
+    display: inline-block;
+    margin-inline-start: 5px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font-size: 0.72rem;
+    background: var(--o-surface-2, #eef0f4);
+    color: var(--gray-600, #6c757d);
+}
+
+.o_pr_head {
+    margin-bottom: 10px;
+}
+
+.o_pr_table td,
+.o_pr_table th {
+    padding: 2px 6px;
+    vertical-align: middle;
+}
+
+.o_pr_table th {
+    background: var(--o-surface-2, #f2f4f7);
+    font-size: 0.8rem;
+}
+
+.o_pr_job {
+    font-size: 0.75rem;
+    color: var(--gray-600, #6c757d);
+}
+
+.o_pr_calc {
+    background: var(--o-surface-2, #f7f8fa);
+    font-weight: 600;
+}
+
+.o_pr_total td {
+    font-weight: 700;
+    border-top: 2px solid var(--o-surface-border, #dee2e6);
+    background: var(--o-surface-2, #f2f2f2);
+}
+
+.o_pr_link {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.o_pr_note {
+    margin-top: 10px;
+}
+
+.o_pr_panel {
+    max-width: 640px;
+    padding: 14px;
+    border: 1px solid var(--o-surface-border, #dee2e6);
+    border-radius: 10px;
+    background: var(--o-surface, #fff);
+}
+
+.o_pr_row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.o_pr_label {
+    min-width: 190px;
+}
+
+.o_pr_print_title {
+    display: none;
+}
+
+@media print {
+    .o_payroll {
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    .o_pr_print_title {
+        display: block;
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .o_payroll td,
+    .o_payroll th {
+        color: #000 !important;
+    }
+
+    .o_pr_table {
+        font-size: 9px;
+        width: 100% !important;
+    }
+
+    .o_pr_table td,
+    .o_pr_table th {
+        padding: 1px 3px !important;
+    }
+
+    .o_pr_table thead {
+        display: table-header-group;
+    }
+
+    .o_pr_calc {
+        background: transparent;
+    }
+}

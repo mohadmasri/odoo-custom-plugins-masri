@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="my_accounting.Payroll">
+        <div class="o_payroll p-3">
+
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <h2 class="m-0">الرواتب</h2>
+                <button t-if="data and state.tab === 'sheet'" class="btn btn-secondary btn-sm"
+                        t-on-click="() => this.print()">
+                    <i class="fa fa-print me-1"/> طباعة
+                </button>
+            </div>
+
+            <ul class="nav nav-tabs mb-3 no-print">
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'sheet' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('sheet')">كشف الشهر</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'employees' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('employees')">
+                        الموظفون <span class="o_pr_count" t-esc="state.employees.length"/>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'settings' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('settings')">إعدادات</a>
+                </li>
+            </ul>
+
+            <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
+
+            <!-- ======================================= كشف الشهر -->
+            <t t-elif="state.tab === 'sheet'">
+                <div class="o_pr_bar no-print">
+                    <select t-if="state.payrolls.length" class="form-select form-select-sm"
+                            style="width:260px;" t-on-change="(ev) => this.openPayroll(ev)">
+                        <option t-foreach="state.payrolls" t-as="item" t-key="item.id"
+                                t-att-value="item.id" t-att-selected="isPayroll(item.id)">
+                            <t t-esc="item.name"/>
+                            <t t-if="item.state === 'posted'"> — مُرحَّل</t>
+                        </option>
+                    </select>
+
+                    <span class="o_pr_sep"/>
+                    <label class="form-label small mb-0">كشف جديد</label>
+                    <select class="form-select form-select-sm" style="width:130px;"
+                            t-on-change="(ev) => this.onNew('newMonth', ev)">
+                        <option t-foreach="months" t-as="month" t-key="month[0]"
+                                t-att-value="month[0]"
+                                t-att-selected="month[0] === state.newMonth"
+                                t-esc="month[1]"/>
+                    </select>
+                    <input type="number" class="form-control form-control-sm" style="width:90px;"
+                           t-att-value="state.newYear"
+                           t-on-change="(ev) => this.onNew('newYear', ev)"/>
+                    <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
+                            t-on-click="() => this.createPayroll()">
+                        <i class="fa fa-plus me-1"/> أنشئ
+                    </button>
+                </div>
+
+                <div t-if="!data" class="text-muted py-5 text-center">
+                    لا كشف بعد. أضف الموظفين ثم أنشئ كشف الشهر.
+                </div>
+
+                <t t-else="">
+                    <div class="o_pr_head">
+                        <div class="o_pr_print_title">
+                            كشف رواتب <t t-esc="data.month_label"/> <t t-esc="data.year"/>
+                        </div>
+                        <div class="small text-muted">
+                            <t t-esc="data.lines.length"/> موظفاً ·
+                            <t t-if="data.state === 'posted'">
+                                مُرحَّل إلى
+                                <a href="#" class="o_pr_link"
+                                   t-custom-click="(ev, mid) => this.openMove(data.move_id, mid)">
+                                    قيد <t t-esc="data.move"/>
+                                </a>
+                            </t>
+                            <t t-else="">مسودة</t>
+                        </div>
+                    </div>
+
+                    <div class="o_pr_bar no-print">
+                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.fillFromEmployees()">
+                            أعد البناء من بطاقات الموظفين
+                        </button>
+                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-primary"
+                                t-att-disabled="state.busy or !linesDirty"
+                                t-on-click="() => this.saveLines()">حفظ</button>
+                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy or !linesDirty"
+                                t-on-click="() => this.cancelLines()">إلغاء</button>
+                        <span t-if="linesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                        <span class="o_pr_sep"/>
+                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-success"
+                                t-att-disabled="state.busy or linesDirty"
+                                t-on-click="() => this.postPayroll()">
+                            <i class="fa fa-check me-1"/> أنشئ القيد
+                        </button>
+                        <button t-else="" class="btn btn-sm btn-outline-danger"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.unpostPayroll()">فكّ الترحيل</button>
+                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-link text-danger"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.deletePayroll()">احذف الكشف</button>
+                    </div>
+
+                    <table class="table table-bordered table-sm o_pr_table">
+                        <thead>
+                            <tr>
+                                <th style="width:150px;">الموظف</th>
+                                <th class="text-end">الأساسي</th>
+                                <th class="text-end">العلاوات</th>
+                                <th class="text-end">الإجمالي</th>
+                                <th class="text-end">الخاضع للضمان</th>
+                                <th class="text-end">ضمان الموظف</th>
+                                <th class="text-end">ضريبة الدخل</th>
+                                <th class="text-end">استقطاعات أخرى</th>
+                                <th class="text-end">مجموع الاستقطاع</th>
+                                <th class="text-end">الصافي</th>
+                                <th class="text-end">ضمان الشركة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="data.lines" t-as="line" t-key="line.id">
+                                <td>
+                                    <t t-esc="line.employee"/>
+                                    <div t-if="line.job_title" class="o_pr_job"
+                                         t-esc="line.job_title"/>
+                                </td>
+                                <t t-if="data.state === 'draft'">
+                                    <td t-foreach="['basic_salary', 'allowance']" t-as="field"
+                                        t-key="field">
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line[field]"
+                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                    </td>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.gross)"/>
+                                    <td t-foreach="['social_base', 'employee_social', 'income_tax', 'other_deduction']"
+                                        t-as="field" t-key="field">
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line[field]"
+                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                    </td>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.total_deduction)"/>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.net)"/>
+                                    <td>
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line.employer_social"
+                                               t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
+                                    </td>
+                                </t>
+                                <t t-else="">
+                                    <td class="text-end" t-esc="fmt(line.basic_salary)"/>
+                                    <td class="text-end" t-esc="fmt(line.allowance)"/>
+                                    <td class="text-end" t-esc="fmt(line.gross)"/>
+                                    <td class="text-end" t-esc="fmt(line.social_base)"/>
+                                    <td class="text-end" t-esc="fmt(line.employee_social)"/>
+                                    <td class="text-end" t-esc="fmt(line.income_tax)"/>
+                                    <td class="text-end" t-esc="fmt(line.other_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(line.total_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(line.net)"/>
+                                    <td class="text-end" t-esc="fmt(line.employer_social)"/>
+                                </t>
+                            </tr>
+                            <tr t-if="!data.lines.length">
+                                <td colspan="11" class="text-muted text-center py-2">
+                                    لا بنود. أضف موظفين ثم «أعد البناء».
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="o_pr_total">
+                                <td>المجموع</td>
+                                <td class="text-end" t-esc="fmt(totals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(totals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(totals.gross)"/>
+                                <td class="text-end" t-esc="fmt(totals.social_base)"/>
+                                <td class="text-end" t-esc="fmt(totals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(totals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(totals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(totals.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(totals.net)"/>
+                                <td class="text-end" t-esc="fmt(totals.employer_social)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="o_pr_note small text-muted">
+                        القيد: مصروف الرواتب <t t-esc="fmt(totals.gross)"/> مديناً،
+                        وحصة الشركة <t t-esc="fmt(totals.employer_social)"/> مديناً،
+                        مقابل الضمان <t t-esc="fmt(totals.employee_social + totals.employer_social)"/>
+                        وضريبة الدخل <t t-esc="fmt(totals.income_tax)"/>
+                        والمدفوع <t t-esc="fmt(totals.net)"/> دائناً.
+                    </div>
+                </t>
+            </t>
+
+            <!-- ======================================= الموظفون -->
+            <t t-elif="state.tab === 'employees'">
+                <div class="o_pr_bar">
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !employeesDirty"
+                            t-on-click="() => this.saveEmployees()">حفظ</button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy or !employeesDirty"
+                            t-on-click="() => this.cancelEmployees()">إلغاء</button>
+                    <span t-if="employeesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                </div>
+
+                <table class="table table-bordered table-sm o_pr_table">
+                    <thead>
+                        <tr>
+                            <th style="width:64px;">ترتيب</th>
+                            <th style="width:150px;">الاسم</th>
+                            <th style="width:130px;">المسمّى</th>
+                            <th class="text-end" style="width:110px;">الأساسي</th>
+                            <th class="text-end" style="width:100px;">العلاوات</th>
+                            <th style="width:70px;">ضمان</th>
+                            <th class="text-end" style="width:120px;">الخاضع للضمان</th>
+                            <th class="text-end" style="width:100px;">ضريبة</th>
+                            <th class="text-end" style="width:100px;">استقطاع</th>
+                            <th style="width:200px;">حساب المصروف</th>
+                            <th style="width:70px;">فعّال</th>
+                            <th style="width:44px;"/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="state.employees" t-as="employee" t-key="employee_index">
+                            <td>
+                                <input type="number" class="form-control form-control-sm"
+                                       t-att-value="employee.sequence"
+                                       t-on-change="(ev) => this.editEmployee(employee, 'sequence', ev)"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm"
+                                       t-att-value="employee.name"
+                                       t-on-change="(ev) => this.editEmployee(employee, 'name', ev)"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm"
+                                       t-att-value="employee.job_title"
+                                       t-on-change="(ev) => this.editEmployee(employee, 'job_title', ev)"/>
+                            </td>
+                            <td t-foreach="['basic_salary', 'allowance']" t-as="field" t-key="field">
+                                <input type="number" step="0.001"
+                                       class="form-control form-control-sm text-end"
+                                       t-att-value="employee[field]"
+                                       t-on-change="(ev) => this.editEmployee(employee, field, ev)"/>
+                            </td>
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="employee.social_security"
+                                       t-on-change="(ev) => this.editEmployee(employee, 'social_security', ev)"/>
+                            </td>
+                            <td t-foreach="['social_base', 'income_tax', 'other_deduction']"
+                                t-as="field" t-key="field">
+                                <input type="number" step="0.001"
+                                       class="form-control form-control-sm text-end"
+                                       t-att-value="employee[field]"
+                                       t-on-change="(ev) => this.editEmployee(employee, field, ev)"/>
+                            </td>
+                            <td>
+                                <RefPicker value="accountToken(employee)"
+                                           options="state.accountOptions"
+                                           disabled="state.busy"
+                                           placeholder="'حساب الرواتب العام'"
+                                           onSelect="(token) => this.onEmployeeAccount(employee, token)"/>
+                            </td>
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="employee.active"
+                                       t-on-change="(ev) => this.editEmployee(employee, 'active', ev)"/>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-link text-danger p-0"
+                                        title="حذف الموظف"
+                                        t-on-click="() => this.removeEmployee(employee_index)">
+                                    <i class="fa fa-trash"/>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr t-if="!state.employees.length">
+                            <td colspan="12" class="text-muted text-center py-2">لا موظفين بعد</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.addEmployee()">
+                    <i class="fa fa-plus me-1"/> موظف
+                </button>
+            </t>
+
+            <!-- ======================================= الإعدادات -->
+            <t t-elif="state.tab === 'settings' and state.settings">
+                <div class="o_pr_bar">
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !settingsDirty"
+                            t-on-click="() => this.saveSettings()">حفظ</button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy or !settingsDirty"
+                            t-on-click="() => this.cancelSettings()">إلغاء</button>
+                    <span t-if="settingsDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                </div>
+
+                <div class="o_pr_panel">
+                    <div class="small text-muted mb-2">
+                        نِسَب الضمان الاجتماعي، والحسابات التي يُبنى عليها قيد الرواتب.
+                    </div>
+                    <div class="o_pr_row">
+                        <label class="form-label small mb-0">حصة الموظف %</label>
+                        <input type="number" step="0.001" class="form-control form-control-sm"
+                               style="width:110px;" t-att-value="state.settings.employee_rate"
+                               t-on-change="(ev) => this.editRate('employee_rate', ev)"/>
+                        <label class="form-label small mb-0">حصة الشركة %</label>
+                        <input type="number" step="0.001" class="form-control form-control-sm"
+                               style="width:110px;" t-att-value="state.settings.employer_rate"
+                               t-on-change="(ev) => this.editRate('employer_rate', ev)"/>
+                    </div>
+
+                    <div t-foreach="state.settings.accounts" t-as="entry" t-key="entry.field"
+                         class="o_pr_row">
+                        <label class="form-label small mb-0 o_pr_label" t-esc="entry.label"/>
+                        <RefPicker value="settingToken(entry)"
+                                   options="state.accountOptions"
+                                   disabled="state.busy"
+                                   placeholder="'اكتب اسم الحساب...'"
+                                   onSelect="(token) => this.onSettingAccount(entry, token)"/>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>
