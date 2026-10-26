@@ -232,7 +232,8 @@
                             <th class="text-end" style="width:100px;">ضريبة</th>
                             <th class="text-end" style="width:100px;">تقاعد</th>
                             <th class="text-end" style="width:100px;">استقطاع</th>
-                            <th style="width:200px;">حساب المصروف</th>
+                            <th style="width:190px;">حساب المصروف</th>
+                            <th style="width:190px;">يُدفع من</th>
                             <th style="width:70px;">فعّال</th>
                             <th style="width:44px;"/>
                         </tr>
@@ -279,6 +280,13 @@
                                            placeholder="'حساب الرواتب العام'"
                                            onSelect="(token) => this.onEmployeeAccount(employee, token)"/>
                             </td>
+                            <td>
+                                <RefPicker value="paymentToken(employee)"
+                                           options="state.accountOptions"
+                                           disabled="state.busy"
+                                           placeholder="'حساب الدفع العام'"
+                                           onSelect="(token) => this.onEmployeePayment(employee, token)"/>
+                            </td>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input"
                                        t-att-checked="employee.active"
@@ -293,7 +301,7 @@
                             </td>
                         </tr>
                         <tr t-if="!state.employees.length">
-                            <td colspan="13" class="text-muted text-center py-2">لا موظفين بعد</td>
+                            <td colspan="14" class="text-muted text-center py-2">لا موظفين بعد</td>
                         </tr>
                     </tbody>
                 </table>

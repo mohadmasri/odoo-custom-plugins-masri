@@ -111,7 +111,12 @@ class MyAccountingEmployee(models.Model):
     pension = fields.Float(string='صندوق التقاعد الشهري', digits=(16, 3))
     other_deduction = fields.Float(string='استقطاعات أخرى', digits=(16, 3))
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف',
-                                 help='اتركه فارغاً ليُستعمل حساب مصروف الرواتب العام.')
+                                 help='اتركه فارغاً ليُستعمل حساب مصروف الرواتب العام. '
+                                      'وحساب المشروع يأخذ معه حصة الشركة من الضمان.')
+    payment_account_id = fields.Many2one(
+        'myaccounting.account', string='يُدفع من',
+        help='اتركه فارغاً ليُستعمل حساب الدفع العام. رواتب المشاريع تُقيَّد '
+             'على من يصرفها (موفق هويدي مثلاً) لا على البنك.')
     note = fields.Char(string='ملاحظة')
 
     def _payload(self):
@@ -134,6 +139,8 @@ class MyAccountingEmployee(models.Model):
             'other_deduction': self.other_deduction,
             'account_id': self.account_id.id or False,
             'account': self.account_id.name or '',
+            'payment_account_id': self.payment_account_id.id or False,
+            'payment_account': self.payment_account_id.name or '',
             'note': self.note or '',
         }
 
@@ -166,6 +173,8 @@ class MyAccountingEmployee(models.Model):
                 'pension': float(item.get('pension') or 0.0),
                 'other_deduction': float(item.get('other_deduction') or 0.0),
                 'account_id': int(item['account_id']) if item.get('account_id') else False,
+                'payment_account_id': int(item['payment_account_id'])
+                                      if item.get('payment_account_id') else False,
                 'note': item.get('note') or '',
             }
             employee = existing.get(item.get('id'))
@@ -215,11 +224,30 @@ class MyAccountingPayroll(models.Model):
         payroll = self.browse(int(payroll_id)) if payroll_id else self.search([], limit=1)
         return payroll._payload() if payroll else False
 
+    def _employer_share(self):
+        """حصة الشركة من الضمان لكل حساب، محسوبةً على مجموع الخاضع للضمان.
+
+        مؤسسة الضمان تحسب النسبة على مجموع الرواتب الخاضعة لا على كل راتب
+        منفرداً، فالتقريب يقع مرةً واحدة لكل حساب. وهذا ما في قيوده:
+        «ما يخص المكتب» و«ما يخص الشركة» لكل مشروع.
+        """
+        self.ensure_one()
+        settings = self.env['myaccounting.payroll.settings']._get()
+        office = settings.employer_expense_account_id
+        base = {}
+        for line in self.line_ids:
+            account = line.account_id or office
+            base[account.id] = round(base.get(account.id, 0.0)
+                                     + (line.social_base or 0.0), 3)
+        return {account_id: round(amount * settings.employer_rate / 100.0, 3)
+                for account_id, amount in base.items() if amount}
+
     def _payload(self):
         self.ensure_one()
         lines = [line._payload() for line in self.line_ids]
         def total(key):
             return round(sum(line[key] for line in lines), 3)
+        employer = round(sum(self._employer_share().values()), 3)
         return {
             'id': self.id,
             'name': self.name,
@@ -229,10 +257,11 @@ class MyAccountingPayroll(models.Model):
             'date': self.date and fields.Date.to_string(self.date) or '',
             'state': self.state,
             'lines': lines,
-            'totals': {key: total(key) for key in (
+            'totals': dict({key: total(key) for key in (
                 'basic_salary', 'allowance', 'gross', 'social_base',
                 'employee_social', 'employer_social', 'income_tax', 'pension',
                 'other_deduction', 'total_deduction', 'net')},
+                employer_social=employer),
             'move_id': self.move_id.id or False,
             'move': self.move_id.name or '',
         }
@@ -276,6 +305,7 @@ class MyAccountingPayroll(models.Model):
                 'pension': employee.pension,
                 'other_deduction': employee.other_deduction,
                 'account_id': employee.account_id.id or False,
+                'payment_account_id': employee.payment_account_id.id or False,
             })
         return self._payload()
 
@@ -330,21 +360,30 @@ class MyAccountingPayroll(models.Model):
         totals = payload['totals']
         label = 'رواتب شهر %s/%s' % (self.month, self.year)
         lines = []
-        # المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام
+        # المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام.
+        # وحصة الشركة من الضمان تتبع حساب الراتب نفسه: راتب المشروع تذهب
+        # حصته إلى حساب المشروع، وراتب المكتب إلى حساب اشتراك الضمان.
         by_account = {}
+        employer_by_account = self._employer_share()
+        by_payment = {}
         for line in self.line_ids:
             account = line.account_id or settings.expense_account_id
             gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
             by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
+            payment = line.payment_account_id or settings.payment_account_id
+            net = line._payload()['net']
+            if net:
+                by_payment[payment.id] = round(by_payment.get(payment.id, 0.0) + net, 3)
         for account_id, amount in by_account.items():
             if amount:
                 lines.append((0, 0, {'account_id': account_id, 'name': label,
                                      'debit': amount, 'credit': 0.0}))
-        if totals['employer_social']:
-            lines.append((0, 0, {
-                'account_id': settings.employer_expense_account_id.id,
-                'name': 'حصة الشركة من الضمان %s' % label,
-                'debit': totals['employer_social'], 'credit': 0.0}))
+        for account_id, amount in employer_by_account.items():
+            if amount:
+                lines.append((0, 0, {
+                    'account_id': account_id,
+                    'name': 'حصة الشركة من الضمان %s' % label,
+                    'debit': amount, 'credit': 0.0}))
         social = round(totals['employee_social'] + totals['employer_social'], 3)
         if social:
             lines.append((0, 0, {
@@ -370,11 +409,10 @@ class MyAccountingPayroll(models.Model):
                 'account_id': settings.other_account_id.id,
                 'name': 'استقطاعات أخرى %s' % label,
                 'debit': 0.0, 'credit': totals['other_deduction']}))
-        if totals['net']:
-            lines.append((0, 0, {
-                'account_id': settings.payment_account_id.id,
-                'name': label,
-                'debit': 0.0, 'credit': totals['net']}))
+        for account_id, amount in by_payment.items():
+            if amount:
+                lines.append((0, 0, {'account_id': account_id, 'name': label,
+                                     'debit': 0.0, 'credit': amount}))
 
         move = self.env['myaccounting.move'].create({
             'name': self._next_move_name(),
@@ -427,6 +465,7 @@ class MyAccountingPayrollLine(models.Model):
     pension = fields.Float(string='صندوق التقاعد', digits=(16, 3))
     other_deduction = fields.Float(string='استقطاعات أخرى', digits=(16, 3))
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف')
+    payment_account_id = fields.Many2one('myaccounting.account', string='يُدفع من')
 
     def _payload(self):
         self.ensure_one()
@@ -450,4 +489,5 @@ class MyAccountingPayrollLine(models.Model):
             'total_deduction': deduction,
             'net': round(gross - deduction, 3),
             'account': self.account_id.name or '',
+            'payment_account': self.payment_account_id.name or '',
         }

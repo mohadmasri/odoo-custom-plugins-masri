@@ -271,12 +271,21 @@ export class Payroll extends Component {
         return employee.account_id ? `${employee.account_id}` : "";
     }
 
+    onEmployeePayment(employee, token) {
+        employee.payment_account_id = parseInt(token, 10) || false;
+    }
+
+    paymentToken(employee) {
+        return employee.payment_account_id ? `${employee.payment_account_id}` : "";
+    }
+
     addEmployee() {
         this.state.employees.push({
             id: false, name: "موظف جديد", sequence: 10 * (this.state.employees.length + 1),
             job_title: "", hire_date: "", active: true, basic_salary: 0, allowance: 0,
             gross: 0, social_security: true, social_base: 0, income_tax: 0,
-            pension: 0, other_deduction: 0, account_id: false, account: "", note: "",
+            pension: 0, other_deduction: 0, account_id: false, account: "",
+            payment_account_id: false, payment_account: "", note: "",
         });
     }
 
