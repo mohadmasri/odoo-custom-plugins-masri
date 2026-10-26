@@ -157,17 +157,28 @@
 .o_pr_sheets .nav-link {
     padding: 4px 12px;
     font-size: 0.85rem;
-    color: var(--o-body-color, #374151);
+    /* لون النص من متغيّر أودو نفسه، فيقلب مع الوضع الداكن كما تقلب الخلفية */
+    color: var(--body-color, #212529);
     background: var(--o-surface-2, #f2f3f5);
+    border: 1px solid var(--gray-300, #dee2e6);
+}
+
+.o_pr_sheets .nav-link:hover {
+    background: var(--o-surface-hover, #e7e9ee);
+    color: var(--body-color, #212529);
 }
 
 .o_pr_sheets .nav-link.active {
-    color: #fff;
+    background: var(--nav-pills-link-active-bg, #714B67);
+    border-color: var(--nav-pills-link-active-bg, #714B67);
+    color: var(--nav-pills-link-active-color, #fff);
 }
 
 .o_pr_sheets .badge {
     margin-inline-start: 6px;
-    background: rgba(0, 0, 0, 0.12);
+    /* العدّاد ظلٌّ من لون النص لا أسودَ ثابتاً، ليُرى على الفاتح والداكن معاً */
+    background: rgba(128, 128, 128, 0.28);
+    background: color-mix(in srgb, currentColor 18%, transparent);
     color: inherit;
     font-size: 0.72rem;
     font-weight: 600;
