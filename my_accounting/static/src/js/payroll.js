@@ -158,7 +158,7 @@ export class Payroll extends Component {
         const gross = this.round(line.basic_salary + line.allowance);
         line.gross = gross;
         line.total_deduction = this.round(
-            line.employee_social + line.income_tax + line.other_deduction);
+            line.employee_social + line.income_tax + line.pension + line.other_deduction);
         line.net = this.round(gross - line.total_deduction);
     }
 
@@ -185,9 +185,9 @@ export class Payroll extends Component {
 
     /** مجاميع الكشف محسوبةً على الشاشة، فتتحرّك مع التعديل قبل الحفظ */
     get totals() {
-        const keys = ["basic_salary", "allowance", "gross", "employee_social",
-                      "employer_social", "income_tax", "other_deduction",
-                      "total_deduction", "net"];
+        const keys = ["basic_salary", "allowance", "gross", "social_base",
+                      "employee_social", "employer_social", "income_tax", "pension",
+                      "other_deduction", "total_deduction", "net"];
         const lines = this.state.data ? this.state.data.lines : [];
         const totals = {};
         for (const key of keys) {
@@ -250,7 +250,7 @@ export class Payroll extends Component {
 
     editEmployee(employee, field, ev) {
         const numbers = ["sequence", "basic_salary", "allowance", "social_base",
-                         "income_tax", "other_deduction"];
+                         "income_tax", "pension", "other_deduction"];
         if (numbers.includes(field)) {
             employee[field] = field === "sequence"
                 ? parseInt(ev.target.value, 10) || 0
@@ -276,7 +276,7 @@ export class Payroll extends Component {
             id: false, name: "موظف جديد", sequence: 10 * (this.state.employees.length + 1),
             job_title: "", hire_date: "", active: true, basic_salary: 0, allowance: 0,
             gross: 0, social_security: true, social_base: 0, income_tax: 0,
-            other_deduction: 0, account_id: false, account: "", note: "",
+            pension: 0, other_deduction: 0, account_id: false, account: "", note: "",
         });
     }
 

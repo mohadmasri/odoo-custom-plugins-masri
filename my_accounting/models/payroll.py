@@ -22,6 +22,7 @@ SETTING_ACCOUNTS = [
     ('employer_expense_account_id', 'حساب حصة الشركة من الضمان', 'اشتراك الضمان'),
     ('social_account_id', 'حساب الضمان الاجتماعي', 'الضمان الاجتماعي'),
     ('tax_account_id', 'حساب ضريبة الدخل', 'ضريبة الدخل'),
+    ('pension_account_id', 'حساب صندوق التقاعد', 'صندوق التقاعد'),
     ('payment_account_id', 'حساب الدفع', 'الاهلي'),
     ('other_account_id', 'حساب الاستقطاعات الأخرى', ''),
 ]
@@ -39,23 +40,26 @@ class MyAccountingPayrollSettings(models.Model):
                                                   string='مصروف حصة الشركة')
     social_account_id = fields.Many2one('myaccounting.account', string='الضمان الاجتماعي')
     tax_account_id = fields.Many2one('myaccounting.account', string='ضريبة الدخل')
+    pension_account_id = fields.Many2one('myaccounting.account', string='صندوق التقاعد')
     payment_account_id = fields.Many2one('myaccounting.account', string='حساب الدفع')
     other_account_id = fields.Many2one('myaccounting.account',
                                        string='الاستقطاعات الأخرى')
 
     @api.model
     def _get(self):
-        settings = self.search([], limit=1)
-        if not settings:
-            Account = self.env['myaccounting.account']
-            values = {}
-            for field, _label, default_name in SETTING_ACCOUNTS:
-                if not default_name:
-                    continue
-                account = Account.search([('name', '=', default_name)], limit=1)
-                if account:
-                    values[field] = account.id
-            settings = self.create(values)
+        settings = self.search([], limit=1) or self.create({})
+        # خانة فارغة تُملأ من حساب يحمل الاسم المعتاد — يلزم أيضاً حين
+        # يُضاف حقل جديد بعد إنشاء الإعدادات (صندوق التقاعد مثلاً)
+        Account = self.env['myaccounting.account']
+        values = {}
+        for field, _label, default_name in SETTING_ACCOUNTS:
+            if settings[field] or not default_name:
+                continue
+            account = Account.search([('name', '=', default_name)], limit=1)
+            if account:
+                values[field] = account.id
+        if values:
+            settings.write(values)
         return settings
 
     @api.model
@@ -104,6 +108,7 @@ class MyAccountingEmployee(models.Model):
     social_base = fields.Float(string='الراتب الخاضع للضمان', digits=(16, 3),
                                help='اتركه صفراً ليُحتسب على الراتب الإجمالي.')
     income_tax = fields.Float(string='ضريبة الدخل الشهرية', digits=(16, 3))
+    pension = fields.Float(string='صندوق التقاعد الشهري', digits=(16, 3))
     other_deduction = fields.Float(string='استقطاعات أخرى', digits=(16, 3))
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف',
                                  help='اتركه فارغاً ليُستعمل حساب مصروف الرواتب العام.')
@@ -125,6 +130,7 @@ class MyAccountingEmployee(models.Model):
             'social_security': self.social_security,
             'social_base': self.social_base,
             'income_tax': self.income_tax,
+            'pension': self.pension,
             'other_deduction': self.other_deduction,
             'account_id': self.account_id.id or False,
             'account': self.account_id.name or '',
@@ -157,6 +163,7 @@ class MyAccountingEmployee(models.Model):
                 'social_security': bool(item.get('social_security')),
                 'social_base': float(item.get('social_base') or 0.0),
                 'income_tax': float(item.get('income_tax') or 0.0),
+                'pension': float(item.get('pension') or 0.0),
                 'other_deduction': float(item.get('other_deduction') or 0.0),
                 'account_id': int(item['account_id']) if item.get('account_id') else False,
                 'note': item.get('note') or '',
@@ -223,9 +230,9 @@ class MyAccountingPayroll(models.Model):
             'state': self.state,
             'lines': lines,
             'totals': {key: total(key) for key in (
-                'basic_salary', 'allowance', 'gross', 'employee_social',
-                'employer_social', 'income_tax', 'other_deduction',
-                'total_deduction', 'net')},
+                'basic_salary', 'allowance', 'gross', 'social_base',
+                'employee_social', 'employer_social', 'income_tax', 'pension',
+                'other_deduction', 'total_deduction', 'net')},
             'move_id': self.move_id.id or False,
             'move': self.move_id.name or '',
         }
@@ -266,6 +273,7 @@ class MyAccountingPayroll(models.Model):
                 'employer_social': round(base * settings.employer_rate / 100.0, 3)
                                    if employee.social_security else 0.0,
                 'income_tax': employee.income_tax,
+                'pension': employee.pension,
                 'other_deduction': employee.other_deduction,
                 'account_id': employee.account_id.id or False,
             })
@@ -288,6 +296,7 @@ class MyAccountingPayroll(models.Model):
                 'employee_social': float(item.get('employee_social') or 0.0),
                 'employer_social': float(item.get('employer_social') or 0.0),
                 'income_tax': float(item.get('income_tax') or 0.0),
+                'pension': float(item.get('pension') or 0.0),
                 'other_deduction': float(item.get('other_deduction') or 0.0),
             })
         return payroll._payload()
@@ -311,8 +320,9 @@ class MyAccountingPayroll(models.Model):
         if not self.line_ids:
             raise UserError('لا بنود في الكشف.')
         settings = self.env['myaccounting.payroll.settings']._get()
+        optional = ('other_account_id', 'pension_account_id')
         missing = [label for field, label, _default in SETTING_ACCOUNTS
-                   if not settings[field] and field != 'other_account_id']
+                   if not settings[field] and field not in optional]
         if missing:
             raise UserError('حدّد في الإعدادات: %s' % '، '.join(missing))
 
@@ -346,6 +356,13 @@ class MyAccountingPayroll(models.Model):
                 'account_id': settings.tax_account_id.id,
                 'name': 'ضريبة الدخل %s' % label,
                 'debit': 0.0, 'credit': totals['income_tax']}))
+        if totals['pension']:
+            if not settings.pension_account_id:
+                raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
+            lines.append((0, 0, {
+                'account_id': settings.pension_account_id.id,
+                'name': 'صندوق التقاعد %s' % label,
+                'debit': 0.0, 'credit': totals['pension']}))
         if totals['other_deduction']:
             if not settings.other_account_id:
                 raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
@@ -407,6 +424,7 @@ class MyAccountingPayrollLine(models.Model):
     employee_social = fields.Float(string='ضمان الموظف', digits=(16, 3))
     employer_social = fields.Float(string='ضمان الشركة', digits=(16, 3))
     income_tax = fields.Float(string='ضريبة الدخل', digits=(16, 3))
+    pension = fields.Float(string='صندوق التقاعد', digits=(16, 3))
     other_deduction = fields.Float(string='استقطاعات أخرى', digits=(16, 3))
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف')
 
@@ -414,7 +432,7 @@ class MyAccountingPayrollLine(models.Model):
         self.ensure_one()
         gross = round((self.basic_salary or 0.0) + (self.allowance or 0.0), 3)
         deduction = round((self.employee_social or 0.0) + (self.income_tax or 0.0)
-                          + (self.other_deduction or 0.0), 3)
+                          + (self.pension or 0.0) + (self.other_deduction or 0.0), 3)
         return {
             'id': self.id,
             'employee_id': self.employee_id.id,
@@ -427,6 +445,7 @@ class MyAccountingPayrollLine(models.Model):
             'employee_social': self.employee_social,
             'employer_social': self.employer_social,
             'income_tax': self.income_tax,
+            'pension': self.pension,
             'other_deduction': self.other_deduction,
             'total_deduction': deduction,
             'net': round(gross - deduction, 3),
