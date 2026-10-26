@@ -254,6 +254,12 @@ export class Payroll extends Component {
         return section ? section.name : "";
     }
 
+    monthPostedOf(id) {
+        const section = this.sheetSections.find(
+            (item) => item.key === (id === false ? "none" : `g${id}`));
+        return section ? section.posted : false;
+    }
+
     monthCountOf(id) {
         const section = this.sheetSections.find(
             (item) => item.key === (id === false ? "none" : `g${id}`));
@@ -279,35 +285,74 @@ export class Payroll extends Component {
             const index = order.indexOf(id);
             return index < 0 ? 9998 : index;
         };
+        const sheets = this.state.data ? this.state.data.sheets || [] : [];
         return [...buckets.keys()].sort((a, b) => rank(a) - rank(b)).map((id) => {
             const group = this.state.groups.find((item) => item.id === id);
             const own = buckets.get(id);
+            // حالة القيد تأتي من الخادم: لكل كشف قيده أو لا قيد له
+            const sheet = sheets.find((item) => (item.id || false) === id) || {};
             return {
                 key: id === false ? "none" : `g${id}`,
+                sheet: id === false ? "none" : id,
                 name: group ? group.name : "بلا كشف",
                 lines: own,
                 totals: this.sumOf(own),
+                posted: !!sheet.posted,
+                move: sheet.move || "",
+                move_id: sheet.move_id || false,
             };
         });
     }
 
+    /** الكشوف المعروضة التي لم تُرحَّل بعد */
+    get toPost() {
+        return this.visibleSections.filter((section) => !section.posted);
+    }
+
+    /** الكشوف المعروضة المُرحَّلة */
+    get posted() {
+        return this.visibleSections.filter((section) => section.posted);
+    }
+
+    /** اسم الزرّ: الكشف المختار بعينه، أو عدد ما بقي عند «عرض الكل» */
+    get postLabel() {
+        const todo = this.toPost;
+        if (todo.length === 1) {
+            return `أنشئ قيد ${todo[0].name}`;
+        }
+        return `أنشئ قيود الكشوف (${todo.length})`;
+    }
+
+    get unpostLabel() {
+        const done = this.posted;
+        if (done.length === 1) {
+            return `فكّ ترحيل ${done[0].name}`;
+        }
+        return `فكّ ترحيل الكشوف (${done.length})`;
+    }
+
     async postPayroll() {
         await this.withBusy(async () => {
+            const count = this.toPost.length;
             this.state.data = await this.orm.call("myaccounting.payroll", "post_payroll",
-                [[this.state.data.id]]);
+                [[this.state.data.id], this.state.monthSheet]);
             await this.refresh(this.state.data.id);
-            this.notification.add("أُنشئ قيد الرواتب مسودةً.", { type: "success" });
+            this.notification.add(count === 1 ? "أُنشئ قيد الكشف مسودةً."
+                                              : `أُنشئت ${count} قيود مسودةً.`,
+                                  { type: "success" });
         });
     }
 
     unpostPayroll() {
+        const done = this.posted;
+        const what = done.length === 1 ? `قيد ${done[0].name}` : `${done.length} قيود`;
         this.dialog.add(ConfirmationDialog, {
             title: "فكّ الترحيل",
-            body: "سيُحذف قيد الرواتب ما دام مسودة، ويعود الكشف قابلاً للتعديل.",
+            body: `سيُحذف ${what} ما دام مسودةً، ويعود الكشف قابلاً للتعديل.`,
             confirmLabel: "نعم",
             confirm: () => this.withBusy(async () => {
                 this.state.data = await this.orm.call("myaccounting.payroll",
-                    "unpost_payroll", [[this.state.data.id]]);
+                    "unpost_payroll", [[this.state.data.id], this.state.monthSheet]);
                 await this.refresh(this.state.data.id);
             }),
             cancel: () => {},

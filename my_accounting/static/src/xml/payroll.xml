@@ -73,40 +73,49 @@
                         </div>
                         <div class="small text-muted">
                             <t t-esc="visibleCount"/> موظفاً ·
-                            <t t-if="data.state === 'posted'">
+                            <t t-if="posted.length">
                                 مُرحَّل إلى
-                                <a href="#" class="o_pr_link"
-                                   t-custom-click="(ev, mid) => this.openMove(data.move_id, mid)">
-                                    قيد <t t-esc="data.move"/>
-                                </a>
+                                <t t-foreach="posted" t-as="done" t-key="done.key">
+                                    <a href="#" class="o_pr_link"
+                                       t-custom-click="(ev, mid) => this.openMove(done.move_id, mid)">
+                                        قيد <t t-esc="done.move"/>
+                                    </a><t t-if="!done_last">،</t>
+                                </t>
                             </t>
-                            <t t-else="">مسودة</t>
+                            <t t-if="toPost.length">
+                                <t t-if="posted.length"> · </t>
+                                <t t-if="toPost.length === 1">مسودة</t>
+                                <t t-else=""><t t-esc="toPost.length"/> كشوف مسودة</t>
+                            </t>
                         </div>
                     </div>
 
                     <div class="o_pr_bar no-print">
-                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-outline-secondary"
+                        <button t-if="!data.posted_any" class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.fillFromEmployees()">
                             أعد البناء من بطاقات الموظفين
                         </button>
-                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-primary"
+                        <button t-if="!data.posted_all" class="btn btn-sm btn-primary"
                                 t-att-disabled="state.busy or !linesDirty"
                                 t-on-click="() => this.saveLines()">حفظ</button>
-                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-outline-secondary"
+                        <button t-if="!data.posted_all" class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy or !linesDirty"
                                 t-on-click="() => this.cancelLines()">إلغاء</button>
                         <span t-if="linesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
                         <span class="o_pr_sep"/>
-                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-success"
+                        <!-- القيد للكشف المعروض وحده: قيدٌ لكل كشف كما في الدفاتر -->
+                        <button t-if="toPost.length" class="btn btn-sm btn-success"
                                 t-att-disabled="state.busy or linesDirty"
                                 t-on-click="() => this.postPayroll()">
-                            <i class="fa fa-check me-1"/> أنشئ القيد
+                            <i class="fa fa-check me-1"/> <t t-esc="postLabel"/>
                         </button>
-                        <button t-else="" class="btn btn-sm btn-outline-danger"
+                        <button t-if="posted.length" class="btn btn-sm btn-outline-danger"
                                 t-att-disabled="state.busy"
-                                t-on-click="() => this.unpostPayroll()">فكّ الترحيل</button>
-                        <button t-if="data.state === 'draft'" class="btn btn-sm btn-link text-danger"
+                                t-on-click="() => this.unpostPayroll()">
+                            <t t-esc="unpostLabel"/>
+                        </button>
+                        <button t-if="!data.posted_any" class="btn btn-sm btn-link text-danger"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.deletePayroll()">احذف الكشف</button>
                     </div>
@@ -126,6 +135,8 @@
                                 <a href="#" t-attf-class="nav-link {{ state.monthSheet === group.id ? 'active' : '' }}"
                                    t-on-click.prevent="() => this.setMonthSheet(group.id)">
                                     <t t-esc="group.name"/>
+                                    <i t-if="monthPostedOf(group.id)"
+                                       class="fa fa-check-circle ms-1" title="مُرحَّل"/>
                                     <span class="badge rounded-pill" t-esc="monthCountOf(group.id)"/>
                                 </a>
                             </li>
@@ -134,6 +145,8 @@
                             <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'none' ? 'active' : '' }}"
                                t-on-click.prevent="() => this.setMonthSheet('none')">
                                 بلا كشف
+                                <i t-if="monthPostedOf(false)"
+                                   class="fa fa-check-circle ms-1" title="مُرحَّل"/>
                                 <span class="badge rounded-pill" t-esc="monthCountOf(false)"/>
                             </a>
                         </li>
@@ -162,6 +175,10 @@
                                 <td colspan="12">
                                     <t t-esc="section.name"/>
                                     <span class="o_pr_count" t-esc="section.lines.length"/>
+                                    <a t-if="section.posted" href="#" class="o_pr_link ms-2 small"
+                                       t-custom-click="(ev, mid) => this.openMove(section.move_id, mid)">
+                                        قيد <t t-esc="section.move"/>
+                                    </a>
                                 </td>
                             </tr>
                             <tr t-foreach="section.lines" t-as="line" t-key="line.id">
@@ -170,7 +187,7 @@
                                     <div t-if="line.job_title" class="o_pr_job"
                                          t-esc="line.job_title"/>
                                 </td>
-                                <t t-if="data.state === 'draft'">
+                                <t t-if="!section.posted">
                                     <td t-foreach="['basic_salary', 'allowance']" t-as="field"
                                         t-key="field">
                                         <input type="number" step="0.001"

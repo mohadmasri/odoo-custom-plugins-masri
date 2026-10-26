@@ -285,7 +285,8 @@ class MyAccountingPayroll(models.Model):
     state = fields.Selection([('draft', 'مسودة'), ('posted', 'مُرحَّل')],
                              string='الحالة', default='draft')
     line_ids = fields.One2many('myaccounting.payroll.line', 'payroll_id', string='البنود')
-    move_id = fields.Many2one('myaccounting.move', string='القيد', ondelete='set null')
+    # لكل كشف قيده، كما في دفاتره: قيد لرواتب المكتب وآخر لكل مشروع
+    move_ids = fields.One2many('myaccounting.move', 'payroll_id', string='القيود')
 
     _year_month_unique = models.Constraint('unique(year, month)',
                                            'لكل شهر كشف رواتب واحد.')
@@ -308,7 +309,7 @@ class MyAccountingPayroll(models.Model):
         payroll = self.browse(int(payroll_id)) if payroll_id else self.search([], limit=1)
         return payroll._payload() if payroll else False
 
-    def _employer_share(self):
+    def _employer_share(self, lines=None):
         """حصة الشركة من الضمان لكل حساب، محسوبةً على مجموع الخاضع للضمان.
 
         مؤسسة الضمان تحسب النسبة على مجموع الرواتب الخاضعة لا على كل راتب
@@ -319,12 +320,70 @@ class MyAccountingPayroll(models.Model):
         settings = self.env['myaccounting.payroll.settings']._get()
         office = settings.employer_expense_account_id
         base = {}
-        for line in self.line_ids:
+        for line in (self.line_ids if lines is None else lines):
             account = line.account_id or office
             base[account.id] = round(base.get(account.id, 0.0)
                                      + (line.social_base or 0.0), 3)
         return {account_id: round(amount * settings.employer_rate / 100.0, 3)
                 for account_id, amount in base.items() if amount}
+
+    def _sheets(self):
+        """كشوف هذا الشهر بترتيبها، و«بلا كشف» في آخرها إن وُجد.
+
+        المفتاح نصّ: رقم الكشف، أو 'none' لمن لا كشف له.
+        """
+        self.ensure_one()
+        groups = self.line_ids.group_id.sorted(lambda group: (group.sequence, group.id))
+        sheets = [(str(group.id), group) for group in groups]
+        if any(not line.group_id for line in self.line_ids):
+            sheets.append(('none', self.env['myaccounting.payroll.group']))
+        return sheets
+
+    def _sheet_lines(self, sheet):
+        """بنود كشفٍ بعينه."""
+        self.ensure_one()
+        if str(sheet) == 'none':
+            return self.line_ids.filtered(lambda line: not line.group_id)
+        return self.line_ids.filtered(lambda line: line.group_id.id == int(sheet))
+
+    def _sheet_move(self, sheet):
+        """قيد هذا الكشف إن كان مُرحَّلاً."""
+        self.ensure_one()
+        group_id = False if str(sheet) == 'none' else int(sheet)
+        found = self.move_ids.filtered(
+            lambda move: (move.payroll_group_id.id or False) == group_id)
+        return found[:1]
+
+    def _sheet_keys(self, sheet):
+        """ما يشمله الزرّ: كشوف الشهر كلها عند «عرض الكل»، أو الكشف المختار."""
+        self.ensure_one()
+        if str(sheet) == 'all':
+            return [key for key, _group in self._sheets()]
+        key = str(sheet)
+        return [key] if key in [item for item, _group in self._sheets()] else []
+
+    def _sync_state(self):
+        """الكشف مُرحَّل متى رُحِّلت كشوفه كلها."""
+        self.ensure_one()
+        sheets = self._sheets()
+        posted = [key for key, _group in sheets if self._sheet_move(key)]
+        self.state = 'posted' if sheets and len(posted) == len(sheets) else 'draft'
+
+    def _sheets_payload(self):
+        self.ensure_one()
+        items = []
+        for key, group in self._sheets():
+            move = self._sheet_move(key)
+            items.append({
+                'key': key,
+                'id': group.id or False,
+                'name': group.name or 'بلا كشف',
+                'count': len(self._sheet_lines(key)),
+                'posted': bool(move),
+                'move_id': move.id or False,
+                'move': move.name or '',
+            })
+        return items
 
     def _payload(self):
         self.ensure_one()
@@ -332,6 +391,7 @@ class MyAccountingPayroll(models.Model):
         def total(key):
             return round(sum(line[key] for line in lines), 3)
         employer = round(sum(self._employer_share().values()), 3)
+        sheets = self._sheets_payload()
         return {
             'id': self.id,
             'name': self.name,
@@ -346,8 +406,9 @@ class MyAccountingPayroll(models.Model):
                 'employee_social', 'employer_social', 'income_tax', 'pension',
                 'other_deduction', 'total_deduction', 'net')},
                 employer_social=employer),
-            'move_id': self.move_id.id or False,
-            'move': self.move_id.name or '',
+            'sheets': sheets,
+            'posted_any': any(sheet['posted'] for sheet in sheets),
+            'posted_all': bool(sheets) and all(sheet['posted'] for sheet in sheets),
         }
 
     @api.model
@@ -367,8 +428,8 @@ class MyAccountingPayroll(models.Model):
     def fill_from_employees(self):
         """يعيد بناء بنود الكشف من بطاقات الموظفين على رأس عملهم."""
         self.ensure_one()
-        if self.state == 'posted':
-            raise UserError('الكشف مُرحَّل، لا يُعاد بناؤه.')
+        if self.move_ids:
+            raise UserError('في الشهر كشوفٌ لها قيود، فُكَّ ترحيلها قبل إعادة البناء.')
         self.line_ids.unlink()
         settings = self.env['myaccounting.payroll.settings']._get()
         Line = self.env['myaccounting.payroll.line']
@@ -397,29 +458,29 @@ class MyAccountingPayroll(models.Model):
     @api.model
     def save_lines(self, payroll_id, items):
         payroll = self.browse(int(payroll_id))
-        if payroll.state == 'posted':
-            raise UserError('الكشف مُرحَّل، لا يُعدَّل.')
+        posted = {key for key, _group in payroll._sheets() if payroll._sheet_move(key)}
         by_id = {line.id: line for line in payroll.line_ids}
+        names = ('basic_salary', 'allowance', 'social_base', 'employee_social',
+                 'employer_social', 'income_tax', 'pension', 'other_deduction')
         for item in items or []:
             line = by_id.get(item.get('id'))
             if not line:
                 continue
-            line.write({
-                'basic_salary': float(item.get('basic_salary') or 0.0),
-                'allowance': float(item.get('allowance') or 0.0),
-                'social_base': float(item.get('social_base') or 0.0),
-                'employee_social': float(item.get('employee_social') or 0.0),
-                'employer_social': float(item.get('employer_social') or 0.0),
-                'income_tax': float(item.get('income_tax') or 0.0),
-                'pension': float(item.get('pension') or 0.0),
-                'other_deduction': float(item.get('other_deduction') or 0.0),
-            })
+            values = {name: float(item.get(name) or 0.0) for name in names}
+            # الشاشة ترسل بنود الشهر كلها، فما لم يتغيّر لا يُكتب ولا يُمنع
+            if all(abs(values[name] - (line[name] or 0.0)) < 0.0005 for name in names):
+                continue
+            key = str(line.group_id.id) if line.group_id else 'none'
+            if key in posted:
+                raise UserError('كشف «%s» له قيد، فلا تُعدَّل بنوده.'
+                                % (line.group_id.name or 'بلا كشف'))
+            line.write(values)
         return payroll._payload()
 
     def delete_payroll(self):
         for payroll in self:
-            if payroll.state == 'posted':
-                raise UserError('الكشف مُرحَّل، لا يُحذف.')
+            if payroll.move_ids:
+                raise UserError('للكشف قيود، فُكَّ ترحيلها قبل حذفه.')
         self.unlink()
         return True
 
@@ -427,11 +488,14 @@ class MyAccountingPayroll(models.Model):
     # القيد
     # ------------------------------------------------------------------
 
-    def post_payroll(self):
-        """ينشئ قيد الرواتب مسودةً من مجاميع الكشف."""
+    def post_payroll(self, sheet='all'):
+        """ينشئ قيد الكشف المعروض مسودةً: قيداً لكل كشف على حِدة.
+
+        هكذا دفاتره: قيدٌ لرواتب المكتب وقيدٌ لكل مشروع، لا قيدٌ واحد
+        يجمعها. فالزرّ يرحّل الكشف المختار من الشريط، وعند «عرض الكل»
+        يرحّل ما بقي من الكشوف، كلَّ واحدٍ في قيده.
+        """
         self.ensure_one()
-        if self.state == 'posted':
-            raise UserError('سبق ترحيل هذا الكشف.')
         if not self.line_ids:
             raise UserError('لا بنود في الكشف.')
         settings = self.env['myaccounting.payroll.settings']._get()
@@ -441,17 +505,39 @@ class MyAccountingPayroll(models.Model):
         if missing:
             raise UserError('حدّد في الإعدادات: %s' % '، '.join(missing))
 
-        payload = self._payload()
-        totals = payload['totals']
+        keys = self._sheet_keys(sheet)
+        todo = [key for key in keys if not self._sheet_move(key)]
+        if not todo:
+            raise UserError('سبق ترحيل هذا الكشف.')
+        for key in todo:
+            self._post_sheet(key, settings)
+        self._sync_state()
+        return self._payload()
+
+    def _post_sheet(self, sheet, settings):
+        """قيد كشفٍ واحد من بنوده وحدها."""
+        self.ensure_one()
+        lines = self._sheet_lines(sheet)
+        if not lines:
+            raise UserError('لا بنود في هذا الكشف.')
+        group = lines[0].group_id
         label = 'رواتب شهر %s/%s' % (self.month, self.year)
-        lines = []
+        if group:
+            label = '%s — %s' % (label, group.name)
+
+        payloads = [line._payload() for line in lines]
+
+        def total(key):
+            return round(sum(item[key] for item in payloads), 3)
+
+        entries = []
         # المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام.
         # وحصة الشركة من الضمان تتبع حساب الراتب نفسه: راتب المشروع تذهب
         # حصته إلى حساب المشروع، وراتب المكتب إلى حساب اشتراك الضمان.
         by_account = {}
-        employer_by_account = self._employer_share()
+        employer_by_account = self._employer_share(lines)
         by_payment = {}
-        for line in self.line_ids:
+        for line in lines:
             account = line.account_id or settings.expense_account_id
             gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
             by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
@@ -461,55 +547,56 @@ class MyAccountingPayroll(models.Model):
                 by_payment[payment.id] = round(by_payment.get(payment.id, 0.0) + net, 3)
         for account_id, amount in by_account.items():
             if amount:
-                lines.append((0, 0, {'account_id': account_id, 'name': label,
-                                     'debit': amount, 'credit': 0.0}))
+                entries.append((0, 0, {'account_id': account_id, 'name': label,
+                                       'debit': amount, 'credit': 0.0}))
         for account_id, amount in employer_by_account.items():
             if amount:
-                lines.append((0, 0, {
+                entries.append((0, 0, {
                     'account_id': account_id,
                     'name': 'حصة الشركة من الضمان %s' % label,
                     'debit': amount, 'credit': 0.0}))
-        social = round(totals['employee_social'] + totals['employer_social'], 3)
+        employer = round(sum(employer_by_account.values()), 3)
+        social = round(total('employee_social') + employer, 3)
         if social:
-            lines.append((0, 0, {
+            entries.append((0, 0, {
                 'account_id': settings.social_account_id.id,
                 'name': 'الضمان الاجتماعي %s' % label,
                 'debit': 0.0, 'credit': social}))
-        if totals['income_tax']:
-            lines.append((0, 0, {
+        if total('income_tax'):
+            entries.append((0, 0, {
                 'account_id': settings.tax_account_id.id,
                 'name': 'ضريبة الدخل %s' % label,
-                'debit': 0.0, 'credit': totals['income_tax']}))
-        if totals['pension']:
+                'debit': 0.0, 'credit': total('income_tax')}))
+        if total('pension'):
             if not settings.pension_account_id:
                 raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
-            lines.append((0, 0, {
+            entries.append((0, 0, {
                 'account_id': settings.pension_account_id.id,
                 'name': 'صندوق التقاعد %s' % label,
-                'debit': 0.0, 'credit': totals['pension']}))
-        if totals['other_deduction']:
+                'debit': 0.0, 'credit': total('pension')}))
+        if total('other_deduction'):
             if not settings.other_account_id:
                 raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
-            lines.append((0, 0, {
+            entries.append((0, 0, {
                 'account_id': settings.other_account_id.id,
                 'name': 'استقطاعات أخرى %s' % label,
-                'debit': 0.0, 'credit': totals['other_deduction']}))
+                'debit': 0.0, 'credit': total('other_deduction')}))
         for account_id, amount in by_payment.items():
             if amount:
-                lines.append((0, 0, {'account_id': account_id, 'name': label,
-                                     'debit': 0.0, 'credit': amount}))
+                entries.append((0, 0, {'account_id': account_id, 'name': label,
+                                       'debit': 0.0, 'credit': amount}))
 
-        move = self.env['myaccounting.move'].create({
+        return self.env['myaccounting.move'].create({
             'name': self._next_move_name(),
             'date': self.date or fields.Date.context_today(self),
             'ref': label,
             'journal': 'رواتب',
             'ledger_year': self.year,
             'ledger_month': self.month,
-            'line_ids': lines,
+            'payroll_id': self.id,
+            'payroll_group_id': group.id or False,
+            'line_ids': entries,
         })
-        self.write({'state': 'posted', 'move_id': move.id})
-        return self._payload()
 
     def _next_move_name(self):
         """رقم القيد في شهر الكشف: ما بعد آخر رقم في الشهر نفسه."""
@@ -523,13 +610,23 @@ class MyAccountingPayroll(models.Model):
                 numbers.append(int(parts[0].strip()))
         return '%d/%s' % ((max(numbers) + 1) if numbers else 1, self.month)
 
-    def unpost_payroll(self):
-        """يفكّ الترحيل ويحذف القيد ما دام مسودة."""
+    def unpost_payroll(self, sheet='all'):
+        """يفكّ ترحيل الكشف المعروض ويحذف قيده ما دام مسودة."""
         self.ensure_one()
-        move = self.move_id
-        self.write({'state': 'draft', 'move_id': False})
-        if move and move.state == 'draft':
-            move.unlink()
+        moves = self.env['myaccounting.move']
+        for key in self._sheet_keys(sheet):
+            move = self._sheet_move(key)
+            if not move:
+                continue
+            if move.state != 'draft':
+                raise UserError(
+                    'قيد «%s» مُرحَّل في الدفتر، فأعِده مسودةً قبل فكّ ترحيل الكشف.'
+                    % move.name)
+            moves |= move
+        if not moves:
+            raise UserError('لا قيد لهذا الكشف.')
+        moves.unlink()
+        self._sync_state()
         return self._payload()
 
 
@@ -579,3 +676,14 @@ class MyAccountingPayrollLine(models.Model):
             'group_id': self.group_id.id or False,
             'group': self.group_id.name or '',
         }
+
+
+class MyAccountingMovePayroll(models.Model):
+    """القيد يحمل كشفه، فيُعرف أيُّ كشفٍ رُحِّل وأيُّه ما زال مسودة."""
+    _inherit = 'myaccounting.move'
+
+    payroll_id = fields.Many2one('myaccounting.payroll', string='كشف الرواتب',
+                                 ondelete='set null', index=True, copy=False)
+    payroll_group_id = fields.Many2one('myaccounting.payroll.group',
+                                       string='كشف الموظفين',
+                                       ondelete='set null', copy=False)
