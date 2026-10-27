@@ -711,7 +711,8 @@ class MyAccountingPayroll(models.Model):
         keys = self._sheet_keys(sheet)
         todo = [key for key in keys if not self._sheet_move(key)]
         if not todo:
-            raise UserError('سبق ترحيل هذا الكشف.')
+            raise UserError('سبق ترحيل هذا الكشف. القيد لا يتغيّر بعد إنشائه، '
+                            'فإن عدّلت بطاقةً أو بنداً فُكَّ الترحيل ثم أنشئه من جديد.')
         for key in todo:
             self._post_sheet(key, settings)
         self._sync_state()
