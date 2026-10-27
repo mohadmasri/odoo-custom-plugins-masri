@@ -747,7 +747,11 @@ class MyAccountingPayroll(models.Model):
             payment = line.payment_account_id or settings.payment_account_id
             net = line._payload()['net']
             if net:
-                by_payment[payment.id] = round(by_payment.get(payment.id, 0.0) + net, 3)
+                # الصافي يُقسم على جهة الدفع وطريقة الصرف: سطرٌ للتحويل
+                # وسطرٌ للشيكات على الحساب نفسه، كما في قيوده
+                method = line.employee_id.payment_method or 'transfer'
+                key = (payment.id, method)
+                by_payment[key] = round(by_payment.get(key, 0.0) + net, 3)
         for account_id, amount in by_account.items():
             if amount:
                 entries.append((0, 0, {'account_id': account_id, 'name': label,
@@ -784,10 +788,14 @@ class MyAccountingPayroll(models.Model):
                 'account_id': settings.other_account_id.id,
                 'name': 'استقطاعات أخرى %s' % label,
                 'debit': 0.0, 'credit': total('other_deduction')}))
-        for account_id, amount in by_payment.items():
+        for (account_id, method), amount in sorted(
+                by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
+                                                      item[0][0])):
             if amount:
-                entries.append((0, 0, {'account_id': account_id, 'name': label,
-                                       'debit': 0.0, 'credit': amount}))
+                entries.append((0, 0, {
+                    'account_id': account_id,
+                    'name': ('شيكات %s' % label) if method == 'cheque' else label,
+                    'debit': 0.0, 'credit': amount}))
 
         return self.env['myaccounting.move'].create({
             'name': self._next_move_name(),
