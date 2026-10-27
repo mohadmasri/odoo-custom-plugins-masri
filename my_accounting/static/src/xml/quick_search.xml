@@ -100,12 +100,13 @@
                                 t-esc="y"/>
                     </select>
                     <span class="o_sp_filter_label">الشهر</span>
-                    <select class="form-select form-select-sm" style="width:90px;"
+                    <select class="form-select form-select-sm" style="width:150px;"
                             t-on-change="(ev) => this.onFilterInput('month', ev)">
                         <option value="">الكل</option>
-                        <option t-foreach="months" t-as="m" t-key="m"
-                                t-att-value="m" t-att-selected="isSame(filters.month, m)"
-                                t-esc="m"/>
+                        <option t-foreach="months" t-as="m" t-key="m[0]"
+                                t-att-value="m[0]"
+                                t-att-selected="isSame(filters.month, m[0])"
+                                t-esc="m[1]"/>
                     </select>
                     <span class="o_sp_filter_label">اليومية</span>
                     <select class="form-select form-select-sm" style="width:150px;"

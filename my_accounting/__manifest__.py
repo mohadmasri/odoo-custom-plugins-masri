@@ -42,6 +42,7 @@
             'my_accounting/static/src/js/account_bulk_dialog.js',
             'my_accounting/static/src/xml/account_bulk_dialog.xml',
             'my_accounting/static/src/js/movement_filter_store.js',
+            'my_accounting/static/src/js/months.js',
             'my_accounting/static/src/js/account_tree.js',
             'my_accounting/static/src/xml/account_tree.xml',
             'my_accounting/static/src/js/account_review_list.js',

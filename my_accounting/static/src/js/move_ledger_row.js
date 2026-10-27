@@ -4,11 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-
-const MONTHS = [
-    "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران",
-    "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول",
-];
+import { monthName } from "./months";
 
 /**
  * سطر القيد الظاهر كما يظهر في دفتر الأستاذ العام: نفس الأعمدة (مدين/دائن لكل
@@ -106,7 +102,7 @@ export class MoveLedgerRow extends Component {
         if (!month || !year) {
             return "";
         }
-        return `${MONTHS[month - 1]} ${year}`;
+        return `${monthName(month)} ${year}`;
     }
 
     fmt(value) {

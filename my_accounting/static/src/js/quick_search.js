@@ -3,6 +3,7 @@
 import { Component, onMounted, onWillStart, useExternalListener, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { MONTH_OPTIONS } from "./months";
 import { openRecord } from "./open_record";
 
 const DEBOUNCE_MS = 180;
@@ -185,7 +186,7 @@ export class SearchPage extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
-        this.months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        this.months = MONTH_OPTIONS;
         this.state = useState({
             query: "", groups: [], total: 0, loading: false,
             options: { years: [], journals: [], states: [], kinds: [], accounts: [] },

@@ -3,6 +3,7 @@
 import { Component, onWillStart, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { loadLedgerYears } from "./ledger_years";
+import { monthName as monthNameOf } from "./months";
 
 /**
  * فلتر الفترة الموحّد لكل الشاشات: قائمة السنة (السنوات التي فيها قيود فقط)
@@ -35,6 +36,11 @@ export class PeriodFilter extends Component {
                 this.state.years = await loadLedgerYears(this.orm);
             }
         });
+    }
+
+    /** اسم الشهر في تلميح الزرّ: الأزرار اثنا عشر فلا تحمل الأسماء */
+    monthName(month) {
+        return monthNameOf(month);
     }
 
     get years() {

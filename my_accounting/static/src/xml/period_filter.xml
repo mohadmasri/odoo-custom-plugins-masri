@@ -12,7 +12,7 @@
                 </t>
             </select>
             <t t-foreach="months" t-as="m" t-key="m">
-                <button type="button"
+                <button type="button" t-att-title="monthName(m)"
                         t-attf-class="btn o_ma_month_btn {{ isMonthActive(m) ? 'btn-primary' : 'btn-outline-secondary' }}"
                         t-on-click="() => this.onMonth(m)" t-esc="m"/>
             </t>

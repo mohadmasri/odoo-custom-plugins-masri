@@ -2,17 +2,12 @@
 
 import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { MONTH_OPTIONS } from "./months";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { RefPicker } from "./balance_sheet";
 import { openRecord } from "./open_record";
 import { usePrintPageSize } from "./print_page_size";
-
-const MONTHS = [
-    ["1", "كانون الثاني"], ["2", "شباط"], ["3", "آذار"], ["4", "نيسان"],
-    ["5", "أيار"], ["6", "حزيران"], ["7", "تموز"], ["8", "آب"],
-    ["9", "أيلول"], ["10", "تشرين الأول"], ["11", "تشرين الثاني"], ["12", "كانون الأول"],
-];
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -49,7 +44,7 @@ export class Payroll extends Component {
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.excelInput = useRef("excelInput");
-        this.months = MONTHS;
+        this.months = MONTH_OPTIONS;
         this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
         const today = new Date();
         this.state = useState({

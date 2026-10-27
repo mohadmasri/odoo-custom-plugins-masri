@@ -5,13 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useExternalListener } from "@odoo/owl";
 import { JournalPicker } from "./journal_input";
-
-const MONTHS = [
-    ["1", "1 - كانون الثاني"], ["2", "2 - شباط"], ["3", "3 - آذار"], ["4", "4 - نيسان"],
-    ["5", "5 - أيار"], ["6", "6 - حزيران"], ["7", "7 - تموز"], ["8", "8 - آب"],
-    ["9", "9 - أيلول"], ["10", "10 - تشرين الأول"], ["11", "11 - تشرين الثاني"],
-    ["12", "12 - كانون الأول"],
-];
+import { MONTH_OPTIONS } from "./months";
 
 /**
  * المراجعة السريعة لقيود الصور: الصورة إلى جانب بنودها، وتأكيد وانتقال
@@ -26,7 +20,7 @@ export class PhotoReview extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
         this.notification = useService("notification");
-        this.months = MONTHS;
+        this.months = MONTH_OPTIONS;
         // مراجع خانات الترويسة: التصحيح بضغطة يحدّث ما تراه في الخانة أيضاً
         this.fieldRefs = {
             name: useRef("f_name"),

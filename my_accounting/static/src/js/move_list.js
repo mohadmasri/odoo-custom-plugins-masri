@@ -8,6 +8,7 @@ import { openRecord } from "./open_record";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useSetupAction } from "@web/search/action_hook";
 import { JournalImportDialog } from "./journal_import_dialog";
+import { MONTH_CHOICES } from "./months";
 
 const STATE_LABELS = { draft: "مسودة", incomplete: "غير مكتمل", posted: "مرحّل" };
 
@@ -61,14 +62,7 @@ const KEPT_STATE_FIELDS = [
     "sortField", "sortDir",
 ];
 
-const LEDGER_MONTH_OPTIONS = [
-    { value: "1", label: "1 - يناير" }, { value: "2", label: "2 - فبراير" },
-    { value: "3", label: "3 - مارس" }, { value: "4", label: "4 - أبريل" },
-    { value: "5", label: "5 - مايو" }, { value: "6", label: "6 - يونيو" },
-    { value: "7", label: "7 - يوليو" }, { value: "8", label: "8 - أغسطس" },
-    { value: "9", label: "9 - سبتمبر" }, { value: "10", label: "10 - أكتوبر" },
-    { value: "11", label: "11 - نوفمبر" }, { value: "12", label: "12 - ديسمبر" },
-];
+const LEDGER_MONTH_OPTIONS = MONTH_CHOICES;
 
 export class MoveList extends Component {
     static template = "my_accounting.MoveList";

@@ -5,13 +5,9 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { loadLedgerYears } from "./ledger_years";
+import { MONTH_NAMES, monthName as monthNameOf } from "./months";
 import { openRecord } from "./open_record";
 import { usePrintPageSize } from "./print_page_size";
-
-const MONTHS = [
-    "كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران",
-    "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول",
-];
 
 // الفترات الضريبية المعتادة: شهران معاً، وآخرها يعبر إلى السنة التالية
 const PAIRS = [[2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 1]];
@@ -43,7 +39,7 @@ export class TaxReturn extends Component {
         this.actionService = useService("action");
         this.dialog = useService("dialog");
         this.notification = useService("notification");
-        this.months = MONTHS;
+        this.months = MONTH_NAMES;
         this.pairs = PAIRS;
         this.printPage = usePrintPageSize("A4 portrait", "5mm");
         this.state = useState({
@@ -447,7 +443,7 @@ export class TaxReturn extends Component {
     }
 
     monthName(number) {
-        return MONTHS[Number(number) - 1] || "";
+        return monthNameOf(number);
     }
 
     isPair(pair) {
