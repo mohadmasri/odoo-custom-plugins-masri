@@ -229,14 +229,21 @@ export class Payroll extends Component {
         this.state.monthSheet = sheet;
     }
 
-    /** الكشف المعروض من الشهر: الكل أو واحد بعينه */
+    /** الكشف المعروض من الشهر: الكل أو واحد بعينه.
+
+        وفي كل قسم «start»: عدد من قبله، فيتصل ترقيم الموظفين عبر الكشوف.
+     */
     get visibleSections() {
         const sheet = this.state.monthSheet;
-        if (sheet === "all") {
-            return this.sheetSections;
-        }
-        return this.sheetSections.filter(
-            (section) => section.key === (sheet === "none" ? "none" : `g${sheet}`));
+        const shown = sheet === "all" ? this.sheetSections
+            : this.sheetSections.filter(
+                (section) => section.key === (sheet === "none" ? "none" : `g${sheet}`));
+        let start = 0;
+        return shown.map((section) => {
+            const numbered = Object.assign({}, section, { start });
+            start += section.lines.length;
+            return numbered;
+        });
     }
 
     /** مجاميع ما هو معروض، فيطبع الكشف الواحد مجموعه هو */

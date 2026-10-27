@@ -155,6 +155,7 @@
                     <table class="table table-bordered table-sm o_pr_table o_pr_month">
                         <thead>
                             <tr>
+                                <th class="text-center" style="width:44px;">م</th>
                                 <th style="width:170px;">الموظف</th>
                                 <th class="text-end" style="width:96px;">الأساسي</th>
                                 <th class="text-end" style="width:96px;">العلاوات</th>
@@ -172,6 +173,8 @@
                         <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
                         <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
                             <tr t-foreach="section.lines" t-as="line" t-key="line.id">
+                                <td class="text-center text-muted"
+                                    t-esc="section.start + line_index + 1"/>
                                 <td>
                                     <t t-esc="line.employee"/>
                                     <div t-if="line.job_title" class="o_pr_job"
@@ -219,21 +222,21 @@
                         </tbody>
                         <tbody t-if="!data.lines.length">
                             <tr>
-                                <td colspan="12" class="text-muted text-center py-2">
+                                <td colspan="13" class="text-muted text-center py-2">
                                     لا بنود. أضف موظفين ثم «أعد البناء».
                                 </td>
                             </tr>
                         </tbody>
                         <tbody t-elif="!visibleSections.length">
                             <tr>
-                                <td colspan="12" class="text-muted text-center py-2">
+                                <td colspan="13" class="text-muted text-center py-2">
                                     لا بنود في هذا الكشف.
                                 </td>
                             </tr>
                         </tbody>
                         <tfoot>
                             <tr class="o_pr_total">
-                                <td>
+                                <td colspan="2">
                                     <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
                                     <t t-else="">مجموع الكشف</t>
                                 </td>
