@@ -723,15 +723,19 @@ class MyAccountingPayroll(models.Model):
         return self._payload()
 
     def _post_sheet(self, sheet, settings):
-        """قيد كشفٍ واحد من بنوده وحدها."""
+        """قيد كشفٍ واحد، ببنوده وترتيبها كما يكتبها هو (انظر قيده 1/9):
+
+        المصروف، ثم الصافي تحويلاً ثم شيكاتٍ، ثم ضمان الموظف وضريبته
+        وتقاعده كلٌّ في بنده، ثم حصة الشركة من الضمان بندين: مديناً على
+        حسابها ودائناً على الضمان. وضمان الموظف وحصة الشركة لا يُجمعان.
+        """
         self.ensure_one()
         lines = self._sheet_lines(sheet)
         if not lines:
             raise UserError('لا بنود في هذا الكشف.')
         group = lines[0].group_id
-        label = 'رواتب شهر %s/%s' % (self.month, self.year)
-        if group:
-            label = '%s — %s' % (label, group.name)
+        period = '%s/%s' % (self.month, self.year)
+        label = '%s شهر %s' % (group.name or 'رواتب', period)
 
         payloads = [line._payload() for line in lines]
 
@@ -739,68 +743,69 @@ class MyAccountingPayroll(models.Model):
             return round(sum(item[key] for item in payloads), 3)
 
         entries = []
-        # المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام.
-        # وحصة الشركة من الضمان تتبع حساب الراتب نفسه: راتب المشروع تذهب
-        # حصته إلى حساب المشروع، وراتب المكتب إلى حساب اشتراك الضمان.
+
+        def add(account, name, debit=0.0, credit=0.0):
+            """بندٌ في آخر القيد، برقم ترتيبٍ يحفظ له مكانه."""
+            account_id = account.id if hasattr(account, 'id') else account
+            if not account_id or not (debit or credit):
+                return
+            entries.append((0, 0, {
+                'sequence': 10 * (len(entries) + 1),
+                'account_id': account_id,
+                'name': name,
+                'debit': debit,
+                'credit': credit,
+            }))
+
+        # 1) المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام
         by_account = {}
-        employer_by_account = self._employer_share(lines)
-        by_payment = {}
         for line in lines:
             account = line.account_id or settings.expense_account_id
             gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
             by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
-            payment = line.payment_account_id or settings.payment_account_id
-            net = line._payload()['net']
-            if net:
-                # الصافي يُقسم على جهة الدفع وطريقة الصرف: سطرٌ للتحويل
-                # وسطرٌ للشيكات على الحساب نفسه، كما في قيوده
-                method = line.employee_id.payment_method or 'transfer'
-                key = (payment.id, method)
-                by_payment[key] = round(by_payment.get(key, 0.0) + net, 3)
         for account_id, amount in by_account.items():
-            if amount:
-                entries.append((0, 0, {'account_id': account_id, 'name': label,
-                                       'debit': amount, 'credit': 0.0}))
-        for account_id, amount in employer_by_account.items():
-            if amount:
-                entries.append((0, 0, {
-                    'account_id': account_id,
-                    'name': 'حصة الشركة من الضمان %s' % label,
-                    'debit': amount, 'credit': 0.0}))
-        employer = round(sum(employer_by_account.values()), 3)
-        social = round(total('employee_social') + employer, 3)
-        if social:
-            entries.append((0, 0, {
-                'account_id': settings.social_account_id.id,
-                'name': 'الضمان الاجتماعي %s' % label,
-                'debit': 0.0, 'credit': social}))
-        if total('income_tax'):
-            entries.append((0, 0, {
-                'account_id': settings.tax_account_id.id,
-                'name': 'ضريبة الدخل %s' % label,
-                'debit': 0.0, 'credit': total('income_tax')}))
-        if total('pension'):
-            if not settings.pension_account_id:
-                raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
-            entries.append((0, 0, {
-                'account_id': settings.pension_account_id.id,
-                'name': 'صندوق التقاعد %s' % label,
-                'debit': 0.0, 'credit': total('pension')}))
-        if total('other_deduction'):
-            if not settings.other_account_id:
-                raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
-            entries.append((0, 0, {
-                'account_id': settings.other_account_id.id,
-                'name': 'استقطاعات أخرى %s' % label,
-                'debit': 0.0, 'credit': total('other_deduction')}))
+            add(account_id, label, debit=amount)
+
+        # 2) الصافي: سطرٌ للتحويل وسطرٌ للشيكات على كل جهة دفع
+        by_payment = {}
+        for line, data in zip(lines, payloads):
+            if not data['net']:
+                continue
+            payment = line.payment_account_id or settings.payment_account_id
+            method = line.employee_id.payment_method or 'transfer'
+            key = (payment.id, method)
+            by_payment[key] = round(by_payment.get(key, 0.0) + data['net'], 3)
         for (account_id, method), amount in sorted(
                 by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
                                                       item[0][0])):
-            if amount:
-                entries.append((0, 0, {
-                    'account_id': account_id,
-                    'name': ('شيكات %s' % label) if method == 'cheque' else label,
-                    'debit': 0.0, 'credit': amount}))
+            add(account_id, 'شيكات' if method == 'cheque' else label, credit=amount)
+
+        # 3) استقطاعات الموظف، كلٌّ في بنده
+        add(settings.social_account_id, 'ضمان شهر %s' % period,
+            credit=total('employee_social'))
+        add(settings.tax_account_id, 'ذمم دخل %s' % period,
+            credit=total('income_tax'))
+        if total('pension') and not settings.pension_account_id:
+            raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
+        add(settings.pension_account_id, 'ذمم تقاعد %s' % period,
+            credit=total('pension'))
+        if total('other_deduction') and not settings.other_account_id:
+            raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
+        add(settings.other_account_id, 'استقطاعات أخرى شهر %s' % period,
+            credit=total('other_deduction'))
+
+        # 4) حصة الشركة من الضمان: مدينٌ على حسابها، ودائنٌ على الضمان.
+        # وهي تتبع حساب الراتب: راتب المشروع حصته على حساب المشروع،
+        # وراتب المكتب على حساب اشتراك الضمان.
+        office = settings.employer_expense_account_id
+        for account_id, amount in self._employer_share(lines).items():
+            own = account_id == office.id
+            add(account_id,
+                'ما يخص المكتب' if own else 'اشتراك الضمان %s' % label,
+                debit=amount)
+            add(settings.social_account_id,
+                label if own else 'ما يخص الشركة',
+                credit=amount)
 
         # القيد يدخل كأي قيدٍ جديد: رقمه وتاريخه وشهره المحاسبي من
         # افتراضات القيد نفسها، فلا ترقيم خاصّ بالرواتب
