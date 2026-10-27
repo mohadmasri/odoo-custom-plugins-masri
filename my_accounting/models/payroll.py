@@ -178,6 +178,8 @@ class MyAccountingEmployee(models.Model):
     social_number = fields.Char(string='رقم الضمان')
     phone = fields.Char(string='الهاتف')
     address = fields.Char(string='العنوان')
+    payment_method = fields.Selection([('transfer', 'تحويل'), ('cheque', 'شيك')],
+                                      string='طريقة الصرف', default='transfer')
 
     basic_salary = fields.Float(string='الراتب الأساسي', digits=(16, 3))
     allowance = fields.Float(string='العلاوات', digits=(16, 3))
@@ -222,6 +224,7 @@ class MyAccountingEmployee(models.Model):
             'social_number': self.social_number or '',
             'phone': self.phone or '',
             'address': self.address or '',
+            'payment_method': self.payment_method or 'transfer',
             'basic_salary': self.basic_salary,
             'allowance': self.allowance,
             'gross': gross,
@@ -241,8 +244,10 @@ class MyAccountingEmployee(models.Model):
     # بطاقة الموظف
     # ------------------------------------------------------------------
 
-    CARD_FIELDS = ('name', 'job_title', 'hire_date', 'national_id',
-                   'social_number', 'phone', 'address', 'note')
+    CARD_TEXT = ('name', 'job_title', 'national_id', 'social_number',
+                 'phone', 'address', 'note')
+    CARD_MONEY = ('basic_salary', 'allowance', 'social_base', 'income_tax',
+                  'pension', 'other_deduction')
 
     def _card_history(self):
         """سجلّ الموظف الشهري من كشوف الرواتب، أحدثها أولاً."""
@@ -312,18 +317,80 @@ class MyAccountingEmployee(models.Model):
         return employee._card()
 
     @api.model
+    def new_employee_card(self, group_id=False, sequence=10):
+        """بطاقة فارغة لموظفٍ جديد، على كشفٍ إن كان معروضاً."""
+        group = self.env['myaccounting.payroll.group'].browse(
+            int(group_id)) if group_id else self.env['myaccounting.payroll.group']
+        employee = {
+            'id': False,
+            'name': '',
+            'sequence': int(sequence or 10),
+            'group_id': group.id or False,
+            'group': group.name or '',
+            'job_title': '',
+            'hire_date': '',
+            'active': True,
+            'national_id': '',
+            'social_number': '',
+            'phone': '',
+            'address': '',
+            'payment_method': 'transfer',
+            'basic_salary': 0.0,
+            'allowance': 0.0,
+            'gross': 0.0,
+            'social_security': True,
+            'social_base': 0.0,
+            'income_tax': 0.0,
+            'pension': 0.0,
+            'other_deduction': 0.0,
+            'account_id': False,
+            'account': '',
+            'payment_account_id': False,
+            'payment_account': '',
+            'note': '',
+        }
+        return {
+            'employee': employee,
+            'social_base': 0.0,
+            'employee_social': 0.0,
+            'net': 0.0,
+            'expense_account': group.account_id.name or '',
+            'payment_account': group.payment_account_id.name or '',
+            'from_group': bool(group.account_id),
+            'history': [],
+            'months': 0,
+            'totals': {key: 0.0 for key in (
+                'basic_salary', 'allowance', 'gross', 'employee_social', 'income_tax',
+                'pension', 'other_deduction', 'total_deduction', 'net')},
+        }
+
+    @api.model
     def save_employee_card(self, employee_id, values):
-        """يحفظ بيانات البطاقة وحدها: الراتب يُعدَّل من جدول الموظفين."""
-        employee = self.with_context(active_test=False).browse(int(employee_id))
-        if not employee.exists():
-            raise UserError('لا بطاقة لهذا الموظف.')
-        name = ((values or {}).get('name') or '').strip()
+        """يحفظ البطاقة كاملةً، وينشئ الموظف إن كانت بطاقة موظفٍ جديد."""
+        values = values or {}
+        name = (values.get('name') or '').strip()
         if not name:
             raise UserError('لا بدّ للموظف من اسم.')
-        data = {field: (values or {}).get(field) or False
-                for field in self.CARD_FIELDS}
+        data = {field: values.get(field) or '' for field in self.CARD_TEXT}
+        data.update({field: float(values.get(field) or 0.0)
+                     for field in self.CARD_MONEY})
         data['name'] = name
-        employee.write(data)
+        data['sequence'] = int(values.get('sequence') or 10)
+        data['hire_date'] = values.get('hire_date') or False
+        data['social_security'] = bool(values.get('social_security'))
+        data['active'] = bool(values.get('active', True))
+        data['payment_method'] = values.get('payment_method') or 'transfer'
+        data['group_id'] = int(values['group_id']) if values.get('group_id') else False
+        data['account_id'] = int(values['account_id']) if values.get('account_id') else False
+        data['payment_account_id'] = (int(values['payment_account_id'])
+                                      if values.get('payment_account_id') else False)
+        if employee_id:
+            employee = self.with_context(active_test=False).browse(int(employee_id))
+            if not employee.exists():
+                raise UserError('لا بطاقة لهذا الموظف.')
+            employee.write(data)
+        else:
+            employee = self.create(data)
         return employee._card()
 
     @api.model
@@ -352,6 +419,7 @@ class MyAccountingEmployee(models.Model):
                 'social_number': item.get('social_number') or '',
                 'phone': item.get('phone') or '',
                 'address': item.get('address') or '',
+                'payment_method': item.get('payment_method') or 'transfer',
                 'basic_salary': float(item.get('basic_salary') or 0.0),
                 'allowance': float(item.get('allowance') or 0.0),
                 'social_security': bool(item.get('social_security')),
@@ -563,6 +631,7 @@ class MyAccountingPayroll(models.Model):
         payroll = self.browse(int(payroll_id))
         posted = {key for key, _group in payroll._sheets() if payroll._sheet_move(key)}
         by_id = {line.id: line for line in payroll.line_ids}
+        changed = self.env['myaccounting.payroll.line']
         names = ('basic_salary', 'allowance', 'social_base', 'employee_social',
                  'employer_social', 'income_tax', 'pension', 'other_deduction')
         for item in items or []:
@@ -578,7 +647,38 @@ class MyAccountingPayroll(models.Model):
                 raise UserError('كشف «%s» له قيد، فلا تُعدَّل بنوده.'
                                 % (line.group_id.name or 'بلا كشف'))
             line.write(values)
+            changed |= line
+        if changed:
+            payroll._apply_to_cards(changed)
         return payroll._payload()
+
+    def _apply_to_cards(self, lines):
+        """تعديل الكشف يسري على بطاقة الموظف ومن ذلك الشهر فصاعداً.
+
+        فمن رُفع راتبه في شهرٍ يُرفع على بطاقته، فتأخذه الأشهر التي تُبنى
+        بعدها، وتأخذه كشوف الأشهر التالية الموجودة ما دامت مسودةً. وما
+        رُحِّل من الأشهر لا يُمسّ.
+        """
+        self.ensure_one()
+        names = ('basic_salary', 'allowance', 'social_base', 'employee_social',
+                 'income_tax', 'pension', 'other_deduction')
+        later = self.search([]).filtered(
+            lambda payroll: (payroll.year, int(payroll.month))
+                            > (self.year, int(self.month)))
+        for line in lines:
+            values = {name: line[name] for name in names}
+            # البطاقة لا تحفظ حصة الموظف من الضمان، فهي تُحتسب بالنسبة
+            line.employee_id.write({name: value for name, value in values.items()
+                                    if name != 'employee_social'})
+            for payroll in later:
+                twin = payroll.line_ids.filtered(
+                    lambda item: item.employee_id == line.employee_id)
+                if not twin:
+                    continue
+                key = str(twin[0].group_id.id) if twin[0].group_id else 'none'
+                if payroll._sheet_move(key):
+                    continue
+                twin.write(values)
 
     def delete_payroll(self):
         for payroll in self:

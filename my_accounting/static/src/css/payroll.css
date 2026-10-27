@@ -48,11 +48,6 @@
     font-size: 0.8rem;
 }
 
-.o_pr_job {
-    font-size: 0.75rem;
-    color: var(--gray-600, #6c757d);
-}
-
 .o_pr_calc {
     background: var(--o-surface-2, #f7f8fa);
     font-weight: 600;
@@ -250,4 +245,12 @@
 
 .o_pr_hist {
     min-width: 1130px;
+}
+
+.o_pr_card_calc {
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    background: var(--o-surface-2, #f2f3f5);
+    color: var(--body-color, #212529);
 }

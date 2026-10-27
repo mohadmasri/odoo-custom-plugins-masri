@@ -398,6 +398,7 @@ export class Payroll extends Component {
     }
 
     editEmployee(employee, field, ev) {
+        // المسمّى والبيانات الشخصية تُعدَّل من البطاقة، والجدول للراتب
         const numbers = ["sequence", "basic_salary", "allowance", "social_base",
                          "income_tax", "pension", "other_deduction"];
         if (numbers.includes(field)) {
@@ -490,16 +491,20 @@ export class Payroll extends Component {
         return employee.payment_account_id ? `${employee.payment_account_id}` : "";
     }
 
-    addEmployee() {
+    /** الموظف الجديد يُدخل من بطاقته لا من سطرٍ في الجدول */
+    async newEmployeeCard() {
+        if (this.employeesDirty) {
+            this.notification.add("احفظ تغييرات الجدول قبل فتح بطاقة جديدة.",
+                                  { type: "warning" });
+            return;
+        }
         const group = this.currentGroup;
-        this.state.employees.push(keyed([{
-            id: false, name: "موظف جديد", sequence: 10 * (this.state.employees.length + 1),
-            group_id: group ? group.id : false, group: group ? group.name : "",
-            job_title: "", hire_date: "", active: true, basic_salary: 0, allowance: 0,
-            gross: 0, social_security: true, social_base: 0, income_tax: 0,
-            pension: 0, other_deduction: 0, account_id: false, account: "",
-            payment_account_id: false, payment_account: "", note: "",
-        }])[0]);
+        await this.withBusy(async () => {
+            const card = await this.orm.call("myaccounting.employee",
+                "new_employee_card",
+                [group ? group.id : false, 10 * (this.state.employees.length + 1)]);
+            this.setCard(card);
+        });
     }
 
     removeEmployee(employee) {
@@ -593,7 +598,7 @@ export class Payroll extends Component {
     // بطاقة الموظف
     // ------------------------------------------------------------------
 
-    /** بيانات البطاقة وحدها: الراتب يُعدَّل من الجدول */
+    /** بيانات الموظف الشخصية والوظيفية */
     get cardFields() {
         return [
             { name: "name", label: "الاسم", type: "text" },
@@ -605,6 +610,95 @@ export class Payroll extends Component {
             { name: "address", label: "العنوان", type: "text" },
             { name: "note", label: "ملاحظة", type: "text" },
         ];
+    }
+
+    /** مكوّنات راتبه الشهري، تُعدَّل من البطاقة كما تُعدَّل من الجدول */
+    get cardMoneyFields() {
+        return [
+            { name: "basic_salary", label: "الراتب الأساسي" },
+            { name: "allowance", label: "العلاوات" },
+            { name: "social_base", label: "الخاضع للضمان" },
+            { name: "income_tax", label: "ضريبة الدخل" },
+            { name: "pension", label: "صندوق التقاعد" },
+            { name: "other_deduction", label: "استقطاعات أخرى" },
+        ];
+    }
+
+    get cardNumbers() {
+        return [...this.cardMoneyFields.map((field) => field.name), "sequence"];
+    }
+
+    get cardFlags() {
+        return ["social_security", "active"];
+    }
+
+    get cardTitle() {
+        return this.state.card.employee.id
+            ? this.state.card.employee.name
+            : "بطاقة موظف جديد";
+    }
+
+    /** الراتب محسوباً على الشاشة، فيتحرّك مع التعديل قبل الحفظ */
+    get cardGross() {
+        const draft = this.state.cardDraft;
+        return this.round((draft.basic_salary || 0) + (draft.allowance || 0));
+    }
+
+    get cardBase() {
+        const draft = this.state.cardDraft;
+        if (!draft.social_security) {
+            return 0;
+        }
+        return draft.social_base || this.cardGross;
+    }
+
+    get cardSocial() {
+        const rate = this.state.settings ? this.state.settings.employee_rate : 0;
+        return this.round((this.cardBase * rate) / 100);
+    }
+
+    get cardNet() {
+        const draft = this.state.cardDraft;
+        return this.round(this.cardGross - this.cardSocial - (draft.income_tax || 0)
+                          - (draft.pension || 0) - (draft.other_deduction || 0));
+    }
+
+    get cardGroupToken() {
+        return this.state.cardDraft.group_id ? `${this.state.cardDraft.group_id}` : "";
+    }
+
+    onCardGroup(token) {
+        this.state.cardDraft.group_id = parseInt(token, 10) || false;
+    }
+
+    get cardAccountToken() {
+        return this.state.cardDraft.account_id ? `${this.state.cardDraft.account_id}` : "";
+    }
+
+    onCardAccount(token) {
+        this.state.cardDraft.account_id = parseInt(token, 10) || false;
+    }
+
+    get cardPaymentToken() {
+        return this.state.cardDraft.payment_account_id
+            ? `${this.state.cardDraft.payment_account_id}` : "";
+    }
+
+    onCardPayment(token) {
+        this.state.cardDraft.payment_account_id = parseInt(token, 10) || false;
+    }
+
+    /** الفارغ يرث حساب كشفه، فنُظهر في الحقل ما سيورثه */
+    get cardGroupAccount() {
+        const group = this.state.groups.find(
+            (item) => item.id === this.state.cardDraft.group_id);
+        return (group && group.account) || "حساب الرواتب العام";
+    }
+
+    get cardGroupPayment() {
+        const group = this.state.groups.find(
+            (item) => item.id === this.state.cardDraft.group_id);
+        return (group && group.payment_account) || "حساب الدفع العام";
     }
 
     async openCard(employee) {
@@ -627,11 +721,22 @@ export class Payroll extends Component {
 
     setCard(card) {
         this.state.card = card;
-        this.state.cardDraft = {};
+        const draft = {};
         for (const field of this.cardFields) {
-            this.state.cardDraft[field.name] = card.employee[field.name] || "";
+            draft[field.name] = card.employee[field.name] || "";
         }
-        this.saved.card = clone(this.state.cardDraft);
+        for (const name of this.cardNumbers) {
+            draft[name] = card.employee[name] || 0;
+        }
+        for (const name of this.cardFlags) {
+            draft[name] = !!card.employee[name];
+        }
+        draft.payment_method = card.employee.payment_method || "transfer";
+        draft.group_id = card.employee.group_id || false;
+        draft.account_id = card.employee.account_id || false;
+        draft.payment_account_id = card.employee.payment_account_id || false;
+        this.state.cardDraft = draft;
+        this.saved.card = clone(draft);
     }
 
     closeCard() {
@@ -640,7 +745,15 @@ export class Payroll extends Component {
     }
 
     editCard(field, ev) {
-        this.state.cardDraft[field] = ev.target.value;
+        if (this.cardNumbers.includes(field)) {
+            this.state.cardDraft[field] = field === "sequence"
+                ? parseInt(ev.target.value, 10) || 0
+                : parseFloat(ev.target.value) || 0;
+        } else if (this.cardFlags.includes(field)) {
+            this.state.cardDraft[field] = ev.target.checked;
+        } else {
+            this.state.cardDraft[field] = ev.target.value;
+        }
     }
 
     get cardDirty() {
@@ -649,13 +762,15 @@ export class Payroll extends Component {
 
     async saveCard() {
         await this.withBusy(async () => {
+            const isNew = !this.state.card.employee.id;
             const card = await this.orm.call("myaccounting.employee",
                 "save_employee_card",
                 [this.state.card.employee.id, clone(this.state.cardDraft)]);
             this.setCard(card);
-            // الجدول يحمل الاسم والمسمّى نفسيهما، فيُحدَّث معهما
+            // الجدول يحمل بيانات البطاقة نفسها، فيُحدَّث معها
             await this.loadSettings();
-            this.notification.add("حُفظت البطاقة.", { type: "success" });
+            this.notification.add(isNew ? "أُضيف الموظف." : "حُفظت البطاقة.",
+                                  { type: "success" });
         });
     }
 

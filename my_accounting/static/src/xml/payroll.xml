@@ -175,11 +175,7 @@
                             <tr t-foreach="section.lines" t-as="line" t-key="line.id">
                                 <td class="text-center text-muted"
                                     t-esc="section.start + line_index + 1"/>
-                                <td>
-                                    <t t-esc="line.employee"/>
-                                    <div t-if="line.job_title" class="o_pr_job"
-                                         t-esc="line.job_title"/>
-                                </td>
+                                <td t-esc="line.employee"/>
                                 <t t-if="!section.posted">
                                     <td t-foreach="['basic_salary', 'allowance']" t-as="field"
                                         t-key="field">
@@ -286,16 +282,19 @@
                 <div class="o_pr_card">
                     <div class="o_pr_card_head">
                         <div>
-                            <div class="o_pr_card_name" t-esc="state.card.employee.name"/>
+                            <div class="o_pr_card_name" t-esc="cardTitle"/>
                             <div class="small text-muted">
-                                <t t-esc="state.card.employee.job_title or 'بلا مسمّى'"/> ·
+                                <t t-esc="state.cardDraft.job_title or 'بلا مسمّى'"/> ·
                                 كشف <t t-esc="state.card.employee.group or 'بلا كشف'"/>
-                                <t t-if="!state.card.employee.active"> · ليس على رأس عمله</t>
+                                <t t-if="!state.cardDraft.active"> · ليس على رأس عمله</t>
                             </div>
                         </div>
                         <div class="text-end small text-muted">
-                            <div>الصافي الشهري <b t-esc="fmt(state.card.net)"/></div>
-                            <div><t t-esc="state.card.months"/> شهراً في السجلّ</div>
+                            <div>الصافي الشهري <b t-esc="fmt(cardNet)"/></div>
+                            <div t-if="state.card.employee.id">
+                                <t t-esc="state.card.months"/> شهراً في السجلّ
+                            </div>
+                            <div t-else="">موظف جديد لم يُحفظ بعد</div>
                         </div>
                     </div>
 
@@ -311,53 +310,95 @@
                         </div>
                     </div>
 
-                    <div class="o_pr_card_sub">مكوّنات الراتب <span class="small text-muted">
-                        (تُعدَّل من جدول الموظفين)</span></div>
-                    <table class="table table-bordered table-sm o_pr_table o_pr_wide">
-                        <tbody>
-                            <tr>
-                                <th>الأساسي</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.basic_salary)"/>
-                                <th>العلاوات</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.allowance)"/>
-                                <th>الإجمالي</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.gross)"/>
-                            </tr>
-                            <tr>
-                                <th>مشمول بالضمان</th>
-                                <td t-esc="state.card.employee.social_security ? 'نعم' : 'لا'"/>
-                                <th>الخاضع للضمان</th>
-                                <td class="text-end" t-esc="fmt(state.card.social_base)"/>
-                                <th>ضمان الموظف</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee_social)"/>
-                            </tr>
-                            <tr>
-                                <th>ضريبة الدخل</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.income_tax)"/>
-                                <th>صندوق التقاعد</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.pension)"/>
-                                <th>استقطاعات أخرى</th>
-                                <td class="text-end" t-esc="fmt(state.card.employee.other_deduction)"/>
-                            </tr>
-                            <tr>
-                                <th>الصافي الشهري</th>
-                                <td class="text-end" t-esc="fmt(state.card.net)"/>
-                                <th/>
-                                <td/>
-                                <th/>
-                                <td/>
-                            </tr>
-                            <tr>
-                                <th>حساب المصروف</th>
-                                <td colspan="2" t-esc="state.card.expense_account or 'حساب الرواتب العام'"/>
-                                <th>يُدفع من</th>
-                                <td colspan="2" t-esc="state.card.payment_account or 'حساب الدفع العام'"/>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="o_pr_card_sub">راتبه الشهري</div>
+                    <div class="o_pr_card_grid">
+                        <div class="o_pr_card_field" t-foreach="cardMoneyFields" t-as="field"
+                             t-key="field.name">
+                            <label class="form-label small mb-0" t-esc="field.label"/>
+                            <input type="number" step="0.001"
+                                   class="form-control form-control-sm text-end"
+                                   t-att-value="state.cardDraft[field.name]"
+                                   t-on-change="(ev) => this.editCard(field.name, ev)"/>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">مشمول بالضمان</label>
+                            <div class="form-check m-0">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="state.cardDraft.social_security"
+                                       t-on-change="(ev) => this.editCard('social_security', ev)"/>
+                                <span class="small text-muted ms-1">
+                                    الخاضع فارغاً يُحتسب على الإجمالي
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
-                    <div class="o_pr_card_sub">سجلّه الشهري</div>
-                    <table class="table table-bordered table-sm o_pr_table o_pr_hist">
+                    <div class="o_pr_card_calc">
+                        الإجمالي <b t-esc="fmt(cardGross)"/> ·
+                        الخاضع للضمان <b t-esc="fmt(cardBase)"/> ·
+                        ضمان الموظف <b t-esc="fmt(cardSocial)"/> ·
+                        الصافي <b t-esc="fmt(cardNet)"/>
+                    </div>
+
+                    <div class="o_pr_card_sub">كشفه وصرف راتبه</div>
+                    <div class="o_pr_card_grid">
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">الكشف</label>
+                            <RefPicker value="cardGroupToken"
+                                       options="groupOptions"
+                                       disabled="state.busy"
+                                       placeholder="'بلا كشف'"
+                                       onSelect="(token) => this.onCardGroup(token)"/>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">شيك أو تحويل</label>
+                            <select class="form-select form-select-sm"
+                                    t-on-change="(ev) => this.editCard('payment_method', ev)">
+                                <option value="transfer"
+                                        t-att-selected="state.cardDraft.payment_method === 'transfer'">
+                                    تحويل
+                                </option>
+                                <option value="cheque"
+                                        t-att-selected="state.cardDraft.payment_method === 'cheque'">
+                                    شيك
+                                </option>
+                            </select>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">حساب المصروف</label>
+                            <RefPicker value="cardAccountToken"
+                                       options="state.accountOptions"
+                                       disabled="state.busy"
+                                       placeholder="cardGroupAccount"
+                                       onSelect="(token) => this.onCardAccount(token)"/>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">يُدفع من</label>
+                            <RefPicker value="cardPaymentToken"
+                                       options="state.accountOptions"
+                                       disabled="state.busy"
+                                       placeholder="cardGroupPayment"
+                                       onSelect="(token) => this.onCardPayment(token)"/>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">الترتيب</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   t-att-value="state.cardDraft.sequence"
+                                   t-on-change="(ev) => this.editCard('sequence', ev)"/>
+                        </div>
+                        <div class="o_pr_card_field">
+                            <label class="form-label small mb-0">على رأس عمله</label>
+                            <div class="form-check m-0">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="state.cardDraft.active"
+                                       t-on-change="(ev) => this.editCard('active', ev)"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div t-if="state.card.employee.id" class="o_pr_card_sub">سجلّه الشهري</div>
+                    <table t-if="state.card.employee.id"
+                           class="table table-bordered table-sm o_pr_table o_pr_hist">
                         <thead>
                             <tr>
                                 <th style="width:150px;">الشهر</th>
@@ -464,9 +505,9 @@
                     <thead>
                         <tr>
                             <th style="width:60px;">ترتيب</th>
+                            <th class="text-center" style="width:44px;">بطاقة</th>
                             <th style="width:170px;">الاسم</th>
                             <th style="width:140px;">الكشف</th>
-                            <th style="width:110px;">المسمّى</th>
                             <th class="text-end" style="width:96px;">الأساسي</th>
                             <th class="text-end" style="width:96px;">العلاوات</th>
                             <th class="text-center" style="width:56px;">ضمان</th>
@@ -477,7 +518,7 @@
                             <th style="width:170px;">حساب المصروف</th>
                             <th style="width:170px;">يُدفع من</th>
                             <th class="text-center" style="width:56px;">فعّال</th>
-                            <th style="width:64px;"/>
+                            <th style="width:40px;"/>
                         </tr>
                     </thead>
                     <tbody>
@@ -486,6 +527,13 @@
                                 <input type="number" class="form-control form-control-sm"
                                        t-att-value="employee.sequence"
                                        t-on-change="(ev) => this.editEmployee(employee, 'sequence', ev)"/>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-link p-0"
+                                        title="بطاقة الموظف"
+                                        t-on-click="() => this.openCard(employee)">
+                                    <i class="fa fa-id-card-o"/>
+                                </button>
                             </td>
                             <td>
                                 <input type="text" class="form-control form-control-sm"
@@ -498,11 +546,6 @@
                                            disabled="state.busy"
                                            placeholder="'بلا كشف'"
                                            onSelect="(token) => this.onEmployeeGroup(employee, token)"/>
-                            </td>
-                            <td>
-                                <input type="text" class="form-control form-control-sm"
-                                       t-att-value="employee.job_title"
-                                       t-on-change="(ev) => this.editEmployee(employee, 'job_title', ev)"/>
                             </td>
                             <td t-foreach="['basic_salary', 'allowance']" t-as="field" t-key="field">
                                 <input type="number" step="0.001"
@@ -542,11 +585,6 @@
                                        t-on-change="(ev) => this.editEmployee(employee, 'active', ev)"/>
                             </td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-link p-0 me-1"
-                                        title="بطاقة الموظف"
-                                        t-on-click="() => this.openCard(employee)">
-                                    <i class="fa fa-id-card-o"/>
-                                </button>
                                 <button class="btn btn-sm btn-link text-danger p-0"
                                         title="حذف الموظف"
                                         t-on-click="() => this.removeEmployee(employee)">
@@ -560,8 +598,7 @@
                     </tbody>
                     <tfoot t-if="visibleEmployees.length">
                         <tr class="o_pr_total">
-                            <td colspan="3">المجاميع</td>
-                            <td/>
+                            <td colspan="4">المجاميع</td>
                             <td class="text-end" t-esc="fmt(employeeTotals.basic_salary)"/>
                             <td class="text-end" t-esc="fmt(employeeTotals.allowance)"/>
                             <td/>
@@ -573,8 +610,10 @@
                         </tr>
                     </tfoot>
                 </table>
-                <button class="btn btn-sm btn-outline-secondary" t-on-click="() => this.addEmployee()">
-                    <i class="fa fa-plus me-1"/> موظف
+                <button class="btn btn-sm btn-outline-secondary"
+                        t-att-disabled="state.busy"
+                        t-on-click="() => this.newEmployeeCard()">
+                    <i class="fa fa-plus me-1"/> بطاقة موظف جديد
                     <t t-if="currentGroup"> في <t t-esc="currentGroup.name"/></t>
                 </button>
             </t>
