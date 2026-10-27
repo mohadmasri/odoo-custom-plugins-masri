@@ -798,29 +798,15 @@ class MyAccountingPayroll(models.Model):
                     'name': ('شيكات %s' % label) if method == 'cheque' else label,
                     'debit': 0.0, 'credit': amount}))
 
+        # القيد يدخل كأي قيدٍ جديد: رقمه وتاريخه وشهره المحاسبي من
+        # افتراضات القيد نفسها، فلا ترقيم خاصّ بالرواتب
         return self.env['myaccounting.move'].create({
-            'name': self._next_move_name(),
-            'date': self.date or fields.Date.context_today(self),
             'ref': label,
             'journal': 'رواتب',
-            'ledger_year': self.year,
-            'ledger_month': self.month,
             'payroll_id': self.id,
             'payroll_group_id': group.id or False,
             'line_ids': entries,
         })
-
-    def _next_move_name(self):
-        """رقم القيد في شهر الكشف: ما بعد آخر رقم في الشهر نفسه."""
-        self.ensure_one()
-        moves = self.env['myaccounting.move'].search([
-            ('ledger_year', '=', self.year), ('ledger_month', '=', self.month)])
-        numbers = []
-        for move in moves:
-            parts = (move.name or '').split('/')
-            if len(parts) == 2 and parts[0].strip().isdigit():
-                numbers.append(int(parts[0].strip()))
-        return '%d/%s' % ((max(numbers) + 1) if numbers else 1, self.month)
 
     def unpost_payroll(self, sheet='all'):
         """يفكّ ترحيل الكشف المعروض ويحذف قيده ما دام مسودة."""
