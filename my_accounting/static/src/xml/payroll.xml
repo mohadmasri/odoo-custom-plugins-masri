@@ -169,18 +169,8 @@
                                 <th class="text-end" style="width:96px;">ضمان الشركة</th>
                             </tr>
                         </thead>
-                        <!-- كل كشف في جسم جدول خاص: عنوانه وبنوده ومجاميعه -->
+                        <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
                         <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
-                            <tr class="o_pr_section" t-if="visibleSections.length > 1">
-                                <td colspan="12">
-                                    <t t-esc="section.name"/>
-                                    <span class="o_pr_count" t-esc="section.lines.length"/>
-                                    <a t-if="section.posted" href="#" class="o_pr_link ms-2 small"
-                                       t-custom-click="(ev, mid) => this.openMove(section.move_id, mid)">
-                                        قيد <t t-esc="section.move"/>
-                                    </a>
-                                </td>
-                            </tr>
                             <tr t-foreach="section.lines" t-as="line" t-key="line.id">
                                 <td>
                                     <t t-esc="line.employee"/>

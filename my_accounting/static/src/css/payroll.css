@@ -135,12 +135,6 @@
     .o_pr_calc {
         background: transparent;
     }
-
-    /* عنوان الكشف لا يُترك وحده في آخر الصفحة */
-    .o_pr_section {
-        break-inside: avoid;
-        break-after: avoid;
-    }
 }
 
 /* تبويبات الكشوف داخل صفحة الموظفين */
@@ -200,12 +194,6 @@
 .o_pr_table th {
     white-space: normal;
     line-height: 1.2;
-}
-
-.o_pr_section td {
-    font-weight: 700;
-    background: var(--o-surface-2, #eef1f5);
-    border-top: 2px solid var(--o-surface-border, #dee2e6);
 }
 
 /* خانة الاختيار داخل الجداول: تملأ عمودها، وقائمتها أوسع منه لتُقرأ الأسماء */
