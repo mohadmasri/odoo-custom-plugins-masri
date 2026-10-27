@@ -38,9 +38,9 @@
               parent="menu_myaccounting_root" sequence="43"
               action="action_myaccounting_reports"/>
 
-    <menuitem id="menu_myaccounting_trial_balance" name="ميزان المراجعة"
+    <menuitem id="menu_myaccounting_payroll" name="الرواتب"
               parent="menu_myaccounting_root" sequence="45"
-              action="action_myaccounting_trial_balance"/>
+              action="action_myaccounting_payroll"/>
 
     <menuitem id="menu_myaccounting_tax_return" name="الاقرار الضريبي"
               parent="menu_myaccounting_root" sequence="47"
@@ -62,9 +62,9 @@
               parent="menu_myaccounting_settings_root" sequence="1"
               action="action_myaccounting_settings"/>
 
-    <menuitem id="menu_myaccounting_payroll" name="الرواتب"
+    <menuitem id="menu_myaccounting_trial_balance" name="ميزان المراجعة"
               parent="menu_myaccounting_settings_root" sequence="4"
-              action="action_myaccounting_payroll"/>
+              action="action_myaccounting_trial_balance"/>
 
     <menuitem id="menu_myaccounting_blocks" name="الكتل الجاهزة"
               parent="menu_myaccounting_settings_root" sequence="3"
