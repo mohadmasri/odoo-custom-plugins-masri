@@ -713,8 +713,8 @@
                             </td>
                             <td class="text-center">
                                 <button class="btn btn-sm btn-link p-0"
-                                        title="بطاقة الموظف"
-                                        t-on-click="() => this.openCard(employee)">
+                                        title="بطاقة الموظف — الزرّ الأوسط يفتحها في تبويب جديد"
+                                        t-custom-click="(ev, mid) => this.openCard(employee, mid)">
                                     <i class="fa fa-id-card-o"/>
                                 </button>
                             </td>

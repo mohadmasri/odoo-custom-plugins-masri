@@ -4,6 +4,7 @@ import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { MONTH_OPTIONS } from "./months";
 import { registry } from "@web/core/registry";
+import { router } from "@web/core/browser/router";
 import { useService } from "@web/core/utils/hooks";
 import { RefPicker } from "./balance_sheet";
 import { openRecord } from "./open_record";
@@ -73,6 +74,8 @@ export class Payroll extends Component {
             await this.refresh();
             await this.loadSettings();
             this.state.loading = false;
+            // الرابط /odoo/action-.../<رقم> يفتح بطاقة ذلك الموظف وحدها
+            await this.openCardFromUrl();
         });
     }
 
@@ -777,10 +780,34 @@ export class Payroll extends Component {
         return (group && group.payment_account) || "حساب الدفع العام";
     }
 
-    async openCard(employee) {
+    /** بطاقة الرابط: ما فُتح في تبويبٍ جديد يُظهر صاحبه لا الجدول */
+    async openCardFromUrl() {
+        const employeeId = router.current.resId;
+        if (!employeeId || !this.state.employees.some(
+                (employee) => employee.id === employeeId)) {
+            return;
+        }
+        this.state.tab = "employees";
+        await this.openCard({ id: employeeId });
+    }
+
+    /** رابط البطاقة: /odoo/action-.../<رقم الموظف>، يفتحها وحدها */
+    cardHref(employeeId) {
+        return router.stateToUrl({
+            action: "my_accounting.action_myaccounting_payroll",
+            resId: employeeId,
+        });
+    }
+
+    async openCard(employee, isMiddleClick) {
         if (!employee.id) {
             this.notification.add("احفظ الموظف الجديد قبل فتح بطاقته.",
                                   { type: "warning" });
+            return;
+        }
+        if (isMiddleClick) {
+            // الزرّ الأوسط (أو Ctrl + نقر): تبويب جديد من المتصفح
+            window.open(this.cardHref(employee.id), "_blank", "noopener");
             return;
         }
         if (this.employeesDirty) {

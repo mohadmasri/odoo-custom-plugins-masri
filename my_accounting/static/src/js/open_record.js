@@ -54,4 +54,5 @@ export const CLICKABLE_PAGES = [
     ".o_photo_page",
     ".o_photo_batch",
     ".o_account_movements_panel",
+    ".o_payroll",
 ].join(",");
