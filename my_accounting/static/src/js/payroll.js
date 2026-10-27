@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
@@ -48,6 +48,7 @@ export class Payroll extends Component {
         this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
+        this.excelInput = useRef("excelInput");
         this.months = MONTHS;
         this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
         const today = new Date();
@@ -61,6 +62,9 @@ export class Payroll extends Component {
             groups: [],
             card: null,
             cardDraft: null,
+            excel: null,
+            excelName: "",
+            excelOptions: { edit: true, add: true, stop: true },
             sheet: "all",
             monthSheet: "all",
             settings: null,
@@ -115,6 +119,7 @@ export class Payroll extends Component {
 
     setTab(tab) {
         this.closeCard();
+        this.closeExcel();
         this.state.tab = tab;
     }
 
@@ -592,6 +597,82 @@ export class Payroll extends Component {
 
     cancelGroups() {
         this.state.groups = clone(this.saved.groups);
+    }
+
+    // ------------------------------------------------------------------
+    // رفع كشف إكسل: يعدّل البطاقات، والكشف يُبنى منها
+    // ------------------------------------------------------------------
+
+    pickExcel() {
+        if (this.employeesDirty) {
+            this.notification.add("احفظ تغييرات الجدول قبل رفع ملف.",
+                                  { type: "warning" });
+            return;
+        }
+        this.excelInput.el.click();
+    }
+
+    async onExcelFile(ev) {
+        const file = ev.target.files && ev.target.files[0];
+        ev.target.value = "";
+        if (!file) {
+            return;
+        }
+        const content = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+        });
+        await this.withBusy(async () => {
+            const plan = await this.orm.call("myaccounting.employee",
+                "preview_excel", [content]);
+            this.excelContent = content;
+            this.state.excelName = file.name;
+            this.state.excel = plan;
+        });
+    }
+
+    closeExcel() {
+        this.state.excel = null;
+        this.excelContent = null;
+    }
+
+    toggleExcel(option, ev) {
+        this.state.excelOptions[option] = ev.target.checked;
+    }
+
+    get excelCount() {
+        const plan = this.state.excel;
+        const options = this.state.excelOptions;
+        return (options.edit ? plan.changed.length : 0)
+             + (options.add ? plan.new.length : 0)
+             + (options.stop ? plan.stop.length : 0);
+    }
+
+    async applyExcel() {
+        await this.withBusy(async () => {
+            const done = await this.orm.call("myaccounting.employee", "apply_excel",
+                [this.excelContent, { ...this.state.excelOptions }]);
+            this.closeExcel();
+            await this.loadSettings();
+            const parts = [];
+            if (done.edited) {
+                parts.push(`عُدِّلت ${done.edited} بطاقة`);
+            }
+            if (done.added) {
+                parts.push(`أُضيفت ${done.added}`);
+            }
+            if (done.stopped) {
+                parts.push(`أُوقفت ${done.stopped}`);
+            }
+            if (done.groups.length) {
+                parts.push(`واستجدّ كشف ${done.groups.join("، ")}`);
+            }
+            this.notification.add(parts.length ? parts.join(" · ")
+                                               : "لا تغيير على البطاقات.",
+                                  { type: "success" });
+        });
     }
 
     // ------------------------------------------------------------------

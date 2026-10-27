@@ -254,3 +254,20 @@
     background: var(--o-surface-2, #f2f3f5);
     color: var(--body-color, #212529);
 }
+
+.o_pr_empty {
+    padding: 22px;
+    border: 1px dashed var(--gray-300, #dee2e6);
+    border-radius: 10px;
+    text-align: center;
+    color: var(--body-color, #212529);
+}
+
+/* كل تغييرٍ في سطره، فيُقرأ فرق البطاقة بلمحة */
+.o_pr_change {
+    display: block;
+}
+
+.o_pr_change s {
+    color: var(--gray-600, #6c757d);
+}

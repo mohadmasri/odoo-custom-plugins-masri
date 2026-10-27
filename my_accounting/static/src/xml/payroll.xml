@@ -29,7 +29,160 @@
                 </li>
             </ul>
 
+            <!-- خانة الملف مخفيّة، يفتحها زرّ «ارفع كشف إكسل» -->
+            <input type="file" class="d-none" t-ref="excelInput"
+                   accept=".xlsx"
+                   t-on-change="(ev) => this.onExcelFile(ev)"/>
+
             <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
+
+            <!-- ======================================= فرق كشف الإكسل -->
+            <t t-elif="state.excel">
+                <div class="o_pr_bar">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-on-click="() => this.closeExcel()">
+                        <i class="fa fa-arrow-right me-1"/> رجوع
+                    </button>
+                    <span class="o_pr_sep"/>
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !excelCount"
+                            t-on-click="() => this.applyExcel()">
+                        طبّق على البطاقات (<t t-esc="excelCount"/>)
+                    </button>
+                </div>
+
+                <div class="o_pr_card">
+                    <div class="o_pr_card_head">
+                        <div>
+                            <div class="o_pr_card_name">مطابقة كشف إكسل بالبطاقات</div>
+                            <div class="small text-muted">
+                                <t t-esc="state.excelName"/> ·
+                                <t t-esc="state.excel.count"/> سطراً في
+                                <t t-esc="state.excel.sheets.length"/> كشوف:
+                                <t t-esc="state.excel.sheets.join('، ')"/>
+                            </div>
+                        </div>
+                        <div class="text-end small text-muted">
+                            الملف لا يبني كشف الشهر،<br/>إنما يعدّل البطاقات.
+                        </div>
+                    </div>
+
+                    <div t-if="state.excel.new_groups.length"
+                         class="o_pr_note small mb-2">
+                        كشوفٌ ستُستجدّ من أوراق الملف:
+                        <b t-esc="state.excel.new_groups.join('، ')"/>
+                        — حدّد لها حساباتها من تبويب الإعدادات بعد الرفع.
+                    </div>
+                    <div t-if="state.excel.skipped.length" class="o_pr_note small mb-2">
+                        أوراقٌ لم أجد فيها جدول موظفين فتركتُها:
+                        <b t-esc="state.excel.skipped.join('، ')"/>
+                    </div>
+
+                    <div class="o_pr_card_grid mb-2">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="state.excelOptions.edit"
+                                   t-on-change="(ev) => this.toggleExcel('edit', ev)"/>
+                            <label class="form-check-label">
+                                تعديل <t t-esc="state.excel.changed.length"/> بطاقة
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="state.excelOptions.add"
+                                   t-on-change="(ev) => this.toggleExcel('add', ev)"/>
+                            <label class="form-check-label">
+                                إضافة <t t-esc="state.excel.new.length"/> بطاقة
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="state.excelOptions.stop"
+                                   t-on-change="(ev) => this.toggleExcel('stop', ev)"/>
+                            <label class="form-check-label">
+                                إيقاف <t t-esc="state.excel.stop.length"/> من غاب
+                            </label>
+                        </div>
+                    </div>
+
+                    <div t-if="state.excel.changed.length" class="o_pr_card_sub">
+                        سيُعدَّل
+                    </div>
+                    <table t-if="state.excel.changed.length"
+                           class="table table-bordered table-sm o_pr_table o_pr_wide">
+                        <thead>
+                            <tr>
+                                <th style="width:200px;">الموظف</th>
+                                <th style="width:140px;">كشف الملف</th>
+                                <th>ما سيتغيّر</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.excel.changed" t-as="item" t-key="item.id">
+                                <td>
+                                    <t t-esc="item.name"/>
+                                    <div t-if="item.near" class="small text-muted">
+                                        في الملف: <t t-esc="item.file_name"/>
+                                    </div>
+                                </td>
+                                <td t-esc="item.sheet"/>
+                                <td>
+                                    <span t-foreach="item.fields" t-as="field"
+                                          t-key="field.label" class="o_pr_change">
+                                        <t t-esc="field.label"/>:
+                                        <s t-esc="field.old"/> →
+                                        <b t-esc="field.new"/>
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div t-if="state.excel.new.length" class="o_pr_card_sub">سيُضاف</div>
+                    <table t-if="state.excel.new.length"
+                           class="table table-bordered table-sm o_pr_table o_pr_wide">
+                        <thead>
+                            <tr>
+                                <th style="width:200px;">الموظف</th>
+                                <th style="width:140px;">الكشف</th>
+                                <th class="text-end" style="width:110px;">الإجمالي</th>
+                                <th class="text-end" style="width:110px;">الصافي</th>
+                                <th style="width:90px;">الصرف</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.excel.new" t-as="item" t-key="item.name">
+                                <td t-esc="item.name"/>
+                                <td t-esc="item.sheet"/>
+                                <td class="text-end" t-esc="fmt(item.gross)"/>
+                                <td class="text-end" t-esc="fmt(item.net)"/>
+                                <td t-esc="item.method"/>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div t-if="state.excel.stop.length" class="o_pr_card_sub">
+                        سيُوقف — غائبون عن الملف
+                    </div>
+                    <table t-if="state.excel.stop.length"
+                           class="table table-bordered table-sm o_pr_table o_pr_wide">
+                        <tbody>
+                            <tr t-foreach="state.excel.stop" t-as="item" t-key="item.id">
+                                <td style="width:200px;" t-esc="item.name"/>
+                                <td t-esc="item.sheet"/>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="small text-muted mt-2">
+                        بلا تغيير: <t t-esc="state.excel.same.length"/> بطاقة.
+                        <t t-if="state.excel.untouched.length">
+                            ولم أمسّ <t t-esc="state.excel.untouched.length"/>
+                            من كشوفٍ ليست في الملف.
+                        </t>
+                    </div>
+                </div>
+            </t>
 
             <!-- ======================================= كشف الشهر -->
             <t t-elif="state.tab === 'sheet'">
@@ -94,7 +247,13 @@
                         <button t-if="!data.posted_any" class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.fillFromEmployees()">
-                            أعد البناء من بطاقات الموظفين
+                            <t t-if="data.lines.length">أعد البناء من بطاقات الموظفين</t>
+                            <t t-else="">ابْنِ من بطاقات الموظفين</t>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.pickExcel()">
+                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
                         </button>
                         <button t-if="!data.posted_all" class="btn btn-sm btn-primary"
                                 t-att-disabled="state.busy or !linesDirty"
@@ -120,9 +279,26 @@
                                 t-on-click="() => this.deletePayroll()">احذف الكشف</button>
                     </div>
 
+                    <div t-if="!data.lines.length" class="o_pr_empty">
+                        <div class="mb-2">الكشف فارغ.</div>
+                        <button class="btn btn-sm btn-primary me-2"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.fillFromEmployees()">
+                            <i class="fa fa-users me-1"/> ابْنِ من بطاقات الموظفين
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.pickExcel()">
+                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                        </button>
+                        <div class="small text-muted mt-2">
+                            ورفع الإكسل يعدّل البطاقات ولا يبني الكشف، فابْنِه منها بعده.
+                        </div>
+                    </div>
+
                     <!-- كشوف الشهر تبويباتٍ: واحدٌ منها أو عرض الكل -->
                     <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
-                        t-if="sheetSections.length > 1">
+                        t-if="data.lines.length and sheetSections.length > 1">
                         <li class="nav-item">
                             <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'all' ? 'active' : '' }}"
                                t-on-click.prevent="() => this.setMonthSheet('all')">
@@ -152,7 +328,8 @@
                         </li>
                     </ul>
 
-                    <table class="table table-bordered table-sm o_pr_table o_pr_month">
+                    <table t-if="data.lines.length"
+                           class="table table-bordered table-sm o_pr_table o_pr_month">
                         <thead>
                             <tr>
                                 <th class="text-center" style="width:44px;">م</th>
@@ -467,6 +644,12 @@
                     <button class="btn btn-sm btn-outline-secondary"
                             t-att-disabled="state.busy or !employeesDirty"
                             t-on-click="() => this.cancelEmployees()">إلغاء</button>
+                    <span class="o_pr_sep"/>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.pickExcel()">
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                    </button>
                     <span t-if="employeesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
                 </div>
 

@@ -593,7 +593,7 @@ class MyAccountingPayroll(models.Model):
             'year': year,
             'month': month,
         })
-        payroll.fill_from_employees()
+        # يُفتح فارغاً: يبنيه من البطاقات أو يرفع كشف إكسل أولاً
         return payroll.id
 
     def fill_from_employees(self):
