@@ -141,10 +141,6 @@
         break-inside: avoid;
         break-after: avoid;
     }
-
-    .o_pr_subtotal {
-        break-inside: avoid;
-    }
 }
 
 /* تبويبات الكشوف داخل صفحة الموظفين */
@@ -210,11 +206,6 @@
     font-weight: 700;
     background: var(--o-surface-2, #eef1f5);
     border-top: 2px solid var(--o-surface-border, #dee2e6);
-}
-
-.o_pr_subtotal td {
-    font-weight: 600;
-    background: var(--o-surface-2, #f7f8fa);
 }
 
 /* خانة الاختيار داخل الجداول: تملأ عمودها، وقائمتها أوسع منه لتُقرأ الأسماء */

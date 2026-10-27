@@ -296,7 +296,6 @@ export class Payroll extends Component {
                 sheet: id === false ? "none" : id,
                 name: group ? group.name : "بلا كشف",
                 lines: own,
-                totals: this.sumOf(own),
                 posted: !!sheet.posted,
                 move: sheet.move || "",
                 move_id: sheet.move_id || false,

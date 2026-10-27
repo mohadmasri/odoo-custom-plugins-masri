@@ -226,20 +226,6 @@
                                     <td class="text-end" t-esc="fmt(line.employer_social)"/>
                                 </t>
                             </tr>
-                            <tr t-if="visibleSections.length > 1" class="o_pr_subtotal">
-                                <td>مجموع <t t-esc="section.name"/></td>
-                                <td class="text-end" t-esc="fmt(section.totals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.gross)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.social_base)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.pension)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.net)"/>
-                                <td class="text-end" t-esc="fmt(section.totals.employer_social)"/>
-                            </tr>
                         </tbody>
                         <tbody t-if="!data.lines.length">
                             <tr>
