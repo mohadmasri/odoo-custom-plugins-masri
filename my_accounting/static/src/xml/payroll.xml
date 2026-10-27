@@ -266,6 +266,158 @@
             </t>
 
             <!-- ======================================= الموظفون -->
+            <t t-elif="state.tab === 'employees' and state.card">
+                <!-- ================================= بطاقة الموظف -->
+                <div class="o_pr_bar">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-on-click="() => this.closeCard()">
+                        <i class="fa fa-arrow-right me-1"/> رجوع إلى الموظفين
+                    </button>
+                    <span class="o_pr_sep"/>
+                    <button class="btn btn-sm btn-primary"
+                            t-att-disabled="state.busy or !cardDirty"
+                            t-on-click="() => this.saveCard()">حفظ البطاقة</button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy or !cardDirty"
+                            t-on-click="() => this.cancelCard()">إلغاء</button>
+                    <span t-if="cardDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                </div>
+
+                <div class="o_pr_card">
+                    <div class="o_pr_card_head">
+                        <div>
+                            <div class="o_pr_card_name" t-esc="state.card.employee.name"/>
+                            <div class="small text-muted">
+                                <t t-esc="state.card.employee.job_title or 'بلا مسمّى'"/> ·
+                                كشف <t t-esc="state.card.employee.group or 'بلا كشف'"/>
+                                <t t-if="!state.card.employee.active"> · ليس على رأس عمله</t>
+                            </div>
+                        </div>
+                        <div class="text-end small text-muted">
+                            <div>الصافي الشهري <b t-esc="fmt(state.card.net)"/></div>
+                            <div><t t-esc="state.card.months"/> شهراً في السجلّ</div>
+                        </div>
+                    </div>
+
+                    <!-- بيانات البطاقة: تُكتب هنا لا في جدول الموظفين -->
+                    <div class="o_pr_card_grid">
+                        <div class="o_pr_card_field" t-foreach="cardFields" t-as="field"
+                             t-key="field.name">
+                            <label class="form-label small mb-0" t-esc="field.label"/>
+                            <input t-att-type="field.type"
+                                   class="form-control form-control-sm"
+                                   t-att-value="state.cardDraft[field.name]"
+                                   t-on-change="(ev) => this.editCard(field.name, ev)"/>
+                        </div>
+                    </div>
+
+                    <div class="o_pr_card_sub">مكوّنات الراتب <span class="small text-muted">
+                        (تُعدَّل من جدول الموظفين)</span></div>
+                    <table class="table table-bordered table-sm o_pr_table o_pr_wide">
+                        <tbody>
+                            <tr>
+                                <th>الأساسي</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.basic_salary)"/>
+                                <th>العلاوات</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.allowance)"/>
+                                <th>الإجمالي</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.gross)"/>
+                            </tr>
+                            <tr>
+                                <th>مشمول بالضمان</th>
+                                <td t-esc="state.card.employee.social_security ? 'نعم' : 'لا'"/>
+                                <th>الخاضع للضمان</th>
+                                <td class="text-end" t-esc="fmt(state.card.social_base)"/>
+                                <th>ضمان الموظف</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee_social)"/>
+                            </tr>
+                            <tr>
+                                <th>ضريبة الدخل</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.income_tax)"/>
+                                <th>صندوق التقاعد</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.pension)"/>
+                                <th>استقطاعات أخرى</th>
+                                <td class="text-end" t-esc="fmt(state.card.employee.other_deduction)"/>
+                            </tr>
+                            <tr>
+                                <th>الصافي الشهري</th>
+                                <td class="text-end" t-esc="fmt(state.card.net)"/>
+                                <th/>
+                                <td/>
+                                <th/>
+                                <td/>
+                            </tr>
+                            <tr>
+                                <th>حساب المصروف</th>
+                                <td colspan="2" t-esc="state.card.expense_account or 'حساب الرواتب العام'"/>
+                                <th>يُدفع من</th>
+                                <td colspan="2" t-esc="state.card.payment_account or 'حساب الدفع العام'"/>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="o_pr_card_sub">سجلّه الشهري</div>
+                    <table class="table table-bordered table-sm o_pr_table o_pr_hist">
+                        <thead>
+                            <tr>
+                                <th style="width:150px;">الشهر</th>
+                                <th style="width:140px;">الكشف</th>
+                                <th class="text-end" style="width:96px;">الأساسي</th>
+                                <th class="text-end" style="width:96px;">العلاوات</th>
+                                <th class="text-end" style="width:96px;">الإجمالي</th>
+                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                <th class="text-end" style="width:96px;">ضريبة</th>
+                                <th class="text-end" style="width:96px;">تقاعد</th>
+                                <th class="text-end" style="width:96px;">استقطاع</th>
+                                <th class="text-end" style="width:96px;">الصافي</th>
+                                <th style="width:120px;">القيد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.card.history" t-as="row" t-key="row.id">
+                                <td>
+                                    <t t-esc="row.month_label"/> <t t-esc="row.year"/>
+                                </td>
+                                <td t-esc="row.group"/>
+                                <td class="text-end" t-esc="fmt(row.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(row.allowance)"/>
+                                <td class="text-end" t-esc="fmt(row.gross)"/>
+                                <td class="text-end" t-esc="fmt(row.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(row.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(row.pension)"/>
+                                <td class="text-end" t-esc="fmt(row.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(row.net)"/>
+                                <td>
+                                    <a t-if="row.posted" href="#" class="o_pr_link"
+                                       t-custom-click="(ev, mid) => this.openMove(row.move_id, mid)"
+                                       t-esc="row.move"/>
+                                    <span t-else="" class="text-muted">مسودة</span>
+                                </td>
+                            </tr>
+                            <tr t-if="!state.card.history.length">
+                                <td colspan="11" class="text-muted text-center py-2">
+                                    لم يدخل في كشف رواتب بعد.
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="state.card.history.length">
+                            <tr class="o_pr_total">
+                                <td colspan="2">المجاميع</td>
+                                <td class="text-end" t-esc="fmt(state.card.totals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.gross)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.pension)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(state.card.totals.net)"/>
+                                <td/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </t>
+
             <t t-elif="state.tab === 'employees'">
                 <div class="o_pr_bar">
                     <button class="btn btn-sm btn-primary"
@@ -325,7 +477,7 @@
                             <th style="width:170px;">حساب المصروف</th>
                             <th style="width:170px;">يُدفع من</th>
                             <th class="text-center" style="width:56px;">فعّال</th>
-                            <th style="width:40px;"/>
+                            <th style="width:64px;"/>
                         </tr>
                     </thead>
                     <tbody>
@@ -390,6 +542,11 @@
                                        t-on-change="(ev) => this.editEmployee(employee, 'active', ev)"/>
                             </td>
                             <td class="text-center">
+                                <button class="btn btn-sm btn-link p-0 me-1"
+                                        title="بطاقة الموظف"
+                                        t-on-click="() => this.openCard(employee)">
+                                    <i class="fa fa-id-card-o"/>
+                                </button>
                                 <button class="btn btn-sm btn-link text-danger p-0"
                                         title="حذف الموظف"
                                         t-on-click="() => this.removeEmployee(employee)">

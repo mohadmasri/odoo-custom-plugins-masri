@@ -173,6 +173,12 @@ class MyAccountingEmployee(models.Model):
     hire_date = fields.Date(string='تاريخ التعيين')
     active = fields.Boolean(string='على رأس عمله', default=True)
 
+    # بيانات البطاقة: تُعبَّأ من البطاقة لا من جدول الموظفين
+    national_id = fields.Char(string='الرقم الوطني')
+    social_number = fields.Char(string='رقم الضمان')
+    phone = fields.Char(string='الهاتف')
+    address = fields.Char(string='العنوان')
+
     basic_salary = fields.Float(string='الراتب الأساسي', digits=(16, 3))
     allowance = fields.Float(string='العلاوات', digits=(16, 3))
     social_security = fields.Boolean(string='مشمول بالضمان', default=True)
@@ -212,6 +218,10 @@ class MyAccountingEmployee(models.Model):
             'job_title': self.job_title or '',
             'hire_date': self.hire_date and fields.Date.to_string(self.hire_date) or '',
             'active': self.active,
+            'national_id': self.national_id or '',
+            'social_number': self.social_number or '',
+            'phone': self.phone or '',
+            'address': self.address or '',
             'basic_salary': self.basic_salary,
             'allowance': self.allowance,
             'gross': gross,
@@ -226,6 +236,95 @@ class MyAccountingEmployee(models.Model):
             'payment_account': self.payment_account_id.name or '',
             'note': self.note or '',
         }
+
+    # ------------------------------------------------------------------
+    # بطاقة الموظف
+    # ------------------------------------------------------------------
+
+    CARD_FIELDS = ('name', 'job_title', 'hire_date', 'national_id',
+                   'social_number', 'phone', 'address', 'note')
+
+    def _card_history(self):
+        """سجلّ الموظف الشهري من كشوف الرواتب، أحدثها أولاً."""
+        self.ensure_one()
+        lines = self.env['myaccounting.payroll.line'].search(
+            [('employee_id', '=', self.id)])
+        rows = []
+        for line in lines:
+            payroll = line.payroll_id
+            move = payroll._sheet_move(line.group_id.id or 'none')
+            data = line._payload()
+            rows.append({
+                'id': line.id,
+                'payroll_id': payroll.id,
+                'payroll': payroll.name or '',
+                'year': payroll.year,
+                'month': payroll.month,
+                'month_label': MONTH_NAMES.get(payroll.month, ''),
+                'group': line.group_id.name or 'بلا كشف',
+                'basic_salary': data['basic_salary'],
+                'allowance': data['allowance'],
+                'gross': data['gross'],
+                'employee_social': data['employee_social'],
+                'income_tax': data['income_tax'],
+                'pension': data['pension'],
+                'other_deduction': data['other_deduction'],
+                'total_deduction': data['total_deduction'],
+                'net': data['net'],
+                'posted': bool(move),
+                'move_id': move.id or False,
+                'move': move.name or '',
+            })
+        rows.sort(key=lambda row: (row['year'], int(row['month'])), reverse=True)
+        return rows
+
+    def _card(self):
+        self.ensure_one()
+        history = self._card_history()
+        keys = ('basic_salary', 'allowance', 'gross', 'employee_social', 'income_tax',
+                'pension', 'other_deduction', 'total_deduction', 'net')
+        # راتبه كما سيُحتسب في الكشف القادم، بنسبة الضمان المعمول بها
+        settings = self.env['myaccounting.payroll.settings']._get()
+        gross = round((self.basic_salary or 0.0) + (self.allowance or 0.0), 3)
+        base = (self.social_base or gross) if self.social_security else 0.0
+        social = round(base * settings.employee_rate / 100.0, 3)
+        net = round(gross - social - (self.income_tax or 0.0)
+                    - (self.pension or 0.0) - (self.other_deduction or 0.0), 3)
+        return {
+            'employee': self._payload(),
+            'social_base': base,
+            'employee_social': social,
+            'net': net,
+            'expense_account': self._expense_account().name or '',
+            'payment_account': self._payment_account().name or '',
+            'from_group': not self.account_id and bool(self.group_id.account_id),
+            'history': history,
+            'months': len(history),
+            'totals': {key: round(sum(row[key] for row in history), 3)
+                       for key in keys},
+        }
+
+    @api.model
+    def get_employee_card(self, employee_id):
+        employee = self.with_context(active_test=False).browse(int(employee_id))
+        if not employee.exists():
+            raise UserError('لا بطاقة لهذا الموظف.')
+        return employee._card()
+
+    @api.model
+    def save_employee_card(self, employee_id, values):
+        """يحفظ بيانات البطاقة وحدها: الراتب يُعدَّل من جدول الموظفين."""
+        employee = self.with_context(active_test=False).browse(int(employee_id))
+        if not employee.exists():
+            raise UserError('لا بطاقة لهذا الموظف.')
+        name = ((values or {}).get('name') or '').strip()
+        if not name:
+            raise UserError('لا بدّ للموظف من اسم.')
+        data = {field: (values or {}).get(field) or False
+                for field in self.CARD_FIELDS}
+        data['name'] = name
+        employee.write(data)
+        return employee._card()
 
     @api.model
     def get_employees(self):
@@ -249,6 +348,10 @@ class MyAccountingEmployee(models.Model):
                 'job_title': item.get('job_title') or '',
                 'hire_date': item.get('hire_date') or False,
                 'active': bool(item.get('active', True)),
+                'national_id': item.get('national_id') or '',
+                'social_number': item.get('social_number') or '',
+                'phone': item.get('phone') or '',
+                'address': item.get('address') or '',
                 'basic_salary': float(item.get('basic_salary') or 0.0),
                 'allowance': float(item.get('allowance') or 0.0),
                 'social_security': bool(item.get('social_security')),

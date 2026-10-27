@@ -215,3 +215,39 @@
     padding-inline: 4px;
     min-width: 0;
 }
+
+/* بطاقة الموظف: بياناته وسجلّه الشهري في لوح واحد */
+.o_pr_card {
+    max-width: 1180px;
+}
+
+.o_pr_card_head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--gray-300, #dee2e6);
+}
+
+.o_pr_card_name {
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.o_pr_card_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px 14px;
+    margin-bottom: 16px;
+}
+
+.o_pr_card_sub {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.o_pr_hist {
+    min-width: 1130px;
+}

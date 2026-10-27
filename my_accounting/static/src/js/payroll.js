@@ -49,7 +49,7 @@ export class Payroll extends Component {
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.months = MONTHS;
-        this.saved = { employees: [], lines: [], settings: null, groups: [] };
+        this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
         const today = new Date();
         this.state = useState({
             loading: true,
@@ -59,6 +59,8 @@ export class Payroll extends Component {
             data: null,
             employees: [],
             groups: [],
+            card: null,
+            cardDraft: null,
             sheet: "all",
             monthSheet: "all",
             settings: null,
@@ -112,6 +114,7 @@ export class Payroll extends Component {
     }
 
     setTab(tab) {
+        this.closeCard();
         this.state.tab = tab;
     }
 
@@ -584,6 +587,80 @@ export class Payroll extends Component {
 
     cancelGroups() {
         this.state.groups = clone(this.saved.groups);
+    }
+
+    // ------------------------------------------------------------------
+    // بطاقة الموظف
+    // ------------------------------------------------------------------
+
+    /** بيانات البطاقة وحدها: الراتب يُعدَّل من الجدول */
+    get cardFields() {
+        return [
+            { name: "name", label: "الاسم", type: "text" },
+            { name: "job_title", label: "المسمّى الوظيفي", type: "text" },
+            { name: "hire_date", label: "تاريخ التعيين", type: "date" },
+            { name: "national_id", label: "الرقم الوطني", type: "text" },
+            { name: "social_number", label: "رقم الضمان", type: "text" },
+            { name: "phone", label: "الهاتف", type: "text" },
+            { name: "address", label: "العنوان", type: "text" },
+            { name: "note", label: "ملاحظة", type: "text" },
+        ];
+    }
+
+    async openCard(employee) {
+        if (!employee.id) {
+            this.notification.add("احفظ الموظف الجديد قبل فتح بطاقته.",
+                                  { type: "warning" });
+            return;
+        }
+        if (this.employeesDirty) {
+            this.notification.add("احفظ تغييرات الجدول قبل فتح البطاقة.",
+                                  { type: "warning" });
+            return;
+        }
+        await this.withBusy(async () => {
+            const card = await this.orm.call("myaccounting.employee",
+                "get_employee_card", [employee.id]);
+            this.setCard(card);
+        });
+    }
+
+    setCard(card) {
+        this.state.card = card;
+        this.state.cardDraft = {};
+        for (const field of this.cardFields) {
+            this.state.cardDraft[field.name] = card.employee[field.name] || "";
+        }
+        this.saved.card = clone(this.state.cardDraft);
+    }
+
+    closeCard() {
+        this.state.card = null;
+        this.state.cardDraft = null;
+    }
+
+    editCard(field, ev) {
+        this.state.cardDraft[field] = ev.target.value;
+    }
+
+    get cardDirty() {
+        return !!this.state.cardDraft && !same(this.state.cardDraft, this.saved.card);
+    }
+
+    async saveCard() {
+        await this.withBusy(async () => {
+            const card = await this.orm.call("myaccounting.employee",
+                "save_employee_card",
+                [this.state.card.employee.id, clone(this.state.cardDraft)]);
+            this.setCard(card);
+            // الجدول يحمل الاسم والمسمّى نفسيهما، فيُحدَّث معهما
+            await this.loadSettings();
+            this.notification.add("حُفظت البطاقة.", { type: "success" });
+        });
+    }
+
+    cancelCard() {
+        this.state.cardDraft = clone(this.saved.card);
     }
 
     // ------------------------------------------------------------------
