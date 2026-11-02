@@ -138,6 +138,40 @@ export function formulaNames(formula) {
     }
 }
 
+/** بنود فاتورةٍ بعينها من بنودٍ معروضة: ما حمل بيانها «فاتورة رقم N / …» */
+export function invoiceLines(lines, number) {
+    const head = `فاتورة رقم ${String(number || "").trim()}`;
+    return (lines || []).filter((line) => {
+        const name = String(line.name || "").trim();
+        return name === head || name.startsWith(`${head} `);
+    });
+}
+
+/**
+ * فاتورةٌ مقروءة من بنودها: إجماليها ونسبتها وحساب جهتها.
+ *
+ * الجهة هي البند المدين (الذمم)، والإيراد أكبر الدائنين والضريبة ما بقي،
+ * فتُستخرج النسبة منهما. وهي صورة ما يفعله الخادم بالقيود المحفوظة.
+ */
+export function readInvoice(lines) {
+    const own = lines || [];
+    const debit = own.find((line) => (line.debit || 0) > 0);
+    if (!debit) {
+        return false;
+    }
+    const credits = own.filter((line) => (line.credit || 0) > 0)
+        .sort((first, second) => second.credit - first.credit);
+    const round = (value) => Math.round(value * 1000) / 1000;
+    const total = round(debit.debit);
+    const revenue = credits.length ? round(credits[0].credit) : 0;
+    const tax = credits.length > 1 ? round(credits[1].credit) : round(total - revenue);
+    return {
+        total,
+        rate: revenue ? round((tax / revenue) * 100) : 0,
+        account_id: debit.account_id || false,
+    };
+}
+
 /**
  * بيان الكتلة من صيغتها: «فاتورة رقم {invoice} / {account}».
  *

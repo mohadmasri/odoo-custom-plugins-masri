@@ -39,7 +39,12 @@
                     <div t-foreach="block.fields" t-as="field" t-key="field.key"
                          t-attf-class="col-6 {{ field.kind === 'text' ? 'col-md-4' : 'col-md-3' }}">
                         <label class="form-label small mb-1" t-esc="field.label"/>
-                        <input t-if="field.kind === 'text'" type="text"
+                        <input t-if="field.kind === 'invoice'" type="text"
+                               class="form-control form-control-sm"
+                               placeholder="رقم الفاتورة المُرتجع عنها"
+                               t-att-value="state.values[field.key]"
+                               t-on-change="(ev) => this.onInvoiceRef(field.key, ev)"/>
+                        <input t-elif="field.kind === 'text'" type="text"
                                class="form-control form-control-sm"
                                t-att-value="state.values[field.key]"
                                t-on-input="(ev) => this.onValue(field.key, ev)"/>
@@ -49,6 +54,9 @@
                                t-on-input="(ev) => this.onValue(field.key, ev)"/>
                     </div>
                 </div>
+
+                <div t-if="state.found" class="small text-muted mb-2"
+                     t-esc="state.found"/>
 
                 <!-- البيان الذي تكتبه الكتلة بنفسها، يراه قبل الإضافة -->
                 <div t-if="block.text_template" class="o_move_block_text mb-3">

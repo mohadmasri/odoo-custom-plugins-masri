@@ -5,7 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-import { buildBlockLines, buildBlockText } from "./block_formula";
+import { buildBlockLines, buildBlockText, invoiceLines, readInvoice } from "./block_formula";
 
 const ACCOUNT_LIST_ID = "o_move_block_accounts";
 
@@ -21,15 +21,65 @@ export class MoveBlockDialog extends Component {
         block: Object,
         accounts: Array,
         onConfirm: Function,
+        currentLines: { type: Array, optional: true },
     };
+    static defaultProps = { currentLines: [] };
 
     setup() {
+        this.orm = useService("orm");
         this.listId = ACCOUNT_LIST_ID;
         const values = {};
         for (const field of this.props.block.fields) {
             values[field.key] = field.default_value || "";
         }
-        this.state = useState({ text: "", values, accounts: {} });
+        this.state = useState({ text: "", values, accounts: {}, found: "" });
+    }
+
+    /**
+     * خانة «رقم فاتورة يُبحث عنه»: تُقرأ الفاتورة من بنود هذا القيد،
+     * وإلا من القيود المحفوظة، فتُعبّأ الخانات ويبقى تعديلها بيده.
+     */
+    async onInvoiceRef(key, ev) {
+        const number = ev.target.value;
+        this.state.values[key] = number;
+        this.state.found = "";
+        if (!String(number).trim()) {
+            return;
+        }
+        const here = invoiceLines(this.props.currentLines, number);
+        let invoice = here.length ? readInvoice(here) : false;
+        let source = invoice ? "من بنود هذا القيد" : "";
+        if (!invoice) {
+            const data = await this.orm.call("myaccounting.block", "find_invoice",
+                [String(number).trim()]);
+            if (data) {
+                invoice = data;
+                source = `من قيد ${data.move}`;
+            }
+        }
+        if (!invoice) {
+            this.state.found = "لم أجد فاتورة بهذا الرقم، فاكتب بياناتها بنفسك.";
+            return;
+        }
+        this.fillFrom(invoice);
+        this.state.found = `قُرئت ${source}: الإجمالي ${invoice.total}`
+            + ` · الضريبة ${invoice.rate}%`;
+    }
+
+    /** تعبئة ما قُرئ: الإجمالي والنسبة وحساب الجهة */
+    fillFrom(invoice) {
+        for (const field of this.block.fields) {
+            if (field.key === "total") {
+                this.state.values.total = invoice.total;
+            }
+            if (field.key === "rate") {
+                this.state.values.rate = invoice.rate;
+            }
+        }
+        const asked = this.askedLines[0];
+        if (asked && invoice.account_id) {
+            this.state.accounts[asked.id] = invoice.account_id;
+        }
     }
 
     get block() {
@@ -147,10 +197,26 @@ export class MoveBlockBar extends Component {
         return ACCOUNT_LIST_ID;
     }
 
+    /** بنود القيد المفتوح كما هي الآن، لتُقرأ منها فاتورة المرتجع */
+    get currentLines() {
+        const list = this.props.record.data.line_ids;
+        const rows = (list && list.records) || [];
+        return rows.map((row) => {
+            const account = row.data.account_id;
+            return {
+                name: row.data.name || "",
+                account_id: account ? (account.id || account[0] || false) : false,
+                debit: row.data.debit || 0,
+                credit: row.data.credit || 0,
+            };
+        });
+    }
+
     open(block) {
         this.dialog.add(MoveBlockDialog, {
             block,
             accounts: this.data.accounts,
+            currentLines: this.currentLines,
             onConfirm: (lines) => this.addLines(block, lines),
         });
     }

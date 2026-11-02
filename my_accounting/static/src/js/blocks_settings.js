@@ -87,7 +87,7 @@ export class BlocksSettings extends Component {
         const trying = {};
         for (const field of this.state.edited.fields) {
             // خانة النص لا تُحسب، فتدخل التجربة بصفر لئلّا تُعدّ مفقودة
-            trying[field.key] = field.kind === "text"
+            trying[field.key] = field.kind && field.kind !== "number"
                 ? 0
                 : field.default_value || 100;
         }

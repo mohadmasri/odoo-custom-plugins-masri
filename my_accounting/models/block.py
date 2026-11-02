@@ -25,6 +25,21 @@ DEFAULT_BLOCKS = [
         ],
     },
     {
+        'name': 'مرتجع فاتورة', 'icon': 'fa-undo', 'sequence': 15,
+        'hint': 'اكتب رقم المرتجع والفاتورة المُرتجع عنها، فتُقرأ بياناتها '
+                'إن كانت مُدخلة في هذا القيد أو في قيدٍ سابق.',
+        'text': 'مرتجع فاتورة رقم {invoice} عن فاتورة رقم {ref} / {account}',
+        'fields': [('invoice', 'رقم الفاتورة', 0.0, 'text'),
+                   ('ref', 'مرتجع عن فاتورة', 0.0, 'invoice'),
+                   ('total', 'اجمالي الفاتورة', 0.0, 'number'),
+                   ('rate', 'نسبة الضريبة %', 16.0, 'number')],
+        'lines': [
+            ('', '', 'حساب الجهة (الذمم)', 'credit', 'total', False),
+            ('', '401', '', 'debit', 'total / (1 + rate / 100)', False),
+            ('', '201', '', 'debit', 'total - total / (1 + rate / 100)', True),
+        ],
+    },
+    {
         'name': 'فاتورة شاملة الضريبة', 'icon': 'fa-file-text-o', 'sequence': 20,
         'hint': 'المبلغ المكتوب على الفاتورة شامل الضريبة، فتُستخرج منه.',
         'text': '',
@@ -193,6 +208,65 @@ class MyAccountingBlock(models.Model):
         } for index, line in enumerate(lines)])
         return block._payload()
 
+    # ------------------------------------------------------------------
+    # قراءة فاتورةٍ مُدخلة، لكتلة المرتجع
+    # ------------------------------------------------------------------
+
+    @api.model
+    def read_invoice_lines(self, lines):
+        """من بنودٍ تحمل بيان فاتورةٍ واحدة: إجماليها ونسبتها وحساب جهتها.
+
+        الجهة هي البند المدين (الذمم)، والإيراد أكبر الدائنين والضريبة
+        ما بقي، فتُستخرج النسبة منهما. تعمل على بنود القيد المفتوح كما
+        تعمل على بنود قيدٍ محفوظ.
+        """
+        debit = next((line for line in lines if (line.get('debit') or 0) > 0), None)
+        if not debit:
+            return False
+        credits = sorted((line for line in lines if (line.get('credit') or 0) > 0),
+                         key=lambda line: line['credit'], reverse=True)
+        total = round(debit['debit'], 3)
+        revenue = round(credits[0]['credit'], 3) if credits else 0.0
+        tax = (round(credits[1]['credit'], 3) if len(credits) > 1
+               else round(total - revenue, 3))
+        return {
+            'total': total,
+            'rate': round(tax / revenue * 100.0, 3) if revenue else 0.0,
+            'account_id': debit.get('account_id') or False,
+        }
+
+    @api.model
+    def find_invoice(self, number):
+        """تبحث عن فاتورة بهذا الرقم في القيود المحفوظة، أحدثها أولاً."""
+        number = ' '.join(str(number or '').split())
+        if not number:
+            return False
+        head = 'فاتورة رقم %s' % number
+        Line = self.env['myaccounting.move.line']
+        found = Line.search(['|', ('name', '=', head),
+                             ('name', '=like', '%s /%%' % head)],
+                            order='id desc', limit=1)
+        if not found:
+            return False
+        move = found.move_id
+        own = [{
+            'debit': line.debit,
+            'credit': line.credit,
+            'account_id': line.account_id.id or False,
+        } for line in move.line_ids
+            if (line.name or '').strip() == (found.name or '').strip()]
+        data = self.read_invoice_lines(own)
+        if not data:
+            return False
+        account = self.env['myaccounting.account'].browse(data['account_id'])
+        data.update({
+            'move': move.name or '',
+            'move_id': move.id,
+            'date': move.date and fields.Date.to_string(move.date) or '',
+            'account_label': self._account_label(account),
+        })
+        return data
+
     @api.model
     def delete_block(self, block_id):
         self.browse(int(block_id)).unlink()
@@ -207,6 +281,43 @@ class MyAccountingBlock(models.Model):
     # ------------------------------------------------------------------
     # الكتل الأولى
     # ------------------------------------------------------------------
+
+    @api.model
+    def _create_block_from_spec(self, spec):
+        """كتلة من تعريفها في DEFAULT_BLOCKS، بحساباتها من أكوادها."""
+        Account = self.env['myaccounting.account']
+        block = self.create({
+            'name': spec['name'], 'icon': spec['icon'],
+            'hint': spec['hint'], 'sequence': spec['sequence'],
+            'text_template': spec.get('text', ''),
+        })
+        self.env['myaccounting.block.field'].create([{
+            'block_id': block.id, 'sequence': index * 10,
+            'key': key, 'label': label, 'default_value': default, 'kind': kind,
+        } for index, (key, label, default, kind) in enumerate(spec['fields'])])
+        lines = []
+        for index, (label, code, prompt, side, formula, zero) in enumerate(spec['lines']):
+            account = Account.search([('code', '=', code)], limit=1) if code else Account
+            lines.append({
+                'block_id': block.id, 'sequence': index * 10, 'label': label,
+                'account_id': account.id or False,
+                'ask_account': not account,
+                'account_prompt': prompt,
+                'side': side, 'formula': formula, 'zero_visible': zero,
+            })
+        self.env['myaccounting.block.line'].create(lines)
+        return block
+
+    @api.model
+    def _upgrade_return_block(self):
+        """تُضيف كتلة «مرتجع فاتورة» لمن كانت كتله مبنيّةً قبلها."""
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.blocks_return'):
+            return
+        spec = [item for item in DEFAULT_BLOCKS if item['name'] == 'مرتجع فاتورة'][0]
+        if not self.search_count([('name', '=', spec['name'])]):
+            self._create_block_from_spec(spec)
+        param.set_param('my_accounting.blocks_return', '1')
 
     @api.model
     def _upgrade_invoice_block(self):
@@ -241,31 +352,13 @@ class MyAccountingBlock(models.Model):
         if param.get_param('my_accounting.blocks_seeded') or self.search_count([]):
             param.set_param('my_accounting.blocks_seeded', '1')
             self._upgrade_invoice_block()
+            self._upgrade_return_block()
             return
-        Account = self.env['myaccounting.account']
         for spec in DEFAULT_BLOCKS:
-            block = self.create({
-                'name': spec['name'], 'icon': spec['icon'],
-                'hint': spec['hint'], 'sequence': spec['sequence'],
-                'text_template': spec.get('text', ''),
-            })
-            self.env['myaccounting.block.field'].create([{
-                'block_id': block.id, 'sequence': index * 10,
-                'key': key, 'label': label, 'default_value': default, 'kind': kind,
-            } for index, (key, label, default, kind) in enumerate(spec['fields'])])
-            lines = []
-            for index, (label, code, prompt, side, formula, zero) in enumerate(spec['lines']):
-                account = Account.search([('code', '=', code)], limit=1) if code else Account
-                lines.append({
-                    'block_id': block.id, 'sequence': index * 10, 'label': label,
-                    'account_id': account.id or False,
-                    'ask_account': not account,
-                    'account_prompt': prompt,
-                    'side': side, 'formula': formula, 'zero_visible': zero,
-                })
-            self.env['myaccounting.block.line'].create(lines)
+            self._create_block_from_spec(spec)
         param.set_param('my_accounting.blocks_seeded', '1')
         param.set_param('my_accounting.blocks_invoice_v2', '1')
+        param.set_param('my_accounting.blocks_return', '1')
 
 
 class MyAccountingBlockField(models.Model):
@@ -279,9 +372,12 @@ class MyAccountingBlockField(models.Model):
     key = fields.Char(string='المفتاح', required=True,
                       help='الاسم الذي يُكتب في صيغ البنود، بالإنجليزية بلا مسافات.')
     label = fields.Char(string='العنوان', required=True)
-    kind = fields.Selection([('number', 'رقم'), ('text', 'نص')], string='النوع',
-                            required=True, default='number',
-                            help='«نص» لما لا يُحسب كرقم الفاتورة، ويُكتب في صيغة البيان.')
+    kind = fields.Selection([('number', 'رقم'), ('text', 'نص'),
+                             ('invoice', 'رقم فاتورة يُبحث عنه')],
+                            string='النوع', required=True, default='number',
+                            help='«نص» لما لا يُحسب كرقم الفاتورة، ويُكتب في صيغة البيان. '
+                                 'و«رقم فاتورة يُبحث عنه» يقرأ فاتورةً مُدخلة فيعبّئ '
+                                 'خانتَي total وrate وحساب الجهة.')
     default_value = fields.Float(string='القيمة الافتراضية', digits=(16, 3))
 
 
