@@ -138,13 +138,22 @@ export function formulaNames(formula) {
     }
 }
 
-/** بنود فاتورةٍ بعينها من بنودٍ معروضة: ما حمل بيانها «فاتورة رقم N / …» */
+/**
+ * بنود فاتورةٍ بعينها من بنودٍ معروضة.
+ *
+ * البيان يُكتب على اختلافه: «فاتورة 316 وزارة الاشغال» و«فاتورة رقم 325
+ * وزارة الاشغال» و«فاتورة رقم 332 / وزارة الاشغال». ويبدأ بالفاتورة فلا
+ * يُطابق «مرتجع فاتورة رقم …»، والرقم لا يُتبع برقمٍ آخر فـ316 ليست 3160.
+ * وهي صورة _invoice_pattern في الخادم.
+ */
 export function invoiceLines(lines, number) {
-    const head = `فاتورة رقم ${String(number || "").trim()}`;
-    return (lines || []).filter((line) => {
-        const name = String(line.name || "").trim();
-        return name === head || name.startsWith(`${head} `);
-    });
+    const text = String(number || "").trim();
+    if (!text) {
+        return [];
+    }
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^\\s*فاتورة\\s*(?:رقم\\s*)?${escaped}(?!\\d)`);
+    return (lines || []).filter((line) => pattern.test(String(line.name || "")));
 }
 
 /**

@@ -32,7 +32,7 @@ export class MoveBlockDialog extends Component {
         for (const field of this.props.block.fields) {
             values[field.key] = field.default_value || "";
         }
-        this.state = useState({ text: "", values, accounts: {}, found: "" });
+        this.state = useState({ text: "", values, accounts: {}, found: "", ok: false });
     }
 
     /**
@@ -43,6 +43,7 @@ export class MoveBlockDialog extends Component {
         const number = ev.target.value;
         this.state.values[key] = number;
         this.state.found = "";
+        this.state.ok = false;
         if (!String(number).trim()) {
             return;
         }
@@ -62,6 +63,7 @@ export class MoveBlockDialog extends Component {
             return;
         }
         this.fillFrom(invoice);
+        this.state.ok = true;
         this.state.found = `قُرئت ${source}: الإجمالي ${invoice.total}`
             + ` · الضريبة ${invoice.rate}%`;
     }

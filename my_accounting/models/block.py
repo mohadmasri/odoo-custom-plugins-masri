@@ -5,6 +5,8 @@
 بلا تعديل برمجي. الصيغ تُحسب في المتصفّح وقت الاستعمال، وهذا النموذج
 يحفظ التعريف فقط.
 """
+import re
+
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
@@ -236,16 +238,28 @@ class MyAccountingBlock(models.Model):
         }
 
     @api.model
+    def _invoice_pattern(self, number):
+        """بيان الفاتورة كما يُكتب على اختلافه: «فاتورة 316 وزارة الاشغال»
+        و«فاتورة رقم 325 وزارة الاشغال» و«فاتورة رقم 332 / وزارة الاشغال».
+
+        يبدأ البيان بالفاتورة، فلا يُطابق «مرتجع فاتورة رقم …». والرقم لا
+        يُتبع برقمٍ آخر، فـ316 ليست 3160.
+        """
+        return re.compile(r'^\s*فاتورة\s*(?:رقم\s*)?%s(?!\d)' % re.escape(number))
+
+    @api.model
     def find_invoice(self, number):
         """تبحث عن فاتورة بهذا الرقم في القيود المحفوظة، أحدثها أولاً."""
         number = ' '.join(str(number or '').split())
         if not number:
             return False
-        head = 'فاتورة رقم %s' % number
+        pattern = self._invoice_pattern(number)
         Line = self.env['myaccounting.move.line']
-        found = Line.search(['|', ('name', '=', head),
-                             ('name', '=like', '%s /%%' % head)],
-                            order='id desc', limit=1)
+        candidates = Line.search([('name', 'like', 'فاتورة'),
+                                  ('name', 'like', number)],
+                                 order='id desc', limit=200)
+        found = next((line for line in candidates
+                      if pattern.match(line.name or '')), None)
         if not found:
             return False
         move = found.move_id
@@ -253,8 +267,7 @@ class MyAccountingBlock(models.Model):
             'debit': line.debit,
             'credit': line.credit,
             'account_id': line.account_id.id or False,
-        } for line in move.line_ids
-            if (line.name or '').strip() == (found.name or '').strip()]
+        } for line in move.line_ids if pattern.match(line.name or '')]
         data = self.read_invoice_lines(own)
         if not data:
             return False

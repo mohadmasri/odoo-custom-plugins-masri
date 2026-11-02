@@ -55,8 +55,11 @@
                     </div>
                 </div>
 
-                <div t-if="state.found" class="small text-muted mb-2"
-                     t-esc="state.found"/>
+                <div t-if="state.found"
+                     t-attf-class="small mb-2 {{ state.ok ? 'text-success' : 'text-warning' }}">
+                    <i t-attf-class="fa {{ state.ok ? 'fa-check' : 'fa-exclamation-triangle' }} me-1"/>
+                    <t t-esc="state.found"/>
+                </div>
 
                 <!-- البيان الذي تكتبه الكتلة بنفسها، يراه قبل الإضافة -->
                 <div t-if="block.text_template" class="o_move_block_text mb-3">
