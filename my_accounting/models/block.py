@@ -78,18 +78,19 @@ DEFAULT_BLOCKS = [
     },
     {
         'name': 'تمويل موفق', 'icon': 'fa-exchange', 'sequence': 55,
-        'hint': 'ما صرفه موفق من رواتب المشروع وخدماته الهندسية، يُسدَّد له بشيك.',
-        'text': 'شيك رقم {cheque} مشروع {project} شهر {month}',
-        'fields': [('cheque', 'رقم الشيك', 0.0, 'text'),
-                   ('project', 'المشروع', 0.0, 'text'),
+        'hint': 'ما صرفه موفق من رواتب المشروع وخدماته الهندسية، يُعاد تمويله بشيك.',
+        'text': 'اعادة تمويل موفق مشروع {project} {month}',
+        'fields': [('project', 'المشروع', 0.0, 'text'),
                    ('month', 'الشهر', 0.0, 'text'),
+                   ('cheque', 'رقم الشيك', 0.0, 'text'),
                    ('salaries', 'رواتب المشروع', 0.0, 'number'),
                    ('services', 'خدمات هندسية', 0.0, 'number')],
         'lines': [
             ('', '687', '', 'debit', 'salaries', False),
             ('خدمات هندسية شهر {month}', '', 'حساب المشروع', 'debit',
              'services', False),
-            ('', '101', '', 'credit', 'salaries + services', False),
+            ('اعادة تمويل موفق مشروع {project} {month} / شيك {cheque}',
+             '101', '', 'credit', 'salaries + services', False),
         ],
     },
     {
@@ -314,12 +315,20 @@ class MyAccountingBlock(models.Model):
     @api.model
     def _create_block_from_spec(self, spec):
         """كتلة من تعريفها في DEFAULT_BLOCKS، بحساباتها من أكوادها."""
-        Account = self.env['myaccounting.account']
         block = self.create({
             'name': spec['name'], 'icon': spec['icon'],
             'hint': spec['hint'], 'sequence': spec['sequence'],
             'text_template': spec.get('text', ''),
         })
+        self._fill_block_from_spec(block, spec)
+        return block
+
+    @api.model
+    def _fill_block_from_spec(self, block, spec):
+        """يبني خانات الكتلة وبنودها من تعريفها، بديلاً عمّا فيها."""
+        Account = self.env['myaccounting.account']
+        block.field_ids.unlink()
+        block.line_ids.unlink()
         self.env['myaccounting.block.field'].create([{
             'block_id': block.id, 'sequence': index * 10,
             'key': key, 'label': label, 'default_value': default, 'kind': kind,
@@ -335,7 +344,38 @@ class MyAccountingBlock(models.Model):
                 'side': side, 'formula': formula, 'zero_visible': zero,
             })
         self.env['myaccounting.block.line'].create(lines)
-        return block
+
+    @api.model
+    def _upgrade_funding_lines(self):
+        """كتلة «تمويل موفق» تُبنى من جديد على لفظ قيده 17/9 كاملاً:
+        رقم الشيك على بند البنك، كما يكتبه."""
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.blocks_funding_v3'):
+            return
+        spec = [item for item in DEFAULT_BLOCKS if item['name'] == 'تمويل موفق'][0]
+        block = self.search([('name', '=', spec['name'])], limit=1)
+        if block:
+            block.write({'hint': spec['hint'], 'text_template': spec['text']})
+            self._fill_block_from_spec(block, spec)
+        param.set_param('my_accounting.blocks_funding_v3', '1')
+
+    @api.model
+    def _upgrade_funding_text(self):
+        """بيان «تمويل موفق» على لفظ قيده 17/9، بلا رقم شيك."""
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.blocks_funding_text'):
+            return
+        spec = [item for item in DEFAULT_BLOCKS if item['name'] == 'تمويل موفق'][0]
+        block = self.search([('name', '=', spec['name'])], limit=1)
+        old_keys = ['cheque', 'project', 'month', 'salaries', 'services']
+        if block and block.field_ids.mapped('key') == old_keys:
+            block.write({'hint': spec['hint'], 'text_template': spec['text']})
+            block.field_ids.unlink()
+            self.env['myaccounting.block.field'].create([{
+                'block_id': block.id, 'sequence': index * 10,
+                'key': key, 'label': label, 'default_value': default, 'kind': kind,
+            } for index, (key, label, default, kind) in enumerate(spec['fields'])])
+        param.set_param('my_accounting.blocks_funding_text', '1')
 
     @api.model
     def _upgrade_funding_block(self):
@@ -394,6 +434,8 @@ class MyAccountingBlock(models.Model):
             self._upgrade_invoice_block()
             self._upgrade_return_block()
             self._upgrade_funding_block()
+            self._upgrade_funding_text()
+            self._upgrade_funding_lines()
             return
         for spec in DEFAULT_BLOCKS:
             self._create_block_from_spec(spec)
@@ -401,6 +443,8 @@ class MyAccountingBlock(models.Model):
         param.set_param('my_accounting.blocks_invoice_v2', '1')
         param.set_param('my_accounting.blocks_return', '1')
         param.set_param('my_accounting.blocks_funding', '1')
+        param.set_param('my_accounting.blocks_funding_text', '1')
+        param.set_param('my_accounting.blocks_funding_v3', '1')
 
 
 class MyAccountingBlockField(models.Model):
