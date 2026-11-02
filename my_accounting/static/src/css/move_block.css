@@ -28,3 +28,11 @@
     font-size: 0.85rem;
     vertical-align: middle;
 }
+
+/* البيان الذي تكتبه الكتلة بنفسها */
+.o_move_block_text {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--o-surface-2, #f2f3f5);
+    color: var(--body-color, #212529);
+}

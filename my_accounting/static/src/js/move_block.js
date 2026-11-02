@@ -5,7 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-import { buildBlockLines } from "./block_formula";
+import { buildBlockLines, buildBlockText } from "./block_formula";
 
 const ACCOUNT_LIST_ID = "o_move_block_accounts";
 
@@ -63,13 +63,30 @@ export class MoveBlockDialog extends Component {
         return numbers;
     }
 
+    /** البيان: تكتبه الكتلة من صيغتها، وإلا فمن المستخدم */
+    get composed() {
+        return buildBlockText(this.block, this.state.values, this.state.accounts,
+            this.props.accounts);
+    }
+
+    get text() {
+        return this.block.text_template
+            ? this.composed.text
+            : this.state.text.trim();
+    }
+
     get lines() {
         return buildBlockLines(this.block, this.numbers, this.state.accounts,
-            this.state.text.trim());
+            this.text);
     }
 
     get problem() {
-        if (!this.state.text.trim()) {
+        if (this.block.text_template) {
+            const missing = this.composed.missing;
+            if (missing.length) {
+                return `اكتب ${missing.join(" و")}.`;
+            }
+        } else if (!this.state.text.trim()) {
             return "اكتب البيان.";
         }
         const lines = this.lines;

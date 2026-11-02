@@ -139,6 +139,41 @@ export function formulaNames(formula) {
 }
 
 /**
+ * بيان الكتلة من صيغتها: «فاتورة رقم {invoice} / {account}».
+ *
+ * {مفتاح الخانة} يأخذ ما كُتب فيها، و{account} يأخذ اسم الحساب المختار
+ * في أول بندٍ يُسأل عن حسابه. ويُرجع ما نقص ليُطلب من المستخدم.
+ */
+export function buildBlockText(block, values, chosenAccounts, accounts) {
+    const template = block.text_template || "";
+    if (!template) {
+        return { text: "", missing: [] };
+    }
+    const missing = [];
+    const asked = block.lines.find((line) => line.ask_account);
+    const text = template.replace(/\{([^{}]+)\}/g, (whole, key) => {
+        const name = key.trim();
+        if (name === "account") {
+            const chosen = asked ? chosenAccounts[asked.id] : false;
+            const account = (accounts || []).find((item) => item.id === chosen);
+            if (!account) {
+                missing.push(asked ? (asked.account_prompt || "الحساب") : "الحساب");
+                return "";
+            }
+            return account.name;
+        }
+        const field = block.fields.find((item) => item.key === name);
+        const value = String(values[name] === undefined ? "" : values[name]).trim();
+        if (!value) {
+            missing.push(field ? field.label : name);
+            return "";
+        }
+        return value;
+    });
+    return { text: text.replace(/\s+/g, " ").trim(), missing };
+}
+
+/**
  * بنود الكتلة كما ستُضاف: يحسب كل بند من صيغته ويطرح الفارغ منها.
  * values: قيم خانات المبالغ، accounts: الحساب المختار لكل بند يُسأل عنه.
  */

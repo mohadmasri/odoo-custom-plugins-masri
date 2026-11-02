@@ -30,20 +30,30 @@
                 <div t-if="block.hint" class="text-muted small mb-3" t-esc="block.hint"/>
 
                 <div class="row g-2 mb-3">
-                    <div class="col-12 col-md-6">
+                    <div t-if="!block.text_template" class="col-12 col-md-6">
                         <label class="form-label small mb-1">البيان</label>
                         <input type="text" class="form-control form-control-sm" autofocus="autofocus"
                                placeholder="يُكتب على كل بند ما لم يكن للبند بيان خاص"
                                t-model="state.text"/>
                     </div>
                     <div t-foreach="block.fields" t-as="field" t-key="field.key"
-                         class="col-6 col-md-3">
+                         t-attf-class="col-6 {{ field.kind === 'text' ? 'col-md-4' : 'col-md-3' }}">
                         <label class="form-label small mb-1" t-esc="field.label"/>
-                        <input type="number" step="0.001"
+                        <input t-if="field.kind === 'text'" type="text"
+                               class="form-control form-control-sm"
+                               t-att-value="state.values[field.key]"
+                               t-on-input="(ev) => this.onValue(field.key, ev)"/>
+                        <input t-else="" type="number" step="0.001"
                                class="form-control form-control-sm text-end"
                                t-att-value="state.values[field.key]"
                                t-on-input="(ev) => this.onValue(field.key, ev)"/>
                     </div>
+                </div>
+
+                <!-- البيان الذي تكتبه الكتلة بنفسها، يراه قبل الإضافة -->
+                <div t-if="block.text_template" class="o_move_block_text mb-3">
+                    <span class="small text-muted">البيان:</span>
+                    <b t-esc="text or '—'"/>
                 </div>
 
                 <div t-if="askedLines.length" class="row g-2 mb-3">

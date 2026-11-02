@@ -64,9 +64,9 @@ export class BlocksSettings extends Component {
 
     create() {
         this.state.edited = {
-            id: false, name: "", icon: "fa-th-large", hint: "",
+            id: false, name: "", icon: "fa-th-large", hint: "", text_template: "",
             sequence: (this.state.blocks.length + 1) * 10, active: true,
-            fields: [{ key: "amount", label: "المبلغ", default_value: 0 }],
+            fields: [{ key: "amount", label: "المبلغ", kind: "number", default_value: 0 }],
             lines: [
                 { id: "n1", label: "", account_id: false, ask_account: true,
                   account_prompt: "الحساب المدين", side: "debit", formula: "amount",
@@ -86,7 +86,10 @@ export class BlocksSettings extends Component {
     resetTrial() {
         const trying = {};
         for (const field of this.state.edited.fields) {
-            trying[field.key] = field.default_value || 100;
+            // خانة النص لا تُحسب، فتدخل التجربة بصفر لئلّا تُعدّ مفقودة
+            trying[field.key] = field.kind === "text"
+                ? 0
+                : field.default_value || 100;
         }
         this.state.trying = trying;
     }
@@ -96,7 +99,8 @@ export class BlocksSettings extends Component {
     // ------------------------------------------------------------------
 
     addField() {
-        this.state.edited.fields.push({ key: "", label: "", default_value: 0 });
+        this.state.edited.fields.push(
+            { key: "", label: "", kind: "number", default_value: 0 });
     }
 
     removeField(index) {

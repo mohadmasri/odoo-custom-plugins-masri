@@ -13,18 +13,23 @@ from odoo.exceptions import UserError
 DEFAULT_BLOCKS = [
     {
         'name': 'فاتورة', 'icon': 'fa-file-text-o', 'sequence': 10,
-        'hint': 'ذمم الجهة مديناً بالإجمالي، الإيراد دائناً بالصافي، والضريبة دائنة.',
-        'fields': [('amount', 'المبلغ قبل الضريبة', 0.0), ('rate', 'نسبة الضريبة %', 16.0)],
+        'hint': 'اكتب رقم الفاتورة وإجماليها، فيُحسب ما قبل الضريبة والضريبة.',
+        'text': 'فاتورة رقم {invoice} / {account}',
+        'fields': [('invoice', 'رقم الفاتورة', 0.0, 'text'),
+                   ('total', 'اجمالي الفاتورة', 0.0, 'number'),
+                   ('rate', 'نسبة الضريبة %', 16.0, 'number')],
         'lines': [
-            ('', '', 'حساب الجهة (الذمم)', 'debit', 'amount + amount * rate / 100', False),
-            ('', '401', '', 'credit', 'amount', False),
-            ('', '201', '', 'credit', 'amount * rate / 100', True),
+            ('', '', 'حساب الجهة (الذمم)', 'debit', 'total', False),
+            ('', '401', '', 'credit', 'total / (1 + rate / 100)', False),
+            ('', '201', '', 'credit', 'total - total / (1 + rate / 100)', True),
         ],
     },
     {
         'name': 'فاتورة شاملة الضريبة', 'icon': 'fa-file-text-o', 'sequence': 20,
         'hint': 'المبلغ المكتوب على الفاتورة شامل الضريبة، فتُستخرج منه.',
-        'fields': [('amount', 'المبلغ شامل الضريبة', 0.0), ('rate', 'نسبة الضريبة %', 16.0)],
+        'text': '',
+        'fields': [('amount', 'المبلغ شامل الضريبة', 0.0, 'number'),
+                   ('rate', 'نسبة الضريبة %', 16.0, 'number')],
         'lines': [
             ('', '', 'حساب الجهة (الذمم)', 'debit', 'amount', False),
             ('', '401', '', 'credit', 'amount / (1 + rate / 100)', False),
@@ -34,7 +39,8 @@ DEFAULT_BLOCKS = [
     {
         'name': 'فاتورة معفاة', 'icon': 'fa-file-o', 'sequence': 30,
         'hint': 'بلا ضريبة، ويبقى بند الضريبة ظاهراً بصفر.',
-        'fields': [('amount', 'المبلغ', 0.0)],
+        'text': '',
+        'fields': [('amount', 'المبلغ', 0.0, 'number')],
         'lines': [
             ('', '', 'حساب الجهة (الذمم)', 'debit', 'amount', False),
             ('', '401', '', 'credit', 'amount', False),
@@ -44,7 +50,9 @@ DEFAULT_BLOCKS = [
     {
         'name': 'كفالة', 'icon': 'fa-shield', 'sequence': 40,
         'hint': 'الكفالة والعمولة مدينتان، والبنك دائن بالمجموع.',
-        'fields': [('amount', 'مبلغ الكفالة', 0.0), ('commission', 'العمولة', 0.0)],
+        'text': '',
+        'fields': [('amount', 'مبلغ الكفالة', 0.0, 'number'),
+                   ('commission', 'العمولة', 0.0, 'number')],
         'lines': [
             ('', '652', '', 'debit', 'amount', False),
             ('', '760', '', 'debit', 'commission', False),
@@ -54,7 +62,9 @@ DEFAULT_BLOCKS = [
     {
         'name': 'قبض', 'icon': 'fa-money', 'sequence': 50,
         'hint': 'ذمم الجهة دائنة بالإجمالي، البنك مدين بالصافي، والطوابع مدينة.',
-        'fields': [('amount', 'المبلغ الإجمالي', 0.0), ('fee', 'الطوابع', 0.0)],
+        'text': '',
+        'fields': [('amount', 'المبلغ الإجمالي', 0.0, 'number'),
+                   ('fee', 'الطوابع', 0.0, 'number')],
         'lines': [
             ('', '', 'حساب الجهة (الذمم)', 'credit', 'amount', False),
             ('', '101', '', 'debit', 'amount - fee', False),
@@ -74,6 +84,11 @@ class MyAccountingBlock(models.Model):
     hint = fields.Char(string='الشرح')
     sequence = fields.Integer(string='الترتيب', default=10)
     active = fields.Boolean(string='مفعّلة', default=True)
+    text_template = fields.Char(
+        string='صيغة البيان',
+        help='يُكتب البيان وحده من خاناتها: «فاتورة رقم {invoice} / {account}». '
+             'و{account} هو الحساب المختار عند الاستعمال. '
+             'واتركها فارغة ليكتب المستخدم البيان بنفسه.')
     field_ids = fields.One2many('myaccounting.block.field', 'block_id',
                                 string='خانات المبالغ', copy=True)
     line_ids = fields.One2many('myaccounting.block.line', 'block_id',
@@ -111,8 +126,10 @@ class MyAccountingBlock(models.Model):
             'hint': self.hint or '',
             'sequence': self.sequence,
             'active': self.active,
+            'text_template': self.text_template or '',
             'fields': [{
                 'id': field.id, 'key': field.key, 'label': field.label,
+                'kind': field.kind or 'number',
                 'default_value': field.default_value, 'sequence': field.sequence,
             } for field in self.field_ids],
             'lines': [{
@@ -140,6 +157,7 @@ class MyAccountingBlock(models.Model):
             'hint': (values.get('hint') or '').strip(),
             'sequence': int(values.get('sequence') or 10),
             'active': bool(values.get('active', True)),
+            'text_template': (values.get('text_template') or '').strip(),
         }
         if not header['name']:
             raise UserError('اكتب اسماً للكتلة.')
@@ -159,6 +177,7 @@ class MyAccountingBlock(models.Model):
             'sequence': index * 10,
             'key': (field.get('key') or '').strip(),
             'label': (field.get('label') or '').strip() or (field.get('key') or ''),
+            'kind': 'text' if field.get('kind') == 'text' else 'number',
             'default_value': float(field.get('default_value') or 0.0),
         } for index, field in enumerate(values.get('fields') or [])])
         self.env['myaccounting.block.line'].create([{
@@ -190,22 +209,50 @@ class MyAccountingBlock(models.Model):
     # ------------------------------------------------------------------
 
     @api.model
+    def _upgrade_invoice_block(self):
+        """كتلة «فاتورة» القديمة تصير بنموذجها الجديد: رقم الفاتورة
+        وإجماليها، ويُحسب ما قبل الضريبة والضريبة، والبيان يُكتب وحده.
+
+        تُنفَّذ مرة واحدة، ولا تمسّ كتلةً عدّلها المستخدم بنفسه.
+        """
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.blocks_invoice_v2'):
+            return
+        spec = DEFAULT_BLOCKS[0]
+        block = self.search([('name', '=', spec['name'])], limit=1)
+        old_keys = ['amount', 'rate']
+        if block and block.field_ids.mapped('key') == old_keys:
+            Account = self.env['myaccounting.account']
+            block.write({'hint': spec['hint'], 'text_template': spec['text']})
+            block.field_ids.unlink()
+            self.env['myaccounting.block.field'].create([{
+                'block_id': block.id, 'sequence': index * 10,
+                'key': key, 'label': label, 'default_value': default, 'kind': kind,
+            } for index, (key, label, default, kind) in enumerate(spec['fields'])])
+            for index, line in enumerate(block.line_ids):
+                _label, code, _prompt, side, formula, zero = spec['lines'][index]
+                line.write({'side': side, 'formula': formula, 'zero_visible': zero})
+        param.set_param('my_accounting.blocks_invoice_v2', '1')
+
+    @api.model
     def _seed_defaults(self):
         """يبني الكتل المعتادة مرة واحدة، عند أول استعمال فقط."""
         param = self.env['ir.config_parameter'].sudo()
         if param.get_param('my_accounting.blocks_seeded') or self.search_count([]):
             param.set_param('my_accounting.blocks_seeded', '1')
+            self._upgrade_invoice_block()
             return
         Account = self.env['myaccounting.account']
         for spec in DEFAULT_BLOCKS:
             block = self.create({
                 'name': spec['name'], 'icon': spec['icon'],
                 'hint': spec['hint'], 'sequence': spec['sequence'],
+                'text_template': spec.get('text', ''),
             })
             self.env['myaccounting.block.field'].create([{
                 'block_id': block.id, 'sequence': index * 10,
-                'key': key, 'label': label, 'default_value': default,
-            } for index, (key, label, default) in enumerate(spec['fields'])])
+                'key': key, 'label': label, 'default_value': default, 'kind': kind,
+            } for index, (key, label, default, kind) in enumerate(spec['fields'])])
             lines = []
             for index, (label, code, prompt, side, formula, zero) in enumerate(spec['lines']):
                 account = Account.search([('code', '=', code)], limit=1) if code else Account
@@ -218,6 +265,7 @@ class MyAccountingBlock(models.Model):
                 })
             self.env['myaccounting.block.line'].create(lines)
         param.set_param('my_accounting.blocks_seeded', '1')
+        param.set_param('my_accounting.blocks_invoice_v2', '1')
 
 
 class MyAccountingBlockField(models.Model):
@@ -231,6 +279,9 @@ class MyAccountingBlockField(models.Model):
     key = fields.Char(string='المفتاح', required=True,
                       help='الاسم الذي يُكتب في صيغ البنود، بالإنجليزية بلا مسافات.')
     label = fields.Char(string='العنوان', required=True)
+    kind = fields.Selection([('number', 'رقم'), ('text', 'نص')], string='النوع',
+                            required=True, default='number',
+                            help='«نص» لما لا يُحسب كرقم الفاتورة، ويُكتب في صيغة البيان.')
     default_value = fields.Float(string='القيمة الافتراضية', digits=(16, 3))
 
 

@@ -91,6 +91,23 @@
                         </div>
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-8">
+                            <label class="form-label small mb-1">
+                                صيغة البيان
+                                <span class="text-muted">
+                                    — اتركها فارغة ليكتب المستخدم البيان بنفسه
+                                </span>
+                            </label>
+                            <input type="text" class="form-control form-control-sm"
+                                   placeholder="فاتورة رقم {invoice} / {account}"
+                                   t-model="state.edited.text_template"/>
+                            <div class="small text-muted mt-1">
+                                {مفتاح الخانة} يأخذ ما كُتب فيها، و{account} اسم الحساب المختار.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-check mb-3">
                         <input type="checkbox" class="form-check-input" id="o_bs_active"
                                t-model="state.edited.active"/>
@@ -109,6 +126,7 @@
                             <tr>
                                 <th style="width:170px;">المفتاح</th>
                                 <th>العنوان المعروض</th>
+                                <th style="width:110px;">النوع</th>
                                 <th class="text-end" style="width:150px;">قيمة افتراضية</th>
                                 <th style="width:50px;"/>
                             </tr>
@@ -126,8 +144,18 @@
                                            t-on-change="(ev) => this.onFieldChange(field, 'label', ev)"/>
                                 </td>
                                 <td>
+                                    <select class="form-select form-select-sm"
+                                            t-on-change="(ev) => this.onFieldChange(field, 'kind', ev)">
+                                        <option value="number"
+                                                t-att-selected="field.kind !== 'text'">رقم</option>
+                                        <option value="text"
+                                                t-att-selected="field.kind === 'text'">نص</option>
+                                    </select>
+                                </td>
+                                <td>
                                     <input type="number" step="0.001"
                                            class="form-control form-control-sm text-end"
+                                           t-att-disabled="field.kind === 'text'"
                                            t-att-value="field.default_value"
                                            t-on-change="(ev) => this.onFieldChange(field, 'default_value', ev)"/>
                                 </td>
