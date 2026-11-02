@@ -723,11 +723,16 @@ class MyAccountingPayroll(models.Model):
         return self._payload()
 
     def _post_sheet(self, sheet, settings):
-        """قيد كشفٍ واحد، ببنوده وترتيبها كما يكتبها هو (انظر قيده 1/9):
+        """قيد كشفٍ واحد، ببنوده وترتيبها كما يكتبها هو.
 
-        المصروف، ثم الصافي تحويلاً ثم شيكاتٍ، ثم ضمان الموظف وضريبته
-        وتقاعده كلٌّ في بنده، ثم حصة الشركة من الضمان بندين: مديناً على
-        حسابها ودائناً على الضمان. وضمان الموظف وحصة الشركة لا يُجمعان.
+        كشف المكتب على نمط قيده 1/9: المصروف، ثم الصافي تحويلاً ثم
+        شيكاتٍ، ثم ضمان الموظف وضريبته وتقاعده كلٌّ في بنده، ثم حصة
+        الشركة من الضمان بندين: مديناً على حسابها ودائناً على الضمان.
+
+        وكشف المشروع على نمط قيده 20/9: الصافي في آخر القيد بعد حصة
+        الشركة، لا بعد المصروف — فآخر ما يُقرأ ما صرفه موفق.
+
+        وضمان الموظف وحصة الشركة لا يُجمعان في الحالين.
         """
         self.ensure_one()
         lines = self._sheet_lines(sheet)
@@ -766,7 +771,8 @@ class MyAccountingPayroll(models.Model):
         for account_id, amount in by_account.items():
             add(account_id, label, debit=amount)
 
-        # 2) الصافي: سطرٌ للتحويل وسطرٌ للشيكات على كل جهة دفع
+        # 2) الصافي: سطرٌ للتحويل وسطرٌ للشيكات على كل جهة دفع.
+        # مكانه يختلف: في كشف المكتب بعد المصروف، وفي المشروع في الآخر.
         by_payment = {}
         for line, data in zip(lines, payloads):
             if not data['net']:
@@ -775,10 +781,18 @@ class MyAccountingPayroll(models.Model):
             method = line.employee_id.payment_method or 'transfer'
             key = (payment.id, method)
             by_payment[key] = round(by_payment.get(key, 0.0) + data['net'], 3)
-        for (account_id, method), amount in sorted(
-                by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
-                                                      item[0][0])):
-            add(account_id, 'شيكات' if method == 'cheque' else label, credit=amount)
+
+        def add_nets():
+            for (account_id, method), amount in sorted(
+                    by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
+                                                          item[0][0])):
+                add(account_id, 'شيكات' if method == 'cheque' else label,
+                    credit=amount)
+
+        # كشف المكتب مصروفه على حساب الرواتب العام، والمشروع على حسابه
+        is_office = set(by_account) <= {settings.expense_account_id.id}
+        if is_office:
+            add_nets()
 
         # 3) استقطاعات الموظف، كلٌّ في بنده
         add(settings.social_account_id, 'ضمان شهر %s' % period,
@@ -806,6 +820,10 @@ class MyAccountingPayroll(models.Model):
             add(settings.social_account_id,
                 label if own else 'ما يخص الشركة',
                 credit=amount)
+
+        # 5) صافي المشروع آخر القيد: ما صرفه موفق، كما في قيده 20/9
+        if not is_office:
+            add_nets()
 
         # القيد يدخل كأي قيدٍ جديد: رقمه وتاريخه وشهره المحاسبي من
         # افتراضات القيد نفسها، فلا ترقيم خاصّ بالرواتب
