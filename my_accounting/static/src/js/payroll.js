@@ -360,7 +360,8 @@ export class Payroll extends Component {
         const what = done.length === 1 ? `قيد ${done[0].name}` : `${done.length} قيود`;
         this.dialog.add(ConfirmationDialog, {
             title: "فكّ الترحيل",
-            body: `سيُحذف ${what} ما دام مسودةً، ويعود الكشف قابلاً للتعديل.`,
+            body: `يبقى ${what} في الدفتر كما هو، ويعود الكشف قابلاً للتعديل`
+                + ` والترحيل من جديد — فإن أنشأت قيداً بعده صار في الدفتر قيدان.`,
             confirmLabel: "نعم",
             confirm: () => this.withBusy(async () => {
                 this.state.data = await this.orm.call("myaccounting.payroll",
@@ -375,7 +376,7 @@ export class Payroll extends Component {
         const payroll = this.state.data;
         this.dialog.add(ConfirmationDialog, {
             title: `حذف "${payroll.name}"`,
-            body: "سيُحذف كشف الشهر بكل بنوده.",
+            body: "سيُحذف كشف الشهر بكل بنوده، وتبقى قيوده في الدفتر كما هي.",
             confirmLabel: "احذف",
             confirm: () => this.withBusy(async () => {
                 await this.orm.call("myaccounting.payroll", "delete_payroll",

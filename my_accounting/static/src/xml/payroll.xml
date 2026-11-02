@@ -240,6 +240,16 @@
                                 <t t-if="toPost.length === 1">مسودة</t>
                                 <t t-else=""><t t-esc="toPost.length"/> كشوف مسودة</t>
                             </t>
+                            <!-- قيودٌ خرجت من هذا الكشف ثم فُكّ ترحيلها -->
+                            <div t-if="data.past_moves.length" class="small text-muted">
+                                قيودٌ سابقة من هذا الكشف:
+                                <t t-foreach="data.past_moves" t-as="past" t-key="past.id">
+                                    <a href="#" class="o_pr_link"
+                                       t-custom-click="(ev, mid) => this.openMove(past.id, mid)">
+                                        <t t-esc="past.name"/>
+                                    </a><t t-if="!past_last">، </t>
+                                </t>
+                            </div>
                         </div>
                     </div>
 

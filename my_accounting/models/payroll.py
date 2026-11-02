@@ -485,7 +485,8 @@ class MyAccountingPayroll(models.Model):
     state = fields.Selection([('draft', 'مسودة'), ('posted', 'مُرحَّل')],
                              string='الحالة', default='draft')
     line_ids = fields.One2many('myaccounting.payroll.line', 'payroll_id', string='البنود')
-    # لكل كشف قيده، كما في دفاتره: قيد لرواتب المكتب وآخر لكل مشروع
+    # لكل كشف قيده، كما في دفاتره: قيد لرواتب المكتب وآخر لكل مشروع.
+    # وتبقى فيها القيود التي فُكّ ترحيلها، صلةً تُعرف بها أصول القيود.
     move_ids = fields.One2many('myaccounting.move', 'payroll_id', string='القيود')
 
     _year_month_unique = models.Constraint('unique(year, month)',
@@ -494,7 +495,30 @@ class MyAccountingPayroll(models.Model):
     # ------------------------------------------------------------------
 
     @api.model
+    def _seed_current_moves(self):
+        """القيود التي أُنشئت قبل هذه الميزة كانت قيود كشوفها الحالية.
+
+        فكّ الترحيل كان يحذف القيد، فما بقي مربوطاً بكشفٍ فهو قيده. ولو
+        وُجد لكشفٍ أكثر من قيد فأحدثها هو الحالي.
+        """
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.payroll_current_moves'):
+            return
+        moves = self.env['myaccounting.move'].search(
+            [('payroll_id', '!=', False)], order='id desc')
+        seen = set()
+        for move in moves:
+            key = (move.payroll_id.id, move.payroll_group_id.id or False)
+            if key in seen:
+                continue
+            seen.add(key)
+            if not move.payroll_current:
+                move.payroll_current = True
+        param.set_param('my_accounting.payroll_current_moves', '1')
+
+    @api.model
     def get_payrolls(self):
+        self._seed_current_moves()
         return [{
             'id': payroll.id,
             'name': payroll.name,
@@ -547,12 +571,22 @@ class MyAccountingPayroll(models.Model):
         return self.line_ids.filtered(lambda line: line.group_id.id == int(sheet))
 
     def _sheet_move(self, sheet):
-        """قيد هذا الكشف إن كان مُرحَّلاً."""
+        """قيد هذا الكشف الحالي إن كان مُرحَّلاً.
+
+        ما فُكّ ترحيله يبقى في الدفتر وفي move_ids، ولكنه لا يُعدّ قيد
+        الكشف بعد ذلك، فيستطيع الكشف أن يُرحَّل من جديد.
+        """
         self.ensure_one()
         group_id = False if str(sheet) == 'none' else int(sheet)
         found = self.move_ids.filtered(
-            lambda move: (move.payroll_group_id.id or False) == group_id)
+            lambda move: move.payroll_current
+            and (move.payroll_group_id.id or False) == group_id)
         return found[:1]
+
+    def _past_moves(self):
+        """قيودٌ أُنشئت من هذا الكشف ثم فُكّ ترحيلها، وما زالت في الدفتر."""
+        self.ensure_one()
+        return self.move_ids.filtered(lambda move: not move.payroll_current)
 
     def _sheet_keys(self, sheet):
         """ما يشمله الزرّ: كشوف الشهر كلها عند «عرض الكل»، أو الكشف المختار."""
@@ -607,6 +641,9 @@ class MyAccountingPayroll(models.Model):
                 'other_deduction', 'total_deduction', 'net')},
                 employer_social=employer),
             'sheets': sheets,
+            'past_moves': [{'id': move.id, 'name': move.name or '',
+                            'sheet': move.payroll_group_id.name or ''}
+                           for move in self._past_moves()],
             'posted_any': any(sheet['posted'] for sheet in sheets),
             'posted_all': bool(sheets) and all(sheet['posted'] for sheet in sheets),
         }
@@ -628,8 +665,8 @@ class MyAccountingPayroll(models.Model):
     def fill_from_employees(self):
         """يعيد بناء بنود الكشف من بطاقات الموظفين على رأس عملهم."""
         self.ensure_one()
-        if self.move_ids:
-            raise UserError('في الشهر كشوفٌ لها قيود، فُكَّ ترحيلها قبل إعادة البناء.')
+        if self.move_ids.filtered('payroll_current'):
+            raise UserError('في الشهر كشوفٌ مُرحَّلة، فُكَّ ترحيلها قبل إعادة البناء.')
         self.line_ids.unlink()
         settings = self.env['myaccounting.payroll.settings']._get()
         Line = self.env['myaccounting.payroll.line']
@@ -710,9 +747,7 @@ class MyAccountingPayroll(models.Model):
                 twin.write(values)
 
     def delete_payroll(self):
-        for payroll in self:
-            if payroll.move_ids:
-                raise UserError('للكشف قيود، فُكَّ ترحيلها قبل حذفه.')
+        """يحذف الكشف وبنوده، وتبقى قيوده في الدفتر كما هي."""
         self.unlink()
         return True
 
@@ -866,25 +901,26 @@ class MyAccountingPayroll(models.Model):
                                          else 'رواتب مشاريع'),
             'payroll_id': self.id,
             'payroll_group_id': group.id or False,
+            'payroll_current': True,
             'line_ids': entries,
         })
 
     def unpost_payroll(self, sheet='all'):
-        """يفكّ ترحيل الكشف المعروض ويحذف قيده ما دام مسودة."""
+        """يفكّ ربط الكشف بقيده، والقيد يبقى في الدفتر كما هو.
+
+        فالكشف يعود مسودةً قابلاً للتعديل والترحيل من جديد، والقيد
+        الأول لا يُمسّ — تبقى صلته بالكشف مكتوبةً فيه، ويبقى مرجعه
+        يقول من أيّ كشفٍ خرج.
+        """
         self.ensure_one()
         moves = self.env['myaccounting.move']
         for key in self._sheet_keys(sheet):
             move = self._sheet_move(key)
-            if not move:
-                continue
-            if move.state != 'draft':
-                raise UserError(
-                    'قيد «%s» مُرحَّل في الدفتر، فأعِده مسودةً قبل فكّ ترحيل الكشف.'
-                    % move.name)
-            moves |= move
+            if move:
+                moves |= move
         if not moves:
             raise UserError('لا قيد لهذا الكشف.')
-        moves.unlink()
+        moves.write({'payroll_current': False})
         self._sync_state()
         return self._payload()
 
@@ -946,3 +982,7 @@ class MyAccountingMovePayroll(models.Model):
     payroll_group_id = fields.Many2one('myaccounting.payroll.group',
                                        string='كشف الموظفين',
                                        ondelete='set null', copy=False)
+    payroll_current = fields.Boolean(
+        string='قيد الكشف الحالي', default=False, copy=False,
+        help='القيد الذي يَعدّه الكشف قيدَه الآن. وفكّ الترحيل يُنزل هذه '
+             'الصفة ولا يحذف القيد، فتبقى صلته بالكشف معروفة.')
