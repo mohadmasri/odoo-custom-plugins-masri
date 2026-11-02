@@ -24,6 +24,14 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'upload' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('upload')">
+                        كشف مرفوع
+                        <span t-if="state.uploads.length" class="o_pr_count"
+                              t-esc="state.uploads.length"/>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.tab === 'settings' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('settings')">إعدادات</a>
                 </li>
@@ -33,6 +41,9 @@
             <input type="file" class="d-none" t-ref="excelInput"
                    accept=".xlsx"
                    t-on-change="(ev) => this.onExcelFile(ev)"/>
+            <input type="file" class="d-none" t-ref="uploadInput"
+                   accept=".xlsx"
+                   t-on-change="(ev) => this.onUploadFile(ev)"/>
 
             <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
 
@@ -809,6 +820,192 @@
                     <i class="fa fa-plus me-1"/> بطاقة موظف جديد
                     <t t-if="currentGroup"> في <t t-esc="currentGroup.name"/></t>
                 </button>
+            </t>
+
+            <!-- ======================================= كشف مرفوع -->
+            <t t-elif="state.tab === 'upload'">
+                <div class="o_pr_bar no-print">
+                    <select t-if="state.uploads.length" class="form-select form-select-sm"
+                            style="width:300px;" t-on-change="(ev) => this.openUpload(ev)">
+                        <option t-foreach="state.uploads" t-as="item" t-key="item.id"
+                                t-att-value="item.id" t-att-selected="isUpload(item.id)">
+                            <t t-esc="item.name"/> — <t t-esc="item.lines"/> بنداً
+                            <t t-if="item.posted"> · <t t-esc="item.posted"/> قيود</t>
+                        </option>
+                    </select>
+                    <span t-if="state.uploads.length" class="o_pr_sep"/>
+                    <label class="form-label small mb-0">شهر الملف</label>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onNew('newMonth', ev)">
+                        <option t-foreach="months" t-as="month" t-key="month[0]"
+                                t-att-value="month[0]"
+                                t-att-selected="month[0] === state.newMonth"
+                                t-esc="month[1]"/>
+                    </select>
+                    <input type="number" class="form-control form-control-sm" style="width:90px;"
+                           t-att-value="state.newYear"
+                           t-on-change="(ev) => this.onNew('newYear', ev)"/>
+                    <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
+                            t-on-click="() => this.pickUpload()">
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                    </button>
+                </div>
+
+                <div t-if="!state.upload" class="o_pr_empty">
+                    <div class="mb-2">لا كشف مرفوع بعد.</div>
+                    <div class="small text-muted">
+                        ارفع ملف كشف الرواتب كما هو، فيُعرض ويُحفظ وتُنشأ منه القيود —
+                        بلا بطاقات ولا تعديلٍ على كشوف الأشهر.
+                    </div>
+                </div>
+
+                <t t-else="">
+                    <div class="o_pr_head">
+                        <div class="o_pr_print_title">
+                            كشف رواتب <t t-esc="state.upload.month_label"/>
+                            <t t-esc="state.upload.year"/>
+                            <t t-if="uploadLabel"> — <t t-esc="uploadLabel"/></t>
+                        </div>
+                        <div class="small text-muted">
+                            <t t-esc="state.upload.filename or state.upload.name"/> ·
+                            <t t-esc="uploadCount"/> موظفاً
+                            <t t-if="uploadPosted.length">
+                                · مُرحَّل إلى
+                                <t t-foreach="uploadPosted" t-as="done" t-key="done.key">
+                                    <a href="#" class="o_pr_link"
+                                       t-custom-click="(ev, mid) => this.openMove(done.move_id, mid)">
+                                        قيد <t t-esc="done.move"/>
+                                    </a><t t-if="!done_last">، </t>
+                                </t>
+                            </t>
+                            <div t-if="state.upload.past_moves.length" class="small text-muted">
+                                قيودٌ سابقة من هذا الكشف:
+                                <t t-foreach="state.upload.past_moves" t-as="past"
+                                   t-key="past.id">
+                                    <a href="#" class="o_pr_link"
+                                       t-custom-click="(ev, mid) => this.openMove(past.id, mid)">
+                                        <t t-esc="past.name"/>
+                                    </a><t t-if="!past_last">، </t>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_pr_bar no-print">
+                        <button t-if="uploadToPost.length" class="btn btn-sm btn-success"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.postUpload()">
+                            <i class="fa fa-check me-1"/> <t t-esc="uploadPostLabel"/>
+                        </button>
+                        <button t-if="uploadPosted.length" class="btn btn-sm btn-outline-danger"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.unpostUpload()">
+                            <t t-esc="uploadUnpostLabel"/>
+                        </button>
+                        <button class="btn btn-sm btn-secondary"
+                                t-on-click="() => this.print()">
+                            <i class="fa fa-print me-1"/> طباعة
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.deleteUpload()">احذف الكشف المرفوع</button>
+                    </div>
+
+                    <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
+                        t-if="uploadSections.length > 1">
+                        <li class="nav-item">
+                            <a href="#" t-attf-class="nav-link {{ state.uploadSheet === 'all' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setUploadSheet('all')">
+                                عرض الكل
+                                <span class="badge rounded-pill"
+                                      t-esc="state.upload.lines.length"/>
+                            </a>
+                        </li>
+                        <li class="nav-item" t-foreach="uploadSections" t-as="section"
+                            t-key="section.key">
+                            <a href="#" t-attf-class="nav-link {{ state.uploadSheet === section.key ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setUploadSheet(section.key)">
+                                <t t-esc="section.name"/>
+                                <i t-if="section.posted" class="fa fa-check-circle ms-1"
+                                   title="له قيد"/>
+                                <span class="badge rounded-pill" t-esc="section.count"/>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <table class="table table-bordered table-sm o_pr_table o_pr_month">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width:44px;">م</th>
+                                <th style="width:170px;">الموظف</th>
+                                <th class="text-end" style="width:96px;">الأساسي</th>
+                                <th class="text-end" style="width:96px;">العلاوات</th>
+                                <th class="text-end" style="width:96px;">الإجمالي</th>
+                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
+                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
+                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
+                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
+                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
+                                <th class="text-end" style="width:96px;">الصافي</th>
+                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
+                                <th class="text-center" style="width:70px;">الصرف</th>
+                            </tr>
+                        </thead>
+                        <tbody t-foreach="uploadVisible" t-as="section" t-key="section.key">
+                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
+                                <td class="text-center text-muted"
+                                    t-esc="section.start + line_index + 1"/>
+                                <td t-esc="line.employee"/>
+                                <td class="text-end" t-esc="fmt(line.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(line.allowance)"/>
+                                <td class="text-end" t-esc="fmt(line.gross)"/>
+                                <td class="text-end" t-esc="fmt(line.social_base)"/>
+                                <td class="text-end" t-esc="fmt(line.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(line.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(line.pension)"/>
+                                <td class="text-end" t-esc="fmt(line.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(line.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(line.net)"/>
+                                <td class="text-end" t-esc="fmt(line.employer_social)"/>
+                                <td class="text-center small" t-esc="line.method"/>
+                            </tr>
+                        </tbody>
+                        <tbody t-if="!uploadCount">
+                            <tr>
+                                <td colspan="14" class="text-muted text-center py-2">
+                                    لا بنود في هذا الكشف.
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="uploadCount">
+                            <tr class="o_pr_total">
+                                <td colspan="2">
+                                    <t t-if="uploadLabel">مجموع <t t-esc="uploadLabel"/></t>
+                                    <t t-else="">مجموع الكشف</t>
+                                </td>
+                                <td class="text-end" t-esc="fmt(uploadTotals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.gross)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.social_base)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.pension)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.net)"/>
+                                <td class="text-end" t-esc="fmt(uploadTotals.employer_social)"/>
+                                <td/>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="o_pr_note small text-muted no-print">
+                        هذا الكشف محفوظٌ كما رُفع: لا يمسّ البطاقات ولا كشوف الأشهر،
+                        ومنه تُنشأ القيود وحدها. وحسابات كل كشفٍ تأتي من «الكشوف»
+                        في الإعدادات.
+                    </div>
+                </t>
             </t>
 
             <!-- ======================================= الإعدادات -->

@@ -32,6 +32,133 @@ SETTING_ACCOUNTS = [
 ]
 
 
+def employer_share(lines, settings):
+    """حصة الشركة من الضمان لكل حساب، محسوبةً على مجموع الخاضع للضمان.
+
+    مؤسسة الضمان تحسب النسبة على مجموع الرواتب الخاضعة لا على كل راتب
+    منفرداً، فالتقريب يقع مرةً واحدة لكل حساب. وهذا ما في قيوده:
+    «ما يخص المكتب» و«ما يخص الشركة» لكل مشروع.
+    """
+    office = settings.employer_expense_account_id
+    base = {}
+    for line in lines:
+        account = line.account_id or office
+        base[account.id] = round(base.get(account.id, 0.0)
+                                 + (line.social_base or 0.0), 3)
+    return {account_id: round(amount * settings.employer_rate / 100.0, 3)
+            for account_id, amount in base.items() if amount}
+
+
+def sheet_entries(lines, group, period, settings):
+    """بنود قيد كشفٍ واحد وترتيبها كما يكتبها هو، ومعها بيانه ويوميته.
+
+    كشف المكتب على نمط قيده 1/9: المصروف، ثم الصافي تحويلاً ثم شيكاتٍ،
+    ثم ضمان الموظف وضريبته وتقاعده كلٌّ في بنده، ثم حصة الشركة من
+    الضمان بندين: مديناً على حسابها ودائناً على الضمان.
+
+    وكشف المشروع على نمط قيده 20/9: الصافي في آخر القيد بعد حصة
+    الشركة، لا بعد المصروف — فآخر ما يُقرأ ما صرفه موفق.
+
+    وضمان الموظف وحصة الشركة لا يُجمعان في الحالين. وتعمل على بنود
+    كشف الشهر وعلى بنود كشفٍ مرفوع سواءً.
+    """
+    payloads = [line._payload() for line in lines]
+
+    def total(key):
+        return round(sum(item[key] for item in payloads), 3)
+
+    # المصروف أولاً: منه يُعرف إن كان الكشف للمكتب أو لمشروع
+    by_account = {}
+    for line in lines:
+        account = line.account_id or settings.expense_account_id
+        gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
+        by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
+    # كشف المكتب مصروفه على حساب الرواتب العام، والمشروع على حسابه
+    is_office = set(by_account) <= {settings.expense_account_id.id}
+
+    # اللفظ كلفظه: «رواتب المكتب شهر 8/2026» في المكتب،
+    # و«رواتب مشروع جرش السياحي شهر 8/2026» في المشروع
+    site = ('مشروع %s شهر %s' % (group.name, period) if group
+            else 'شهر %s' % period)
+    label = ('%s شهر %s' % (group.name, period) if is_office and group
+             else 'رواتب %s' % site)
+
+    entries = []
+
+    def add(account, name, debit=0.0, credit=0.0):
+        """بندٌ في آخر القيد، برقم ترتيبٍ يحفظ له مكانه."""
+        account_id = account.id if hasattr(account, 'id') else account
+        if not account_id or not (debit or credit):
+            return
+        entries.append((0, 0, {
+            'sequence': 10 * (len(entries) + 1),
+            'account_id': account_id,
+            'name': name,
+            'debit': debit,
+            'credit': credit,
+        }))
+
+    # 1) المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام
+    for account_id, amount in by_account.items():
+        add(account_id, label, debit=amount)
+
+    # 2) الصافي: سطرٌ للتحويل وسطرٌ للشيكات على كل جهة دفع.
+    # مكانه يختلف: في كشف المكتب بعد المصروف، وفي المشروع في الآخر.
+    by_payment = {}
+    for line, data in zip(lines, payloads):
+        if not data['net']:
+            continue
+        payment = line.payment_account_id or settings.payment_account_id
+        method = line.payment_method or 'transfer'
+        key = (payment.id, method)
+        by_payment[key] = round(by_payment.get(key, 0.0) + data['net'], 3)
+
+    def add_nets():
+        for (account_id, method), amount in sorted(
+                by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
+                                                      item[0][0])):
+            add(account_id, 'شيكات' if method == 'cheque' else label,
+                credit=amount)
+
+    if is_office:
+        add_nets()
+
+    # 3) استقطاعات الموظف، كلٌّ في بنده
+    add(settings.social_account_id,
+        'ضمان شهر %s' % period if is_office else 'ضمان %s' % site,
+        credit=total('employee_social'))
+    add(settings.tax_account_id, 'ذمم دخل %s' % period,
+        credit=total('income_tax'))
+    if total('pension') and not settings.pension_account_id:
+        raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
+    add(settings.pension_account_id, 'ذمم تقاعد %s' % period,
+        credit=total('pension'))
+    if total('other_deduction') and not settings.other_account_id:
+        raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
+    add(settings.other_account_id, 'استقطاعات أخرى شهر %s' % period,
+        credit=total('other_deduction'))
+
+    # 4) حصة الشركة من الضمان: مدينٌ على حسابها، ودائنٌ على الضمان.
+    # وهي تتبع حساب الراتب: راتب المشروع حصته على حساب المشروع،
+    # وراتب المكتب على حساب اشتراك الضمان.
+    office = settings.employer_expense_account_id
+    for account_id, amount in employer_share(lines, settings).items():
+        own = account_id == office.id
+        add(account_id,
+            'ما يخص المكتب' if own else 'اشتراك الضمان %s' % site,
+            debit=amount)
+        add(settings.social_account_id,
+            label if own else 'ما يخص الشركة',
+            credit=amount)
+
+    # 5) صافي المشروع آخر القيد: ما صرفه موفق، كما في قيده 20/9
+    if not is_office:
+        add_nets()
+
+    journal = group.journal or ('رواتب المكتب' if is_office else 'رواتب مشاريع')
+    return entries, label, journal
+
+
 class MyAccountingPayrollSettings(models.Model):
     _name = 'myaccounting.payroll.settings'
     _description = 'إعدادات الرواتب'
@@ -534,22 +661,10 @@ class MyAccountingPayroll(models.Model):
         return payroll._payload() if payroll else False
 
     def _employer_share(self, lines=None):
-        """حصة الشركة من الضمان لكل حساب، محسوبةً على مجموع الخاضع للضمان.
-
-        مؤسسة الضمان تحسب النسبة على مجموع الرواتب الخاضعة لا على كل راتب
-        منفرداً، فالتقريب يقع مرةً واحدة لكل حساب. وهذا ما في قيوده:
-        «ما يخص المكتب» و«ما يخص الشركة» لكل مشروع.
-        """
+        """حصة الشركة من الضمان لكل حساب (انظر employer_share)."""
         self.ensure_one()
         settings = self.env['myaccounting.payroll.settings']._get()
-        office = settings.employer_expense_account_id
-        base = {}
-        for line in (self.line_ids if lines is None else lines):
-            account = line.account_id or office
-            base[account.id] = round(base.get(account.id, 0.0)
-                                     + (line.social_base or 0.0), 3)
-        return {account_id: round(amount * settings.employer_rate / 100.0, 3)
-                for account_id, amount in base.items() if amount}
+        return employer_share(self.line_ids if lines is None else lines, settings)
 
     def _sheets(self):
         """كشوف هذا الشهر بترتيبها، و«بلا كشف» في آخرها إن وُجد.
@@ -783,122 +898,19 @@ class MyAccountingPayroll(models.Model):
         return self._payload()
 
     def _post_sheet(self, sheet, settings):
-        """قيد كشفٍ واحد، ببنوده وترتيبها كما يكتبها هو.
-
-        كشف المكتب على نمط قيده 1/9: المصروف، ثم الصافي تحويلاً ثم
-        شيكاتٍ، ثم ضمان الموظف وضريبته وتقاعده كلٌّ في بنده، ثم حصة
-        الشركة من الضمان بندين: مديناً على حسابها ودائناً على الضمان.
-
-        وكشف المشروع على نمط قيده 20/9: الصافي في آخر القيد بعد حصة
-        الشركة، لا بعد المصروف — فآخر ما يُقرأ ما صرفه موفق.
-
-        وضمان الموظف وحصة الشركة لا يُجمعان في الحالين.
-        """
+        """قيد كشفٍ واحد من بنوده (انظر sheet_entries)."""
         self.ensure_one()
         lines = self._sheet_lines(sheet)
         if not lines:
             raise UserError('لا بنود في هذا الكشف.')
         group = lines[0].group_id
-        period = '%s/%s' % (self.month, self.year)
-        payloads = [line._payload() for line in lines]
-
-        def total(key):
-            return round(sum(item[key] for item in payloads), 3)
-
-        # المصروف أولاً: منه يُعرف إن كان الكشف للمكتب أو لمشروع
-        by_account = {}
-        for line in lines:
-            account = line.account_id or settings.expense_account_id
-            gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
-            by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
-        # كشف المكتب مصروفه على حساب الرواتب العام، والمشروع على حسابه
-        is_office = set(by_account) <= {settings.expense_account_id.id}
-
-        # اللفظ كلفظه: «رواتب المكتب شهر 8/2026» في المكتب،
-        # و«رواتب مشروع جرش السياحي شهر 8/2026» في المشروع
-        site = ('مشروع %s شهر %s' % (group.name, period) if group
-                else 'شهر %s' % period)
-        label = ('%s شهر %s' % (group.name, period) if is_office and group
-                 else 'رواتب %s' % site)
-
-        entries = []
-
-        def add(account, name, debit=0.0, credit=0.0):
-            """بندٌ في آخر القيد، برقم ترتيبٍ يحفظ له مكانه."""
-            account_id = account.id if hasattr(account, 'id') else account
-            if not account_id or not (debit or credit):
-                return
-            entries.append((0, 0, {
-                'sequence': 10 * (len(entries) + 1),
-                'account_id': account_id,
-                'name': name,
-                'debit': debit,
-                'credit': credit,
-            }))
-
-        # 1) المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام
-        for account_id, amount in by_account.items():
-            add(account_id, label, debit=amount)
-
-        # 2) الصافي: سطرٌ للتحويل وسطرٌ للشيكات على كل جهة دفع.
-        # مكانه يختلف: في كشف المكتب بعد المصروف، وفي المشروع في الآخر.
-        by_payment = {}
-        for line, data in zip(lines, payloads):
-            if not data['net']:
-                continue
-            payment = line.payment_account_id or settings.payment_account_id
-            method = line.employee_id.payment_method or 'transfer'
-            key = (payment.id, method)
-            by_payment[key] = round(by_payment.get(key, 0.0) + data['net'], 3)
-
-        def add_nets():
-            for (account_id, method), amount in sorted(
-                    by_payment.items(), key=lambda item: (item[0][1] != 'transfer',
-                                                          item[0][0])):
-                add(account_id, 'شيكات' if method == 'cheque' else label,
-                    credit=amount)
-
-        if is_office:
-            add_nets()
-
-        # 3) استقطاعات الموظف، كلٌّ في بنده
-        add(settings.social_account_id,
-            'ضمان شهر %s' % period if is_office else 'ضمان %s' % site,
-            credit=total('employee_social'))
-        add(settings.tax_account_id, 'ذمم دخل %s' % period,
-            credit=total('income_tax'))
-        if total('pension') and not settings.pension_account_id:
-            raise UserError('في الكشف صندوق تقاعد، فحدّد له حساباً في الإعدادات.')
-        add(settings.pension_account_id, 'ذمم تقاعد %s' % period,
-            credit=total('pension'))
-        if total('other_deduction') and not settings.other_account_id:
-            raise UserError('في الكشف استقطاعات أخرى، فحدّد لها حساباً في الإعدادات.')
-        add(settings.other_account_id, 'استقطاعات أخرى شهر %s' % period,
-            credit=total('other_deduction'))
-
-        # 4) حصة الشركة من الضمان: مدينٌ على حسابها، ودائنٌ على الضمان.
-        # وهي تتبع حساب الراتب: راتب المشروع حصته على حساب المشروع،
-        # وراتب المكتب على حساب اشتراك الضمان.
-        office = settings.employer_expense_account_id
-        for account_id, amount in self._employer_share(lines).items():
-            own = account_id == office.id
-            add(account_id,
-                'ما يخص المكتب' if own else 'اشتراك الضمان %s' % site,
-                debit=amount)
-            add(settings.social_account_id,
-                label if own else 'ما يخص الشركة',
-                credit=amount)
-
-        # 5) صافي المشروع آخر القيد: ما صرفه موفق، كما في قيده 20/9
-        if not is_office:
-            add_nets()
-
+        entries, label, journal = sheet_entries(
+            lines, group, '%s/%s' % (self.month, self.year), settings)
         # القيد يدخل كأي قيدٍ جديد: رقمه وتاريخه وشهره المحاسبي من
         # افتراضات القيد نفسها، فلا ترقيم خاصّ بالرواتب
         return self.env['myaccounting.move'].create({
             'ref': label,
-            'journal': group.journal or ('رواتب المكتب' if is_office
-                                         else 'رواتب مشاريع'),
+            'journal': journal,
             'payroll_id': self.id,
             'payroll_group_id': group.id or False,
             'payroll_current': True,
@@ -944,6 +956,13 @@ class MyAccountingPayrollLine(models.Model):
     group_id = fields.Many2one('myaccounting.payroll.group', string='الكشف')
     account_id = fields.Many2one('myaccounting.account', string='حساب المصروف')
     payment_account_id = fields.Many2one('myaccounting.account', string='يُدفع من')
+    # تُقرأ من البطاقة وقت الحاجة، فتغييرها على البطاقة يسري على المسودة
+    payment_method = fields.Char(string='طريقة الصرف',
+                                 compute='_compute_payment_method')
+
+    def _compute_payment_method(self):
+        for line in self:
+            line.payment_method = line.employee_id.payment_method or 'transfer'
 
     def _payload(self):
         self.ensure_one()

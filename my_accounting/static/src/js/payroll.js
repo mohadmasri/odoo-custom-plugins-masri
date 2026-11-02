@@ -45,6 +45,7 @@ export class Payroll extends Component {
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.excelInput = useRef("excelInput");
+        this.uploadInput = useRef("uploadInput");
         this.months = MONTH_OPTIONS;
         this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
         const today = new Date();
@@ -58,6 +59,9 @@ export class Payroll extends Component {
             groups: [],
             card: null,
             cardDraft: null,
+            uploads: [],
+            upload: null,
+            uploadSheet: "all",
             excel: null,
             excelName: "",
             excelOptions: { edit: true, add: true, stop: true },
@@ -73,6 +77,7 @@ export class Payroll extends Component {
                 "myaccounting.bank.statement", "get_account_options", []);
             await this.refresh();
             await this.loadSettings();
+            await this.loadUploads();
             this.state.loading = false;
             // الرابط /odoo/action-.../<رقم> يفتح بطاقة ذلك الموظف وحدها
             await this.openCardFromUrl();
@@ -596,6 +601,169 @@ export class Payroll extends Component {
 
     cancelGroups() {
         this.state.groups = clone(this.saved.groups);
+    }
+
+    // ------------------------------------------------------------------
+    // كشف مرفوع: يُقرأ ويُحفظ وتُنشأ منه القيود، بلا بطاقات ولا تعديل
+    // ------------------------------------------------------------------
+
+    async loadUploads(uploadId = false) {
+        const [uploads, upload] = await Promise.all([
+            this.orm.call("myaccounting.payroll.upload", "get_uploads", []),
+            this.orm.call("myaccounting.payroll.upload", "get_upload",
+                [uploadId || (this.state.upload ? this.state.upload.id : false)]),
+        ]);
+        this.state.uploads = uploads;
+        this.state.upload = upload || null;
+        if (this.state.uploadSheet !== "all" && !this.uploadVisible.length) {
+            this.state.uploadSheet = "all";
+        }
+    }
+
+    pickUpload() {
+        this.uploadInput.el.click();
+    }
+
+    async onUploadFile(ev) {
+        const file = ev.target.files && ev.target.files[0];
+        ev.target.value = "";
+        if (!file) {
+            return;
+        }
+        const content = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+        });
+        await this.withBusy(async () => {
+            const upload = await this.orm.call("myaccounting.payroll.upload",
+                "read_excel", [content, file.name, this.state.newYear,
+                    this.state.newMonth]);
+            this.state.uploadSheet = "all";
+            await this.loadUploads(upload.id);
+            this.notification.add(`رُفع الكشف: ${upload.lines.length} بنداً.`,
+                                  { type: "success" });
+        });
+    }
+
+    async openUpload(ev) {
+        const id = parseInt(ev.target.value, 10);
+        await this.withBusy(async () => {
+            this.state.uploadSheet = "all";
+            await this.loadUploads(id);
+        });
+    }
+
+    isUpload(id) {
+        return this.state.upload && this.state.upload.id === id;
+    }
+
+    deleteUpload() {
+        const upload = this.state.upload;
+        this.dialog.add(ConfirmationDialog, {
+            title: `حذف "${upload.name}"`,
+            body: "سيُحذف الكشف المرفوع بكل بنوده، وتبقى قيوده في الدفتر كما هي.",
+            confirmLabel: "احذف",
+            confirm: () => this.withBusy(async () => {
+                await this.orm.call("myaccounting.payroll.upload", "delete_upload",
+                    [[upload.id]]);
+                this.state.upload = null;
+                await this.loadUploads();
+            }),
+            cancel: () => {},
+        });
+    }
+
+    /** كشوف الملف: بنود كل ورقة ومجاميعها، بترتيب كشوف النظام */
+    get uploadSections() {
+        const data = this.state.upload;
+        if (!data) {
+            return [];
+        }
+        return data.sheets.map((sheet) => {
+            const own = data.lines.filter((line) => line.key === sheet.key);
+            return { ...sheet, lines: own, totals: this.sumOf(own) };
+        });
+    }
+
+    get uploadVisible() {
+        const sheet = this.state.uploadSheet;
+        const shown = sheet === "all" ? this.uploadSections
+            : this.uploadSections.filter((item) => item.key === sheet);
+        let start = 0;
+        return shown.map((section) => {
+            const numbered = { ...section, start };
+            start += section.lines.length;
+            return numbered;
+        });
+    }
+
+    get uploadTotals() {
+        return this.sumOf(this.uploadVisible.flatMap((section) => section.lines));
+    }
+
+    get uploadCount() {
+        return this.uploadVisible.reduce(
+            (sum, section) => sum + section.lines.length, 0);
+    }
+
+    get uploadLabel() {
+        const section = this.state.uploadSheet === "all" ? null : this.uploadVisible[0];
+        return section ? section.name : "";
+    }
+
+    setUploadSheet(key) {
+        this.state.uploadSheet = key;
+    }
+
+    get uploadToPost() {
+        return this.uploadVisible.filter((section) => !section.posted);
+    }
+
+    get uploadPosted() {
+        return this.uploadVisible.filter((section) => section.posted);
+    }
+
+    get uploadPostLabel() {
+        const todo = this.uploadToPost;
+        return todo.length === 1 ? `أنشئ قيد ${todo[0].name}`
+                                 : `أنشئ قيود الكشوف (${todo.length})`;
+    }
+
+    get uploadUnpostLabel() {
+        const done = this.uploadPosted;
+        return done.length === 1 ? `فكّ ربط ${done[0].name}`
+                                 : `فكّ ربط الكشوف (${done.length})`;
+    }
+
+    async postUpload() {
+        await this.withBusy(async () => {
+            const count = this.uploadToPost.length;
+            await this.orm.call("myaccounting.payroll.upload", "post_upload",
+                [[this.state.upload.id], this.state.uploadSheet]);
+            await this.loadUploads(this.state.upload.id);
+            this.notification.add(count === 1 ? "أُنشئ قيد الكشف مسودةً."
+                                              : `أُنشئت ${count} قيود مسودةً.`,
+                                  { type: "success" });
+        });
+    }
+
+    unpostUpload() {
+        const done = this.uploadPosted;
+        const what = done.length === 1 ? `قيد ${done[0].move}` : `${done.length} قيود`;
+        this.dialog.add(ConfirmationDialog, {
+            title: "فكّ الربط",
+            body: `يبقى ${what} في الدفتر كما هو، ويعود الكشف المرفوع قابلاً`
+                + ` لإنشاء قيدٍ جديد — فإن أنشأته صار في الدفتر قيدان.`,
+            confirmLabel: "نعم",
+            confirm: () => this.withBusy(async () => {
+                await this.orm.call("myaccounting.payroll.upload", "unpost_upload",
+                    [[this.state.upload.id], this.state.uploadSheet]);
+                await this.loadUploads(this.state.upload.id);
+            }),
+            cancel: () => {},
+        });
     }
 
     // ------------------------------------------------------------------
