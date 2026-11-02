@@ -853,14 +853,16 @@
                     <div class="small text-muted mb-2">
                         الكشوف هي تبويبات الموظفين. ما يُكتب هنا من حساب مصروف أو جهة
                         دفع يرثه كل موظف في الكشف، إلا من كُتب على بطاقته غيره.
+                        واليومية يومية قيد الكشف، كما في دفاترك.
                     </div>
-                    <table class="table table-bordered table-sm o_pr_table" style="max-width:860px;">
+                    <table class="table table-bordered table-sm o_pr_table" style="max-width:1020px;">
                         <thead>
                             <tr>
                                 <th style="width:64px;">ترتيب</th>
                                 <th style="width:190px;">الكشف</th>
                                 <th style="width:220px;">حساب المصروف</th>
                                 <th style="width:220px;">يُدفع من</th>
+                                <th style="width:160px;">اليومية</th>
                                 <th style="width:70px;">موظفون</th>
                                 <th style="width:44px;"/>
                             </tr>
@@ -891,6 +893,12 @@
                                                placeholder="'حساب الدفع العام'"
                                                onSelect="(token) => this.onGroupPayment(group, token)"/>
                                 </td>
+                                <td>
+                                    <input type="text" class="form-control form-control-sm"
+                                           placeholder="رواتب المكتب"
+                                           t-att-value="group.journal"
+                                           t-on-change="(ev) => this.editGroup(group, 'journal', ev)"/>
+                                </td>
                                 <td class="text-center" t-esc="countOf(group.id)"/>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-link text-danger p-0"
@@ -901,7 +909,7 @@
                                 </td>
                             </tr>
                             <tr t-if="!state.groups.length">
-                                <td colspan="6" class="text-muted text-center py-2">لا كشوف بعد</td>
+                                <td colspan="7" class="text-muted text-center py-2">لا كشوف بعد</td>
                             </tr>
                         </tbody>
                     </table>

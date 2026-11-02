@@ -113,6 +113,10 @@ class MyAccountingPayrollGroup(models.Model):
     payment_account_id = fields.Many2one(
         'myaccounting.account', string='يُدفع من',
         help='اتركه فارغاً ليُستعمل حساب الدفع العام.')
+    journal = fields.Char(
+        string='اليومية',
+        help='يومية قيد هذا الكشف، كما في دفاتره: «رواتب المكتب 1» '
+             'و«رواتب مشاريع». واتركها فارغة ليُستعمل الاسم المعتاد.')
     employee_ids = fields.One2many('myaccounting.employee', 'group_id',
                                    string='الموظفون')
 
@@ -126,11 +130,31 @@ class MyAccountingPayrollGroup(models.Model):
             'account': self.account_id.name or '',
             'payment_account_id': self.payment_account_id.id or False,
             'payment_account': self.payment_account_id.name or '',
+            'journal': self.journal or '',
             'count': len(self.with_context(active_test=False).employee_ids),
         }
 
+    JOURNALS = {
+        'رواتب المكتب': 'رواتب المكتب 1',
+        'المكتب العجزة': 'رواتب المكتب 2',
+    }
+
+    @api.model
+    def _seed_journals(self):
+        """يومية كل كشفٍ كما في دفاتره، مرةً واحدة ولا تُمسّ بعدها."""
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.payroll_group_journals'):
+            return
+        for group in self.search([]):
+            if group.journal:
+                continue
+            group.journal = self.JOURNALS.get(
+                group.name, 'رواتب مشاريع' if group.account_id else 'رواتب المكتب')
+        param.set_param('my_accounting.payroll_group_journals', '1')
+
     @api.model
     def get_groups(self):
+        self._seed_journals()
         return [group._payload() for group in self.search([])]
 
     @api.model
@@ -148,6 +172,7 @@ class MyAccountingPayrollGroup(models.Model):
                 'account_id': int(item['account_id']) if item.get('account_id') else False,
                 'payment_account_id': int(item['payment_account_id'])
                                       if item.get('payment_account_id') else False,
+                'journal': (item.get('journal') or '').strip(),
             }
             group = existing.get(item.get('id'))
             if group:
@@ -740,12 +765,26 @@ class MyAccountingPayroll(models.Model):
             raise UserError('لا بنود في هذا الكشف.')
         group = lines[0].group_id
         period = '%s/%s' % (self.month, self.year)
-        label = '%s شهر %s' % (group.name or 'رواتب', period)
-
         payloads = [line._payload() for line in lines]
 
         def total(key):
             return round(sum(item[key] for item in payloads), 3)
+
+        # المصروف أولاً: منه يُعرف إن كان الكشف للمكتب أو لمشروع
+        by_account = {}
+        for line in lines:
+            account = line.account_id or settings.expense_account_id
+            gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
+            by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
+        # كشف المكتب مصروفه على حساب الرواتب العام، والمشروع على حسابه
+        is_office = set(by_account) <= {settings.expense_account_id.id}
+
+        # اللفظ كلفظه: «رواتب المكتب شهر 8/2026» في المكتب،
+        # و«رواتب مشروع جرش السياحي شهر 8/2026» في المشروع
+        site = ('مشروع %s شهر %s' % (group.name, period) if group
+                else 'شهر %s' % period)
+        label = ('%s شهر %s' % (group.name, period) if is_office and group
+                 else 'رواتب %s' % site)
 
         entries = []
 
@@ -763,11 +802,6 @@ class MyAccountingPayroll(models.Model):
             }))
 
         # 1) المصروف: لكل حساب مصروفه، والباقي على حساب الرواتب العام
-        by_account = {}
-        for line in lines:
-            account = line.account_id or settings.expense_account_id
-            gross = round((line.basic_salary or 0.0) + (line.allowance or 0.0), 3)
-            by_account[account.id] = round(by_account.get(account.id, 0.0) + gross, 3)
         for account_id, amount in by_account.items():
             add(account_id, label, debit=amount)
 
@@ -789,13 +823,12 @@ class MyAccountingPayroll(models.Model):
                 add(account_id, 'شيكات' if method == 'cheque' else label,
                     credit=amount)
 
-        # كشف المكتب مصروفه على حساب الرواتب العام، والمشروع على حسابه
-        is_office = set(by_account) <= {settings.expense_account_id.id}
         if is_office:
             add_nets()
 
         # 3) استقطاعات الموظف، كلٌّ في بنده
-        add(settings.social_account_id, 'ضمان شهر %s' % period,
+        add(settings.social_account_id,
+            'ضمان شهر %s' % period if is_office else 'ضمان %s' % site,
             credit=total('employee_social'))
         add(settings.tax_account_id, 'ذمم دخل %s' % period,
             credit=total('income_tax'))
@@ -815,7 +848,7 @@ class MyAccountingPayroll(models.Model):
         for account_id, amount in self._employer_share(lines).items():
             own = account_id == office.id
             add(account_id,
-                'ما يخص المكتب' if own else 'اشتراك الضمان %s' % label,
+                'ما يخص المكتب' if own else 'اشتراك الضمان %s' % site,
                 debit=amount)
             add(settings.social_account_id,
                 label if own else 'ما يخص الشركة',
@@ -829,7 +862,8 @@ class MyAccountingPayroll(models.Model):
         # افتراضات القيد نفسها، فلا ترقيم خاصّ بالرواتب
         return self.env['myaccounting.move'].create({
             'ref': label,
-            'journal': 'رواتب',
+            'journal': group.journal or ('رواتب المكتب' if is_office
+                                         else 'رواتب مشاريع'),
             'payroll_id': self.id,
             'payroll_group_id': group.id or False,
             'line_ids': entries,

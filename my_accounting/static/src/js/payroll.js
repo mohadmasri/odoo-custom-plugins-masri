@@ -573,7 +573,7 @@ export class Payroll extends Component {
         this.state.groups.push(keyed([{
             id: false, name: "كشف جديد", sequence: 10 * (this.state.groups.length + 1),
             account_id: false, account: "", payment_account_id: false,
-            payment_account: "", count: 0,
+            payment_account: "", journal: "", count: 0,
         }])[0]);
     }
 
