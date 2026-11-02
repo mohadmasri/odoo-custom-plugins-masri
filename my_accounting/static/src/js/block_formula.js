@@ -188,7 +188,12 @@ export function readInvoice(lines) {
  * في أول بندٍ يُسأل عن حسابه. ويُرجع ما نقص ليُطلب من المستخدم.
  */
 export function buildBlockText(block, values, chosenAccounts, accounts) {
-    const template = block.text_template || "";
+    return fillTemplate(block.text_template || "", block, values,
+        chosenAccounts, accounts);
+}
+
+/** يملأ صيغةً بخانات الكتلة وحسابها المختار، ويُرجع ما نقص منها */
+export function fillTemplate(template, block, values, chosenAccounts, accounts) {
     if (!template) {
         return { text: "", missing: [] };
     }
@@ -219,8 +224,9 @@ export function buildBlockText(block, values, chosenAccounts, accounts) {
 /**
  * بنود الكتلة كما ستُضاف: يحسب كل بند من صيغته ويطرح الفارغ منها.
  * values: قيم خانات المبالغ، accounts: الحساب المختار لكل بند يُسأل عنه.
+ * وبيان البند قد يحمل خانات الكتلة: «خدمات هندسية شهر {month}».
  */
-export function buildBlockLines(block, values, chosenAccounts, mainText) {
+export function buildBlockLines(block, values, chosenAccounts, mainText, resolve) {
     const lines = [];
     for (const line of block.lines) {
         const computed = evalFormula(line.formula, values);
@@ -231,9 +237,12 @@ export function buildBlockLines(block, values, chosenAccounts, mainText) {
         if (!amount && !line.zero_visible) {
             continue;   // بند بلا مبلغ ولا يُراد إظهاره بصفر
         }
+        const label = line.label && line.label.includes("{") && resolve
+            ? resolve(line.label)
+            : line.label;
         lines.push({
             key: line.id,
-            name: line.label || mainText,
+            name: label || mainText,
             account_id: accountId,
             debit: line.side === "debit" ? amount : 0,
             credit: line.side === "credit" ? amount : 0,

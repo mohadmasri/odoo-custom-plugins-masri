@@ -104,6 +104,7 @@
                                    t-model="state.edited.text_template"/>
                             <div class="small text-muted mt-1">
                                 {مفتاح الخانة} يأخذ ما كُتب فيها، و{account} اسم الحساب المختار.
+                                وبيان البند يقبلهما كذلك: «خدمات هندسية شهر {month}».
                             </div>
                         </div>
                     </div>

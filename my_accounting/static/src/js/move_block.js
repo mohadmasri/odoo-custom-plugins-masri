@@ -5,7 +5,9 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-import { buildBlockLines, buildBlockText, invoiceLines, readInvoice } from "./block_formula";
+import {
+    buildBlockLines, buildBlockText, fillTemplate, invoiceLines, readInvoice,
+} from "./block_formula";
 
 const ACCOUNT_LIST_ID = "o_move_block_accounts";
 
@@ -129,7 +131,9 @@ export class MoveBlockDialog extends Component {
 
     get lines() {
         return buildBlockLines(this.block, this.numbers, this.state.accounts,
-            this.text);
+            this.text,
+            (template) => fillTemplate(template, this.block, this.state.values,
+                this.state.accounts, this.props.accounts).text);
     }
 
     get problem() {

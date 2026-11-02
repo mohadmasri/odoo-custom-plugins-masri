@@ -77,6 +77,22 @@ DEFAULT_BLOCKS = [
         ],
     },
     {
+        'name': 'تمويل موفق', 'icon': 'fa-exchange', 'sequence': 55,
+        'hint': 'ما صرفه موفق من رواتب المشروع وخدماته الهندسية، يُسدَّد له بشيك.',
+        'text': 'شيك رقم {cheque} مشروع {project} شهر {month}',
+        'fields': [('cheque', 'رقم الشيك', 0.0, 'text'),
+                   ('project', 'المشروع', 0.0, 'text'),
+                   ('month', 'الشهر', 0.0, 'text'),
+                   ('salaries', 'رواتب المشروع', 0.0, 'number'),
+                   ('services', 'خدمات هندسية', 0.0, 'number')],
+        'lines': [
+            ('', '687', '', 'debit', 'salaries', False),
+            ('خدمات هندسية شهر {month}', '', 'حساب المشروع', 'debit',
+             'services', False),
+            ('', '101', '', 'credit', 'salaries + services', False),
+        ],
+    },
+    {
         'name': 'قبض', 'icon': 'fa-money', 'sequence': 50,
         'hint': 'ذمم الجهة دائنة بالإجمالي، البنك مدين بالصافي، والطوابع مدينة.',
         'text': '',
@@ -322,6 +338,17 @@ class MyAccountingBlock(models.Model):
         return block
 
     @api.model
+    def _upgrade_funding_block(self):
+        """تُضيف كتلة «تمويل موفق» لمن كانت كتله مبنيّةً قبلها."""
+        param = self.env['ir.config_parameter'].sudo()
+        if param.get_param('my_accounting.blocks_funding'):
+            return
+        spec = [item for item in DEFAULT_BLOCKS if item['name'] == 'تمويل موفق'][0]
+        if not self.search_count([('name', '=', spec['name'])]):
+            self._create_block_from_spec(spec)
+        param.set_param('my_accounting.blocks_funding', '1')
+
+    @api.model
     def _upgrade_return_block(self):
         """تُضيف كتلة «مرتجع فاتورة» لمن كانت كتله مبنيّةً قبلها."""
         param = self.env['ir.config_parameter'].sudo()
@@ -366,12 +393,14 @@ class MyAccountingBlock(models.Model):
             param.set_param('my_accounting.blocks_seeded', '1')
             self._upgrade_invoice_block()
             self._upgrade_return_block()
+            self._upgrade_funding_block()
             return
         for spec in DEFAULT_BLOCKS:
             self._create_block_from_spec(spec)
         param.set_param('my_accounting.blocks_seeded', '1')
         param.set_param('my_accounting.blocks_invoice_v2', '1')
         param.set_param('my_accounting.blocks_return', '1')
+        param.set_param('my_accounting.blocks_funding', '1')
 
 
 class MyAccountingBlockField(models.Model):
