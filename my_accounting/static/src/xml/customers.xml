@@ -120,106 +120,110 @@
                 <t t-if="state.tab === 'customers'" t-call="my_accounting.CustomersNoteAlert">
                     <t t-set="alertNotes" t-value="openNotesFor('customers')"/>
                 </t>
-                <table t-if="state.tab === 'customers'" class="table table-sm table-hover o_cust_table">
-                    <thead>
-                        <tr>
-                            <th style="width:70px;">الرمز</th>
-                            <th>العميل</th>
-                            <th class="text-center" style="width:90px;">الفواتير</th>
-                            <th class="text-center" style="width:100px;">غير محصّلة</th>
-                            <th class="text-end" style="width:130px;">قيمة الفواتير</th>
-                            <th class="text-end" style="width:120px;">المرتجعات</th>
-                            <th class="text-end" style="width:130px;">المحصّل</th>
-                            <th class="text-end" style="width:140px;">الرصيد المستحق</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-if="!customers.length">
-                            <td colspan="8" class="text-center text-muted py-4">لا يوجد عملاء مطابقون</td>
-                        </tr>
-                        <tr t-foreach="customers" t-as="c" t-key="c.id" style="cursor:pointer;"
-                            t-on-click="() => this.selectCustomer(c)">
-                            <td class="text-muted" t-esc="c.code"/>
-                            <td>
-                                <t t-esc="c.name"/>
-                                <span t-if="c.balance &lt; -0.0005" class="badge text-bg-primary ms-1" style="font-size:10px;"
-                                      title="المحصّل أكثر من الفواتير المسجّلة: ربما فاتورة لم تُدخل بعد">
-                                    رصيد دائن
-                                </span>
-                            </td>
-                            <td class="text-center" t-esc="c.invoice_count"/>
-                            <td class="text-center">
-                                <span t-if="c.open_count" class="badge rounded-pill text-bg-danger" t-esc="c.open_count"/>
-                                <span t-elif="c.invoice_count" class="text-success"><i class="fa fa-check"/></span>
-                            </td>
-                            <td class="text-end" t-esc="fmt(c.invoiced)"/>
-                            <td class="text-end" t-esc="c.returned ? fmt(c.returned) : ''"/>
-                            <td class="text-end" t-esc="c.collected ? fmt(c.collected) : ''"/>
-                            <td t-attf-class="text-end fw-bold {{ balanceClass(c.balance) }}" t-esc="fmt(c.balance)"/>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr class="fw-bold">
-                            <td colspan="3">الإجمالي</td>
-                            <td class="text-center" t-esc="state.data.totals.open_count"/>
-                            <td class="text-end" t-esc="fmt(state.data.totals.invoiced)"/>
-                            <td class="text-end" t-esc="fmt(state.data.totals.returned)"/>
-                            <td class="text-end" t-esc="fmt(state.data.totals.collected)"/>
-                            <td class="text-end" t-esc="fmt(state.data.totals.balance)"/>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="o_ma_scroll" t-if="state.tab === 'customers'">
+                    <table class="table table-sm table-hover o_cust_table">
+                        <thead>
+                            <tr>
+                                <th style="width:70px;">الرمز</th>
+                                <th>العميل</th>
+                                <th class="text-center" style="width:90px;">الفواتير</th>
+                                <th class="text-center" style="width:100px;">غير محصّلة</th>
+                                <th class="text-end" style="width:130px;">قيمة الفواتير</th>
+                                <th class="text-end" style="width:120px;">المرتجعات</th>
+                                <th class="text-end" style="width:130px;">المحصّل</th>
+                                <th class="text-end" style="width:140px;">الرصيد المستحق</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-if="!customers.length">
+                                <td colspan="8" class="text-center text-muted py-4">لا يوجد عملاء مطابقون</td>
+                            </tr>
+                            <tr t-foreach="customers" t-as="c" t-key="c.id" style="cursor:pointer;"
+                                t-on-click="() => this.selectCustomer(c)">
+                                <td class="text-muted" t-esc="c.code"/>
+                                <td>
+                                    <t t-esc="c.name"/>
+                                    <span t-if="c.balance &lt; -0.0005" class="badge text-bg-primary ms-1" style="font-size:10px;"
+                                          title="المحصّل أكثر من الفواتير المسجّلة: ربما فاتورة لم تُدخل بعد">
+                                        رصيد دائن
+                                    </span>
+                                </td>
+                                <td class="text-center" t-esc="c.invoice_count"/>
+                                <td class="text-center">
+                                    <span t-if="c.open_count" class="badge rounded-pill text-bg-danger" t-esc="c.open_count"/>
+                                    <span t-elif="c.invoice_count" class="text-success"><i class="fa fa-check"/></span>
+                                </td>
+                                <td class="text-end" t-esc="fmt(c.invoiced)"/>
+                                <td class="text-end" t-esc="c.returned ? fmt(c.returned) : ''"/>
+                                <td class="text-end" t-esc="c.collected ? fmt(c.collected) : ''"/>
+                                <td t-attf-class="text-end fw-bold {{ balanceClass(c.balance) }}" t-esc="fmt(c.balance)"/>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="3">الإجمالي</td>
+                                <td class="text-center" t-esc="state.data.totals.open_count"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.invoiced)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.returned)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.collected)"/>
+                                <td class="text-end" t-esc="fmt(state.data.totals.balance)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
                 <!-- السجل الكامل: الفواتير والمرتجعات وسندات القبض معاً بالترتيب الزمني -->
-                <table t-if="state.tab === 'all'" class="table table-sm table-hover o_cust_table">
-                    <thead>
-                        <tr>
-                            <th style="width:100px;">التاريخ</th>
-                            <th style="width:90px;">النوع</th>
-                            <th style="width:90px;">الرقم</th>
-                            <th>العميل</th>
-                            <th>البيان</th>
-                            <th class="text-end" style="width:120px;">مدين (فواتير)</th>
-                            <th class="text-end" style="width:120px;">دائن (تحصيل/مرتجع)</th>
-                            <th class="text-end" style="width:130px;">الرصيد</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-if="state.ledgerMonth" class="fw-bold text-muted">
-                            <td colspan="7">رصيد أول الشهر</td>
-                            <td t-attf-class="text-end {{ balanceClass(openingBalance) }}" t-esc="fmt(openingBalance)"/>
-                        </tr>
-                        <tr t-if="!fullLedger.length">
-                            <td colspan="8" class="text-center text-muted py-4">لا توجد حركات مطابقة</td>
-                        </tr>
-                        <tr t-foreach="fullLedger" t-as="row" t-key="row.key" style="cursor:pointer;"
-                            t-att-class="{ 'o_cust_return': row.kind === 'return', 'o_cust_receipt': row.kind === 'receipt' }"
-                            t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
-                            <td t-esc="row.date"/>
-                            <td>
-                                <span t-attf-class="badge {{ row.kind === 'invoice' ? 'text-bg-light border' : (row.kind === 'receipt' ? 'text-bg-success' : 'text-bg-danger') }}"
-                                      t-esc="kindLabel(row.kind)"/>
-                            </td>
-                            <td class="fw-bold">
-                                <t t-if="row.number" t-esc="row.number"/>
-                                <span t-else="" class="text-muted small">—</span>
-                            </td>
-                            <td t-esc="row.customer"/>
-                            <td class="small" t-esc="row.label"/>
-                            <td class="text-end" t-esc="row.debit ? fmt(row.debit) : ''"/>
-                            <td class="text-end text-success" t-esc="row.credit ? fmt(row.credit) : ''"/>
-                            <td t-attf-class="text-end fw-bold {{ balanceClass(row.balance) }}" t-esc="fmt(row.balance)"/>
-                        </tr>
-                    </tbody>
-                    <tfoot t-if="fullLedger.length">
-                        <tr class="fw-bold">
-                            <td colspan="5">الإجمالي</td>
-                            <td class="text-end" t-esc="fmt(fullLedgerTotals.debit)"/>
-                            <td class="text-end text-success" t-esc="fmt(fullLedgerTotals.credit)"/>
-                            <td t-attf-class="text-end {{ balanceClass(fullLedgerTotals.balance) }}" t-esc="fmt(fullLedgerTotals.balance)"/>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="o_ma_scroll" t-if="state.tab === 'all'">
+                    <table class="table table-sm table-hover o_cust_table">
+                        <thead>
+                            <tr>
+                                <th style="width:100px;">التاريخ</th>
+                                <th style="width:90px;">النوع</th>
+                                <th style="width:90px;">الرقم</th>
+                                <th>العميل</th>
+                                <th>البيان</th>
+                                <th class="text-end" style="width:120px;">مدين (فواتير)</th>
+                                <th class="text-end" style="width:120px;">دائن (تحصيل/مرتجع)</th>
+                                <th class="text-end" style="width:130px;">الرصيد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-if="state.ledgerMonth" class="fw-bold text-muted">
+                                <td colspan="7">رصيد أول الشهر</td>
+                                <td t-attf-class="text-end {{ balanceClass(openingBalance) }}" t-esc="fmt(openingBalance)"/>
+                            </tr>
+                            <tr t-if="!fullLedger.length">
+                                <td colspan="8" class="text-center text-muted py-4">لا توجد حركات مطابقة</td>
+                            </tr>
+                            <tr t-foreach="fullLedger" t-as="row" t-key="row.key" style="cursor:pointer;"
+                                t-att-class="{ 'o_cust_return': row.kind === 'return', 'o_cust_receipt': row.kind === 'receipt' }"
+                                t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
+                                <td t-esc="row.date"/>
+                                <td>
+                                    <span t-attf-class="badge {{ row.kind === 'invoice' ? 'text-bg-light border' : (row.kind === 'receipt' ? 'text-bg-success' : 'text-bg-danger') }}"
+                                          t-esc="kindLabel(row.kind)"/>
+                                </td>
+                                <td class="fw-bold">
+                                    <t t-if="row.number" t-esc="row.number"/>
+                                    <span t-else="" class="text-muted small">—</span>
+                                </td>
+                                <td t-esc="row.customer"/>
+                                <td class="small" t-esc="row.label"/>
+                                <td class="text-end" t-esc="row.debit ? fmt(row.debit) : ''"/>
+                                <td class="text-end text-success" t-esc="row.credit ? fmt(row.credit) : ''"/>
+                                <td t-attf-class="text-end fw-bold {{ balanceClass(row.balance) }}" t-esc="fmt(row.balance)"/>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="fullLedger.length">
+                            <tr class="fw-bold">
+                                <td colspan="5">الإجمالي</td>
+                                <td class="text-end" t-esc="fmt(fullLedgerTotals.debit)"/>
+                                <td class="text-end text-success" t-esc="fmt(fullLedgerTotals.credit)"/>
+                                <td t-attf-class="text-end {{ balanceClass(fullLedgerTotals.balance) }}" t-esc="fmt(fullLedgerTotals.balance)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
                 <!-- سجل الفواتير بالترتيب الرقمي -->
                 <t t-if="state.tab === 'invoices'">
@@ -234,106 +238,108 @@
                             </button>
                         </t>
                     </div>
-                    <table class="table table-sm table-hover o_cust_table">
-                        <thead>
-                            <tr>
-                                <th style="width:100px;">رقم الفاتورة</th>
-                                <th style="width:100px;">التاريخ</th>
-                                <th>العميل</th>
-                                <th>البيان</th>
-                                <th class="text-end" style="width:120px;">القيمة</th>
-                                <th class="text-end" style="width:120px;">المحصّل</th>
-                                <th class="text-end" style="width:120px;">المتبقي</th>
-                                <th class="text-center" style="width:100px;">الحالة</th>
-                                <th style="width:80px;">القيد</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-if="!invoicesShown.length">
-                                <td colspan="9" class="text-center text-muted py-4">لا توجد فواتير مطابقة</td>
-                            </tr>
-                            <tr t-foreach="invoicesShown" t-as="inv" t-key="inv.line_id" style="cursor:pointer;"
-                                t-att-class="{ 'o_cust_return': inv.kind === 'return' }"
-                                t-custom-click="(ev, isMiddleClick) => this.openMove(inv.move_id, isMiddleClick)">
-                                <td class="fw-bold">
-                                    <t t-if="inv.number" t-esc="inv.number"/>
-                                    <span t-else="" class="badge text-bg-secondary">بدون رقم</span>
-                                    <span t-if="inv.kind === 'return'" class="badge text-bg-danger ms-1" style="font-size:10px;">مرتجع</span>
-                                    <div t-if="inv.kind === 'return' and inv.cancels" class="small text-muted fw-normal">عن ف <t t-esc="inv.cancels"/></div>
-                                </td>
-                                <td t-esc="inv.date"/>
-                                <td t-esc="inv.customer"/>
-                                <td class="small" t-esc="inv.label"/>
-                                <td t-attf-class="text-end {{ inv.amount &lt; 0 ? 'text-danger' : '' }}" t-esc="fmt(inv.amount)"/>
-                                <td class="text-end text-success" t-att-title="paymentsTitle(inv)">
-                                    <t t-if="inv.collected" t-esc="fmt(inv.collected)"/>
-                                    <div t-if="inv.payments and inv.payments.length" class="small text-muted">
-                                        <t t-foreach="inv.payments" t-as="p" t-key="p_index">
-                                            <span class="me-1">
-                                                <t t-esc="p.receipt"/><t t-if="!p.manual">*</t>
-                                            </span>
-                                        </t>
-                                    </div>
-                                </td>
-                                <td t-attf-class="text-end fw-bold {{ inv.remaining ? 'text-danger' : '' }}"
-                                    t-esc="inv.kind === 'invoice' ? fmt(inv.remaining) : ''"/>
-                                <td class="text-center">
-                                    <span t-if="inv.status" t-attf-class="badge {{ statusClass(inv.status) }}"
-                                          t-esc="statusLabel(inv.status)"/>
-                                </td>
-                                <td>
-                                    <t t-esc="inv.move_name"/>
-                                    <span t-if="inv.state !== 'posted'" class="badge text-bg-secondary ms-1" style="font-size:9px;">مسودة</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot t-if="invoicesShown.length">
-                            <tr t-if="invoiceTotals.returned" class="small text-muted">
-                                <td colspan="4">مجموع الفواتير</td>
-                                <td class="text-end" t-esc="fmt(invoiceTotals.invoiced)"/>
-                                <td colspan="4"/>
-                            </tr>
-                            <tr t-if="invoiceTotals.returned" class="small text-muted">
-                                <td colspan="4">المرتجعات</td>
-                                <td class="text-end text-danger" t-esc="fmt(-invoiceTotals.returned)"/>
-                                <td colspan="4"/>
-                            </tr>
-                            <tr class="fw-bold">
-                                <td colspan="4">الإجمالي<t t-if="invoiceTotals.returned"> (صافي بعد المرتجعات)</t></td>
-                                <td class="text-end" t-esc="fmt(invoiceTotals.net)"/>
-                                <td class="text-end text-success" t-esc="fmt(invoiceTotals.collected)"/>
-                                <td class="text-end text-danger" t-esc="fmt(invoiceTotals.remaining)"/>
-                                <td colspan="2"/>
-                            </tr>
-                            <t t-if="reconciliation">
-                                <tr class="small o_cust_reconcile">
-                                    <td colspan="6">
-                                        <i class="fa fa-balance-scale me-1"/>
-                                        مطابقة مع المستحق: المتبقي على الفواتير
+                    <div class="o_ma_scroll">
+                        <table class="table table-sm table-hover o_cust_table">
+                            <thead>
+                                <tr>
+                                    <th style="width:100px;">رقم الفاتورة</th>
+                                    <th style="width:100px;">التاريخ</th>
+                                    <th>العميل</th>
+                                    <th>البيان</th>
+                                    <th class="text-end" style="width:120px;">القيمة</th>
+                                    <th class="text-end" style="width:120px;">المحصّل</th>
+                                    <th class="text-end" style="width:120px;">المتبقي</th>
+                                    <th class="text-center" style="width:100px;">الحالة</th>
+                                    <th style="width:80px;">القيد</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-if="!invoicesShown.length">
+                                    <td colspan="9" class="text-center text-muted py-4">لا توجد فواتير مطابقة</td>
+                                </tr>
+                                <tr t-foreach="invoicesShown" t-as="inv" t-key="inv.line_id" style="cursor:pointer;"
+                                    t-att-class="{ 'o_cust_return': inv.kind === 'return' }"
+                                    t-custom-click="(ev, isMiddleClick) => this.openMove(inv.move_id, isMiddleClick)">
+                                    <td class="fw-bold">
+                                        <t t-if="inv.number" t-esc="inv.number"/>
+                                        <span t-else="" class="badge text-bg-secondary">بدون رقم</span>
+                                        <span t-if="inv.kind === 'return'" class="badge text-bg-danger ms-1" style="font-size:10px;">مرتجع</span>
+                                        <div t-if="inv.kind === 'return' and inv.cancels" class="small text-muted fw-normal">عن ف <t t-esc="inv.cancels"/></div>
                                     </td>
-                                    <td class="text-end" t-esc="fmt(reconciliation.remaining)"/>
-                                    <td colspan="2"/>
-                                </tr>
-                                <tr t-if="reconciliation.unapplied" class="small o_cust_reconcile">
-                                    <td colspan="6">
-                                        − دفعات غير مخصّصة لفواتير (سندات قبض بلا فاتورة مسجّلة، أو زائدة عنها)
+                                    <td t-esc="inv.date"/>
+                                    <td t-esc="inv.customer"/>
+                                    <td class="small" t-esc="inv.label"/>
+                                    <td t-attf-class="text-end {{ inv.amount &lt; 0 ? 'text-danger' : '' }}" t-esc="fmt(inv.amount)"/>
+                                    <td class="text-end text-success" t-att-title="paymentsTitle(inv)">
+                                        <t t-if="inv.collected" t-esc="fmt(inv.collected)"/>
+                                        <div t-if="inv.payments and inv.payments.length" class="small text-muted">
+                                            <t t-foreach="inv.payments" t-as="p" t-key="p_index">
+                                                <span class="me-1">
+                                                    <t t-esc="p.receipt"/><t t-if="!p.manual">*</t>
+                                                </span>
+                                            </t>
+                                        </div>
                                     </td>
-                                    <td class="text-end text-primary" t-esc="fmt(-reconciliation.unapplied)"/>
+                                    <td t-attf-class="text-end fw-bold {{ inv.remaining ? 'text-danger' : '' }}"
+                                        t-esc="inv.kind === 'invoice' ? fmt(inv.remaining) : ''"/>
+                                    <td class="text-center">
+                                        <span t-if="inv.status" t-attf-class="badge {{ statusClass(inv.status) }}"
+                                              t-esc="statusLabel(inv.status)"/>
+                                    </td>
+                                    <td>
+                                        <t t-esc="inv.move_name"/>
+                                        <span t-if="inv.state !== 'posted'" class="badge text-bg-secondary ms-1" style="font-size:9px;">مسودة</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot t-if="invoicesShown.length">
+                                <tr t-if="invoiceTotals.returned" class="small text-muted">
+                                    <td colspan="4">مجموع الفواتير</td>
+                                    <td class="text-end" t-esc="fmt(invoiceTotals.invoiced)"/>
+                                    <td colspan="4"/>
+                                </tr>
+                                <tr t-if="invoiceTotals.returned" class="small text-muted">
+                                    <td colspan="4">المرتجعات</td>
+                                    <td class="text-end text-danger" t-esc="fmt(-invoiceTotals.returned)"/>
+                                    <td colspan="4"/>
+                                </tr>
+                                <tr class="fw-bold">
+                                    <td colspan="4">الإجمالي<t t-if="invoiceTotals.returned"> (صافي بعد المرتجعات)</t></td>
+                                    <td class="text-end" t-esc="fmt(invoiceTotals.net)"/>
+                                    <td class="text-end text-success" t-esc="fmt(invoiceTotals.collected)"/>
+                                    <td class="text-end text-danger" t-esc="fmt(invoiceTotals.remaining)"/>
                                     <td colspan="2"/>
                                 </tr>
-                                <tr t-if="Math.abs(reconciliation.other) > 0.0005" class="small o_cust_reconcile">
-                                    <td colspan="6">± حركات أخرى على حسابات العملاء (تسويات، أرصدة افتتاحية...)</td>
-                                    <td class="text-end" t-esc="fmt(reconciliation.other)"/>
-                                    <td colspan="2"/>
-                                </tr>
-                                <tr class="fw-bold o_cust_reconcile">
-                                    <td colspan="6">= المستحق على <t t-if="selectedCustomer">العميل</t><t t-else="">العملاء</t></td>
-                                    <td t-attf-class="text-end {{ balanceClass(reconciliation.balance) }}" t-esc="fmt(reconciliation.balance)"/>
-                                    <td colspan="2"/>
-                                </tr>
-                            </t>
-                        </tfoot>
-                    </table>
+                                <t t-if="reconciliation">
+                                    <tr class="small o_cust_reconcile">
+                                        <td colspan="6">
+                                            <i class="fa fa-balance-scale me-1"/>
+                                            مطابقة مع المستحق: المتبقي على الفواتير
+                                        </td>
+                                        <td class="text-end" t-esc="fmt(reconciliation.remaining)"/>
+                                        <td colspan="2"/>
+                                    </tr>
+                                    <tr t-if="reconciliation.unapplied" class="small o_cust_reconcile">
+                                        <td colspan="6">
+                                            − دفعات غير مخصّصة لفواتير (سندات قبض بلا فاتورة مسجّلة، أو زائدة عنها)
+                                        </td>
+                                        <td class="text-end text-primary" t-esc="fmt(-reconciliation.unapplied)"/>
+                                        <td colspan="2"/>
+                                    </tr>
+                                    <tr t-if="Math.abs(reconciliation.other) > 0.0005" class="small o_cust_reconcile">
+                                        <td colspan="6">± حركات أخرى على حسابات العملاء (تسويات، أرصدة افتتاحية...)</td>
+                                        <td class="text-end" t-esc="fmt(reconciliation.other)"/>
+                                        <td colspan="2"/>
+                                    </tr>
+                                    <tr class="fw-bold o_cust_reconcile">
+                                        <td colspan="6">= المستحق على <t t-if="selectedCustomer">العميل</t><t t-else="">العملاء</t></td>
+                                        <td t-attf-class="text-end {{ balanceClass(reconciliation.balance) }}" t-esc="fmt(reconciliation.balance)"/>
+                                        <td colspan="2"/>
+                                    </tr>
+                                </t>
+                            </tfoot>
+                        </table>
+                    </div>
                     <div class="small text-muted">
                         * تحصيل موزّع تلقائياً على أقدم الفواتير (السند غير مخصّص). لتحديد الفواتير بدقة استخدم زر "تخصيص" في تبويب سندات القبض.
                     </div>
@@ -343,51 +349,53 @@
                 <t t-if="state.tab === 'receipts'" t-call="my_accounting.CustomersNoteAlert">
                     <t t-set="alertNotes" t-value="openNotesFor('receipts')"/>
                 </t>
-                <table t-if="state.tab === 'receipts'" class="table table-sm table-hover o_cust_table">
-                    <thead>
-                        <tr>
-                            <th style="width:90px;">السند</th>
-                            <th style="width:100px;">التاريخ</th>
-                            <th>العميل</th>
-                            <th>البيان</th>
-                            <th class="text-end" style="width:120px;">المبلغ</th>
-                            <th style="width:260px;">الفواتير المحصّلة</th>
-                            <th style="width:90px;"/>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-if="!receipts.length">
-                            <td colspan="7" class="text-center text-muted py-4">لا توجد سندات قبض مطابقة</td>
-                        </tr>
-                        <tr t-foreach="receipts" t-as="rec" t-key="rec.key" style="cursor:pointer;"
-                            t-custom-click="(ev, isMiddleClick) => this.openMove(rec.move_id, isMiddleClick)">
-                            <td class="fw-bold" t-esc="rec.move_name"/>
-                            <td t-esc="rec.date"/>
-                            <td t-esc="rec.customer"/>
-                            <td class="small" t-esc="rec.label"/>
-                            <td class="text-end text-success" t-esc="fmt(rec.amount)"/>
-                            <td class="small">
-                                <span t-if="rec.mode === 'auto'" class="badge text-bg-light border me-1" title="غير مخصّص: وُزِّع تلقائياً على أقدم الفواتير">تلقائي</span>
-                                <t t-foreach="rec.allocations" t-as="a" t-key="a_index">
-                                    <span class="badge text-bg-info me-1">ف <t t-esc="a.number"/>: <t t-esc="fmt(a.amount)"/></span>
-                                </t>
-                                <span t-if="rec.unallocated" class="badge text-bg-warning">غير مخصّص <t t-esc="fmt(rec.unallocated)"/></span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" t-on-click.stop="() => this.openAllocation(rec)">
-                                    <i class="fa fa-link me-1"/>تخصيص
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot t-if="receipts.length">
-                        <tr class="fw-bold">
-                            <td colspan="4">الإجمالي</td>
-                            <td class="text-end text-success" t-esc="fmt(receiptsTotal)"/>
-                            <td colspan="2"/>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="o_ma_scroll" t-if="state.tab === 'receipts'">
+                    <table class="table table-sm table-hover o_cust_table">
+                        <thead>
+                            <tr>
+                                <th style="width:90px;">السند</th>
+                                <th style="width:100px;">التاريخ</th>
+                                <th>العميل</th>
+                                <th>البيان</th>
+                                <th class="text-end" style="width:120px;">المبلغ</th>
+                                <th style="width:260px;">الفواتير المحصّلة</th>
+                                <th style="width:90px;"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-if="!receipts.length">
+                                <td colspan="7" class="text-center text-muted py-4">لا توجد سندات قبض مطابقة</td>
+                            </tr>
+                            <tr t-foreach="receipts" t-as="rec" t-key="rec.key" style="cursor:pointer;"
+                                t-custom-click="(ev, isMiddleClick) => this.openMove(rec.move_id, isMiddleClick)">
+                                <td class="fw-bold" t-esc="rec.move_name"/>
+                                <td t-esc="rec.date"/>
+                                <td t-esc="rec.customer"/>
+                                <td class="small" t-esc="rec.label"/>
+                                <td class="text-end text-success" t-esc="fmt(rec.amount)"/>
+                                <td class="small">
+                                    <span t-if="rec.mode === 'auto'" class="badge text-bg-light border me-1" title="غير مخصّص: وُزِّع تلقائياً على أقدم الفواتير">تلقائي</span>
+                                    <t t-foreach="rec.allocations" t-as="a" t-key="a_index">
+                                        <span class="badge text-bg-info me-1">ف <t t-esc="a.number"/>: <t t-esc="fmt(a.amount)"/></span>
+                                    </t>
+                                    <span t-if="rec.unallocated" class="badge text-bg-warning">غير مخصّص <t t-esc="fmt(rec.unallocated)"/></span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" t-on-click.stop="() => this.openAllocation(rec)">
+                                        <i class="fa fa-link me-1"/>تخصيص
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot t-if="receipts.length">
+                            <tr class="fw-bold">
+                                <td colspan="4">الإجمالي</td>
+                                <td class="text-end text-success" t-esc="fmt(receiptsTotal)"/>
+                                <td colspan="2"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
                 <!-- الملاحظات: كل ملاحظات المراجعة، مع حلها يدوياً وتسجيل سبب الحل -->
                 <t t-if="state.tab === 'notes'">
@@ -490,40 +498,42 @@
                 <div t-if="!visibleRows.length" class="alert alert-info">
                     لا توجد فواتير مفتوحة لهذا العميل؛ يبقى السند دفعة غير مخصّصة.
                 </div>
-                <table t-else="" class="table table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th style="width:36px;"/>
-                            <th>الفاتورة</th>
-                            <th>التاريخ</th>
-                            <th>البيان</th>
-                            <th class="text-end">قيمتها</th>
-                            <th class="text-end">المتاح للتخصيص</th>
-                            <th class="text-end" style="width:150px;">المبلغ من هذا السند</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-foreach="visibleRows" t-as="row" t-key="row.number">
-                            <td><input type="checkbox" class="form-check-input" t-att-checked="row.checked"
-                                       t-on-change="(ev) => this.toggle(row, ev)"/></td>
-                            <td class="fw-bold">
-                                <t t-esc="row.number"/>
-                                <span t-if="row.suggested" class="badge text-bg-info ms-1" style="font-size:10px;"
-                                      title="مذكورة في بيان السند">من البيان</span>
-                            </td>
-                            <td class="small" t-esc="row.date"/>
-                            <td class="small" t-esc="row.label"/>
-                            <td class="text-end" t-esc="fmt(row.net)"/>
-                            <td class="text-end" t-esc="fmt(row.available)"/>
-                            <td>
-                                <input type="number" step="0.001" min="0"
-                                       t-attf-class="form-control form-control-sm text-end {{ row.checked and row.amount > row.available + 0.0005 ? 'is-invalid' : '' }}"
-                                       t-att-value="row.checked ? row.amount : ''"
-                                       t-on-change="(ev) => this.setAmount(row, ev)"/>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="o_ma_scroll" t-else="">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;"/>
+                                <th>الفاتورة</th>
+                                <th>التاريخ</th>
+                                <th>البيان</th>
+                                <th class="text-end">قيمتها</th>
+                                <th class="text-end">المتاح للتخصيص</th>
+                                <th class="text-end" style="width:150px;">المبلغ من هذا السند</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="visibleRows" t-as="row" t-key="row.number">
+                                <td><input type="checkbox" class="form-check-input" t-att-checked="row.checked"
+                                           t-on-change="(ev) => this.toggle(row, ev)"/></td>
+                                <td class="fw-bold">
+                                    <t t-esc="row.number"/>
+                                    <span t-if="row.suggested" class="badge text-bg-info ms-1" style="font-size:10px;"
+                                          title="مذكورة في بيان السند">من البيان</span>
+                                </td>
+                                <td class="small" t-esc="row.date"/>
+                                <td class="small" t-esc="row.label"/>
+                                <td class="text-end" t-esc="fmt(row.net)"/>
+                                <td class="text-end" t-esc="fmt(row.available)"/>
+                                <td>
+                                    <input type="number" step="0.001" min="0"
+                                           t-attf-class="form-control form-control-sm text-end {{ row.checked and row.amount > row.available + 0.0005 ? 'is-invalid' : '' }}"
+                                           t-att-value="row.checked ? row.amount : ''"
+                                           t-on-change="(ev) => this.setAmount(row, ev)"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="d-flex justify-content-end small" style="gap: 24px;">
                     <div>المخصّص: <b t-esc="fmt(allocated)"/></div>

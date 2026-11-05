@@ -1,0 +1,336 @@
+/* ===================================================================
+   الهاتف: الشاشة فيه ضيّقة، فما يُفرَش في سطرٍ على الحاسوب يلتفّ هنا
+   أسطراً، فتذهب الشاشة في الفلاتر قبل أن تُرى بيانة. القاعدة هنا:
+   ما كان صفّاً يبقى صفّاً واحداً يُسحب بالإصبع، والجداول تُسحب أفقياً
+   وعمودها الأول ثابتٌ لا يغيب.
+   =================================================================== */
+
+@media (max-width: 767px) {
+
+    /* ---------------------------------------- فلتر الأشهر (كل الشاشات) */
+    .o_ma_period {
+        /* الصنف flex-wrap من بوتستراب يحمل !important، فلا يُغلب إلا بمثله */
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 4px;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .o_ma_period > * {
+        flex: 0 0 auto;
+    }
+
+    .o_ma_month_btn {
+        min-width: 36px;
+        padding: 5px 9px;
+        margin-inline-end: 0;
+        margin-bottom: 0;
+    }
+
+    .o_ma_year_select {
+        width: 104px !important;
+        margin-bottom: 0;
+    }
+
+    /* ---------------------------------------- التبويبات والحبوب */
+    .o_payroll .nav-tabs,
+    .o_pr_sheets,
+    .o_customers_page .nav-tabs,
+    .o_customers_page .nav-pills,
+    .o_tr_page .nav-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .o_payroll .nav-tabs .nav-item,
+    .o_pr_sheets .nav-item,
+    .o_customers_page .nav-tabs .nav-item,
+    .o_customers_page .nav-pills .nav-item {
+        flex: 0 0 auto;
+    }
+
+    .o_payroll .nav-tabs .nav-link,
+    .o_customers_page .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: 6px 10px;
+        font-size: 0.86rem;
+    }
+
+    /* ---------------------------------------- العناوين وأشرطة الأدوات */
+    .o_move_list > .d-flex:first-child,
+    .o_general_ledger > .d-flex:first-child {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .o_move_list h2,
+    .o_general_ledger h2,
+    .o_payroll h2,
+    .o_customers_page h2 {
+        font-size: 1.15rem;
+        white-space: nowrap;
+    }
+
+    .o_pr_bar {
+        gap: 6px;
+        row-gap: 6px;
+    }
+
+    .o_pr_bar > .form-control,
+    .o_pr_bar > input[type="text"] {
+        width: 100% !important;
+        min-width: 0;
+    }
+
+    /* الصفحة نفسها لا تُسحب جانباً: الجداول وحدها تفعل داخل صناديقها.
+       وعلى الحاسوب تبقى الصناديق شفّافة، فالشاشة تتّسع للجدول كما كانت */
+    .o_pr_scroll,
+    .o_ma_scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .o_payroll,
+    .o_move_list,
+    .o_general_ledger,
+    .o_customers_page,
+    .o_trial_balance {
+        overflow-x: hidden;
+    }
+
+    /* شريط أدوات دفتر الأستاذ: يلتفّ بدل أن يدفع الصفحة جانباً */
+    .o_general_ledger > .d-flex > .d-flex {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    .o_general_ledger .btn,
+    .o_trial_balance .btn {
+        padding: 4px 9px;
+        font-size: 0.82rem;
+    }
+
+    /* ---------------------------------------- الجداول: سحبٌ أفقي واضح */
+    .o_pr_table,
+    .o_move_list table,
+    .o_general_ledger table,
+    .o_customers_page table {
+        font-size: 0.82rem;
+    }
+
+    .o_pr_table th,
+    .o_pr_table td {
+        padding: 4px 6px;
+    }
+
+    /* كشف الشهر: عمود الترقيم «م» يُطوى، فالشاشة أضيق من أن تحتمله،
+       واسم الموظف يثبت مكانه بينما تُسحب أرقامه */
+    .o_pr_month thead th:first-child,
+    .o_pr_month tbody td:first-child,
+    .o_pr_month tfoot td:first-child {
+        display: none;
+    }
+
+    .o_pr_month th:nth-child(2),
+    .o_pr_month td:nth-child(2) {
+        width: 126px !important;
+        min-width: 126px;
+        max-width: 126px;
+    }
+
+    /* العمود الأول (الاسم أو الشهر) يبقى مرئياً والباقي يُسحب تحته */
+    .o_pr_table thead th:first-child,
+    .o_pr_table tbody td:first-child,
+    .o_pr_table tfoot td:first-child,
+    .o_pr_month thead th:nth-child(2),
+    .o_pr_month tbody td:nth-child(2),
+    .o_pr_month tfoot td:nth-child(2) {
+        position: sticky;
+        inset-inline-start: 0;
+        z-index: 2;
+        background: var(--o-surface, #fff);
+    }
+
+    .o_pr_table thead th:first-child,
+    .o_pr_month thead th:nth-child(2) {
+        z-index: 3;
+        background: var(--o-surface-2, #f2f3f5);
+    }
+
+    .o_pr_table tfoot td:first-child,
+    .o_pr_month tfoot td:nth-child(2) {
+        background: var(--o-surface-2, #f2f3f5);
+    }
+
+    /* أزرار الكشف: أصغر، فتسع صفّين لا ثلاثة */
+    .o_payroll .o_pr_bar .btn {
+        padding: 4px 9px;
+        font-size: 0.82rem;
+    }
+
+    /* ---------------------------------------- البحث العام في الشريط */
+    .o_qs_systray_panel {
+        position: fixed;
+        inset-inline: 10px;
+        width: auto;
+        top: 54px;
+    }
+
+    .o_qs_menu {
+        max-height: 68vh;
+    }
+
+    .o_qs_item_text {
+        min-width: 0;
+    }
+
+    /* ---------------------------------------- الرواتب: العمود الجانبي */
+    /* على الحاسوب عمودٌ إلى جانب البطاقات، وعلى الهاتف شريطٌ واحد
+       يُسحب بالإصبع — وإلا ذهبت الشاشة كلها في أربعة عشر سطر فلتر */
+    .o_pr_side {
+        position: static;
+        display: flex;
+        flex-wrap: nowrap !important;
+        align-items: center;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 8px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .o_pr_side_title {
+        flex: 0 0 auto;
+        margin: 0;
+        white-space: nowrap;
+        align-self: center;
+    }
+
+    .o_pr_side_item {
+        flex: 0 0 auto;
+        width: auto;
+        white-space: nowrap;
+        padding: 5px 10px;
+    }
+
+    .o_pr_side_sep {
+        flex: 0 0 auto;
+        width: 1px;
+        height: 22px;
+        margin: 0 2px;
+    }
+
+    /* بطاقات الموظفين: بطاقتان في الصفّ على الهاتف لا بطاقةٌ واحدة */
+    .o_pr_people {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 8px;
+    }
+
+    .o_pr_person {
+        padding: 9px 10px;
+        border-radius: 10px;
+    }
+
+    .o_pr_person_name {
+        font-size: 0.88rem;
+    }
+
+    .o_pr_person_rows {
+        gap: 10px;
+        margin: 6px 0;
+        flex-wrap: wrap;
+    }
+
+    .o_pr_person_rows b {
+        font-size: 0.86rem;
+    }
+
+    /* بطاقة الموظف: حقولٌ بعرض الشاشة */
+    .o_pr_card_grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .o_pr_card_head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .o_pr_card_head .text-end {
+        text-align: start !important;
+    }
+
+    /* ---------------------------------------- فلاتر تُطوى */
+    /* الفلاتر على الهاتف خلف زرٍّ واحد، فالبيانات هي التي تُرى أولاً.
+       الطيّ بخانة اختيارٍ مخفيّة: لا جافاسكربت ولا حالةٌ تُدار */
+    .o_ma_collapse_btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        padding: 6px 14px;
+        border: 1px solid var(--gray-300, #dee2e6);
+        border-radius: 8px;
+        background: var(--o-surface-2, #f2f3f5);
+        color: var(--body-color, #212529);
+        font-size: 0.86rem;
+        cursor: pointer;
+    }
+
+    .o_ma_collapse_btn::after {
+        content: "▾";
+        font-size: 0.8rem;
+    }
+
+    .o_ma_collapse_box:checked ~ .o_ma_collapse_btn {
+        background: var(--nav-pills-link-active-bg, #714B67);
+        border-color: var(--nav-pills-link-active-bg, #714B67);
+        color: var(--nav-pills-link-active-color, #fff);
+    }
+
+    .o_ma_collapse_box:checked ~ .o_ma_collapse_btn::after {
+        content: "▴";
+    }
+
+    .o_ma_collapse_box:not(:checked) ~ .o_move_filters {
+        display: none !important;
+    }
+
+    .o_move_filters {
+        gap: 8px !important;
+        margin-top: 8px;
+    }
+
+    .o_move_filters > div {
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+
+    .o_move_filters .form-control,
+    .o_move_filters .form-select {
+        width: 100% !important;
+    }
+}
+
+.o_ma_scroll {
+    max-width: 100%;
+}
+
+/* خانة الطيّ نفسها لا تُرى أبداً، وعلى الحاسوب لا طيّ أصلاً:
+   الفلاتر مفروشةٌ دائماً وزرّها مخفيّ */
+.o_ma_collapse_box {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .o_ma_collapse_btn {
+        display: none;
+    }
+}

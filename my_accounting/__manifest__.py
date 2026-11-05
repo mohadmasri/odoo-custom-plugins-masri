@@ -150,6 +150,8 @@
             'my_accounting/static/src/js/theme_service.js',
             'my_accounting/static/src/css/themes.css',
             'my_accounting/static/src/xml/dark_mode_toggle.xml',
+            # الهاتف آخر ما يُحمَّل، فما فيه يغلب ما قبله
+            'my_accounting/static/src/css/mobile.css',
         ],
         # الوضع الداكن: نحقن متغيّرات الألوان الداكنة في حزمتي الأنماط الداكنة
         # قبل تجميع بقية الملفات، فتُعاد صياغة كل ألوان الواجهة تلقائياً.

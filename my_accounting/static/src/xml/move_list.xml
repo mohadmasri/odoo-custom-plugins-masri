@@ -25,6 +25,13 @@
             <PeriodFilter year="state.ledgerYear" month="state.ledgerMonth" allowAllYears="true"
                           onChange.bind="onPeriodChange"/>
 
+            <!-- على الهاتف تُطوى الفلاتر خلف زرّ، وعلى الحاسوب تبقى مفروشة.
+                 الطيّ بخانة اختيارٍ مخفيّة لا بجافاسكربت، فلا حالة تُدار -->
+            <div class="o_ma_collapse">
+            <input type="checkbox" class="o_ma_collapse_box" id="o_mv_filters_toggle"/>
+            <label class="o_ma_collapse_btn" for="o_mv_filters_toggle">
+                <i class="fa fa-sliders"/> الفلاتر
+            </label>
             <div class="o_move_filters d-flex flex-wrap align-items-end mb-3" style="gap: 12px;">
                 <div>
                     <label class="d-block small text-muted mb-1">رقم القيد</label>
@@ -109,6 +116,7 @@
                     </button>
                 </div>
             </div>
+            </div>
 
             <div t-if="selectedIds.length" class="o_move_bulk_toolbar d-flex align-items-center mb-2 p-2"
                  style="gap: 10px; border-radius: 6px;">
@@ -130,66 +138,68 @@
                 </button>
             </div>
 
-            <table class="table table-hover table-sm">
-                <thead>
-                    <tr>
-                        <th style="width: 32px;">
-                            <input type="checkbox" class="form-check-input"
-                                   t-att-checked="allSelected"
-                                   t-on-change="(ev) => this.toggleSelectAll(ev)"/>
-                        </th>
-                        <t t-foreach="[
-                                ['name', 'رقم القيد', ''],
-                                ['date', 'التاريخ', ''],
-                                ['ledger_period', 'الشهر المحاسبي', ''],
-                                ['ref', 'المرجع', ''],
-                                ['journal', 'اليومية', ''],
-                                ['total_debit', 'إجمالي المدين', 'text-end'],
-                                ['total_credit', 'إجمالي الدائن', 'text-end'],
-                                ['state', 'الحالة', ''],
-                            ]" t-as="col" t-key="col[0]">
-                            <th t-att-class="col[2]" style="cursor:pointer; user-select:none; white-space:nowrap;"
-                                t-on-click="() => this.onSort(col[0])">
-                                <t t-esc="col[1]"/>
-                                <i t-attf-class="fa {{ sortIcon(col[0]) }} ms-1"/>
+            <div class="o_ma_scroll">
+                <table class="table table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width: 32px;">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="allSelected"
+                                       t-on-change="(ev) => this.toggleSelectAll(ev)"/>
                             </th>
-                        </t>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr t-if="!state.records.length">
-                        <td colspan="9" class="text-center text-muted py-4">لا توجد قيود مطابقة</td>
-                    </tr>
-                    <tr t-foreach="sortedRecords" t-as="rec" t-key="rec.id"
-                        t-att-class="{ 'o_move_has_import_notes': rec.has_import_notes }"
-                        style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(rec.id, isMiddleClick)">
-                        <td t-on-click="(ev) => ev.stopPropagation()">
-                            <input type="checkbox" class="form-check-input"
-                                   t-att-checked="state.selected[rec.id] || false"
-                                   t-on-change="(ev) => this.toggleSelect(rec.id, ev)"/>
-                        </td>
-                        <td>
-                            <strong t-esc="rec.name"/>
-                            <span t-if="rec.move_type === 'receipt'" class="badge text-bg-info ms-1"
-                                  style="font-size:10px;">سند قبض</span>
-                            <i t-if="rec.attachment_count" class="fa fa-paperclip text-muted ms-1"
-                               t-att-title="rec.attachment_count + ' مرفق'"/>
-                            <i t-if="rec.has_import_notes" class="fa fa-exclamation-triangle text-warning ms-1"
-                               title="لهذا القيد ملاحظات استيراد لم تُراجع بعد"/>
-                        </td>
-                        <td t-esc="rec.date"/>
-                        <td t-esc="rec.ledger_period_label or ''"/>
-                        <td t-esc="rec.ref or ''"/>
-                        <td t-esc="rec.journal or ''"/>
-                        <td class="text-end" t-esc="rec.total_debit.toFixed(3)"/>
-                        <td class="text-end" t-esc="rec.total_credit.toFixed(3)"/>
-                        <td>
-                            <span t-attf-class="badge {{ rec.state === 'posted' ? 'text-bg-success' : (rec.state === 'incomplete' ? 'text-bg-warning' : 'text-bg-info') }}"
-                                  t-esc="stateLabels[rec.state]"/>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                            <t t-foreach="[
+                                    ['name', 'رقم القيد', ''],
+                                    ['date', 'التاريخ', ''],
+                                    ['ledger_period', 'الشهر المحاسبي', ''],
+                                    ['ref', 'المرجع', ''],
+                                    ['journal', 'اليومية', ''],
+                                    ['total_debit', 'إجمالي المدين', 'text-end'],
+                                    ['total_credit', 'إجمالي الدائن', 'text-end'],
+                                    ['state', 'الحالة', ''],
+                                ]" t-as="col" t-key="col[0]">
+                                <th t-att-class="col[2]" style="cursor:pointer; user-select:none; white-space:nowrap;"
+                                    t-on-click="() => this.onSort(col[0])">
+                                    <t t-esc="col[1]"/>
+                                    <i t-attf-class="fa {{ sortIcon(col[0]) }} ms-1"/>
+                                </th>
+                            </t>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-if="!state.records.length">
+                            <td colspan="9" class="text-center text-muted py-4">لا توجد قيود مطابقة</td>
+                        </tr>
+                        <tr t-foreach="sortedRecords" t-as="rec" t-key="rec.id"
+                            t-att-class="{ 'o_move_has_import_notes': rec.has_import_notes }"
+                            style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(rec.id, isMiddleClick)">
+                            <td t-on-click="(ev) => ev.stopPropagation()">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-checked="state.selected[rec.id] || false"
+                                       t-on-change="(ev) => this.toggleSelect(rec.id, ev)"/>
+                            </td>
+                            <td>
+                                <strong t-esc="rec.name"/>
+                                <span t-if="rec.move_type === 'receipt'" class="badge text-bg-info ms-1"
+                                      style="font-size:10px;">سند قبض</span>
+                                <i t-if="rec.attachment_count" class="fa fa-paperclip text-muted ms-1"
+                                   t-att-title="rec.attachment_count + ' مرفق'"/>
+                                <i t-if="rec.has_import_notes" class="fa fa-exclamation-triangle text-warning ms-1"
+                                   title="لهذا القيد ملاحظات استيراد لم تُراجع بعد"/>
+                            </td>
+                            <td t-esc="rec.date"/>
+                            <td t-esc="rec.ledger_period_label or ''"/>
+                            <td t-esc="rec.ref or ''"/>
+                            <td t-esc="rec.journal or ''"/>
+                            <td class="text-end" t-esc="rec.total_debit.toFixed(3)"/>
+                            <td class="text-end" t-esc="rec.total_credit.toFixed(3)"/>
+                            <td>
+                                <span t-attf-class="badge {{ rec.state === 'posted' ? 'text-bg-success' : (rec.state === 'incomplete' ? 'text-bg-warning' : 'text-bg-info') }}"
+                                      t-esc="stateLabels[rec.state]"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </t>
 

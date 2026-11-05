@@ -162,66 +162,72 @@
                     <div t-if="state.excel.changed.length" class="o_pr_card_sub">
                         سيُعدَّل
                     </div>
-                    <table t-if="state.excel.changed.length"
-                           class="table table-bordered table-sm o_pr_table o_pr_wide">
-                        <thead>
-                            <tr>
-                                <th style="width:200px;">الموظف</th>
-                                <th style="width:140px;">كشف الملف</th>
-                                <th>ما سيتغيّر</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-foreach="state.excel.changed" t-as="item" t-key="item.id">
-                                <td t-esc="item.name"/>
-                                <td t-esc="item.sheet"/>
-                                <td>
-                                    <span t-foreach="item.fields" t-as="field"
-                                          t-key="field.label" class="o_pr_change">
-                                        <t t-esc="field.label"/>:
-                                        <s t-esc="field.old"/> →
-                                        <b t-esc="field.new"/>
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="o_pr_scroll" t-if="state.excel.changed.length">
+                        <table
+                               class="table table-bordered table-sm o_pr_table o_pr_wide">
+                            <thead>
+                                <tr>
+                                    <th style="width:200px;">الموظف</th>
+                                    <th style="width:140px;">كشف الملف</th>
+                                    <th>ما سيتغيّر</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.excel.changed" t-as="item" t-key="item.id">
+                                    <td t-esc="item.name"/>
+                                    <td t-esc="item.sheet"/>
+                                    <td>
+                                        <span t-foreach="item.fields" t-as="field"
+                                              t-key="field.label" class="o_pr_change">
+                                            <t t-esc="field.label"/>:
+                                            <s t-esc="field.old"/> →
+                                            <b t-esc="field.new"/>
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div t-if="state.excel.new.length" class="o_pr_card_sub">سيُضاف</div>
-                    <table t-if="state.excel.new.length"
-                           class="table table-bordered table-sm o_pr_table o_pr_wide">
-                        <thead>
-                            <tr>
-                                <th style="width:200px;">الموظف</th>
-                                <th style="width:140px;">الكشف</th>
-                                <th class="text-end" style="width:110px;">الإجمالي</th>
-                                <th class="text-end" style="width:110px;">الصافي</th>
-                                <th style="width:90px;">الصرف</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-foreach="state.excel.new" t-as="item" t-key="item.name">
-                                <td t-esc="item.name"/>
-                                <td t-esc="item.sheet"/>
-                                <td class="text-end" t-esc="fmt(item.gross)"/>
-                                <td class="text-end" t-esc="fmt(item.net)"/>
-                                <td t-esc="item.method"/>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="o_pr_scroll" t-if="state.excel.new.length">
+                        <table
+                               class="table table-bordered table-sm o_pr_table o_pr_wide">
+                            <thead>
+                                <tr>
+                                    <th style="width:200px;">الموظف</th>
+                                    <th style="width:140px;">الكشف</th>
+                                    <th class="text-end" style="width:110px;">الإجمالي</th>
+                                    <th class="text-end" style="width:110px;">الصافي</th>
+                                    <th style="width:90px;">الصرف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.excel.new" t-as="item" t-key="item.name">
+                                    <td t-esc="item.name"/>
+                                    <td t-esc="item.sheet"/>
+                                    <td class="text-end" t-esc="fmt(item.gross)"/>
+                                    <td class="text-end" t-esc="fmt(item.net)"/>
+                                    <td t-esc="item.method"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div t-if="state.excel.stop.length" class="o_pr_card_sub">
                         سيُوقف — غائبون عن الملف
                     </div>
-                    <table t-if="state.excel.stop.length"
-                           class="table table-bordered table-sm o_pr_table o_pr_wide">
-                        <tbody>
-                            <tr t-foreach="state.excel.stop" t-as="item" t-key="item.id">
-                                <td style="width:200px;" t-esc="item.name"/>
-                                <td t-esc="item.sheet"/>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="o_pr_scroll" t-if="state.excel.stop.length">
+                        <table
+                               class="table table-bordered table-sm o_pr_table o_pr_wide">
+                            <tbody>
+                                <tr t-foreach="state.excel.stop" t-as="item" t-key="item.id">
+                                    <td style="width:200px;" t-esc="item.name"/>
+                                    <td t-esc="item.sheet"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div class="small text-muted mt-2">
                         بلا تغيير: <t t-esc="state.excel.same.length"/> بطاقة.
@@ -393,56 +399,58 @@
 
                     <t t-else="">
                     <div class="o_pr_card_sub">سجلّ رواتبه الشهري</div>
-                    <table class="table table-bordered table-sm o_pr_table o_pr_hist">
-                        <thead>
-                            <tr>
-                                <th style="width:150px;">الشهر</th>
-                                <th style="width:140px;">الكشف</th>
-                                <th class="text-end" style="width:96px;">الأساسي</th>
-                                <th class="text-end" style="width:96px;">العلاوات</th>
-                                <th class="text-end" style="width:96px;">الإجمالي</th>
-                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                <th class="text-end" style="width:96px;">ضريبة</th>
-                                <th class="text-end" style="width:96px;">تقاعد</th>
-                                <th class="text-end" style="width:96px;">استقطاع</th>
-                                <th class="text-end" style="width:96px;">الصافي</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-foreach="state.card.history" t-as="row" t-key="row.id">
-                                <td>
-                                    <t t-esc="row.month_label"/> <t t-esc="row.year"/>
-                                </td>
-                                <td t-esc="row.group"/>
-                                <td class="text-end" t-esc="fmt(row.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(row.allowance)"/>
-                                <td class="text-end" t-esc="fmt(row.gross)"/>
-                                <td class="text-end" t-esc="fmt(row.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(row.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(row.pension)"/>
-                                <td class="text-end" t-esc="fmt(row.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(row.net)"/>
-                            </tr>
-                            <tr t-if="!state.card.history.length">
-                                <td colspan="10" class="text-muted text-center py-2">
-                                    لم يدخل في كشف رواتب بعد.
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot t-if="state.card.history.length">
-                            <tr class="o_pr_total">
-                                <td colspan="2">المجاميع</td>
-                                <td class="text-end" t-esc="fmt(state.card.totals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.gross)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.pension)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(state.card.totals.net)"/>
-                            </tr>
-                        </tfoot>
-                    </table>
+                    <div class="o_pr_scroll">
+                        <table class="table table-bordered table-sm o_pr_table o_pr_hist">
+                            <thead>
+                                <tr>
+                                    <th style="width:150px;">الشهر</th>
+                                    <th style="width:140px;">الكشف</th>
+                                    <th class="text-end" style="width:96px;">الأساسي</th>
+                                    <th class="text-end" style="width:96px;">العلاوات</th>
+                                    <th class="text-end" style="width:96px;">الإجمالي</th>
+                                    <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                    <th class="text-end" style="width:96px;">ضريبة</th>
+                                    <th class="text-end" style="width:96px;">تقاعد</th>
+                                    <th class="text-end" style="width:96px;">استقطاع</th>
+                                    <th class="text-end" style="width:96px;">الصافي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.card.history" t-as="row" t-key="row.id">
+                                    <td>
+                                        <t t-esc="row.month_label"/> <t t-esc="row.year"/>
+                                    </td>
+                                    <td t-esc="row.group"/>
+                                    <td class="text-end" t-esc="fmt(row.basic_salary)"/>
+                                    <td class="text-end" t-esc="fmt(row.allowance)"/>
+                                    <td class="text-end" t-esc="fmt(row.gross)"/>
+                                    <td class="text-end" t-esc="fmt(row.employee_social)"/>
+                                    <td class="text-end" t-esc="fmt(row.income_tax)"/>
+                                    <td class="text-end" t-esc="fmt(row.pension)"/>
+                                    <td class="text-end" t-esc="fmt(row.other_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(row.net)"/>
+                                </tr>
+                                <tr t-if="!state.card.history.length">
+                                    <td colspan="10" class="text-muted text-center py-2">
+                                        لم يدخل في كشف رواتب بعد.
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot t-if="state.card.history.length">
+                                <tr class="o_pr_total">
+                                    <td colspan="2">المجاميع</td>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.basic_salary)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.allowance)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.gross)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.employee_social)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.income_tax)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.pension)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.other_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(state.card.totals.net)"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                     </t>
                 </div>
             </t>
@@ -554,92 +562,94 @@
                         </li>
                     </ul>
 
-                    <table t-if="data.lines.length"
-                           class="table table-bordered table-sm o_pr_table o_pr_month">
-                        <thead>
-                            <tr>
-                                <th class="text-center" style="width:44px;">م</th>
-                                <th style="width:170px;">الموظف</th>
-                                <th class="text-end" style="width:96px;">الأساسي</th>
-                                <th class="text-end" style="width:96px;">العلاوات</th>
-                                <th class="text-end" style="width:96px;">الإجمالي</th>
-                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
-                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
-                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
-                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
-                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
-                                <th class="text-end" style="width:96px;">الصافي</th>
-                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
-                            </tr>
-                        </thead>
-                        <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
-                        <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
-                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
-                                <td class="text-center text-muted"
-                                    t-esc="section.start + line_index + 1"/>
-                                <td t-esc="line.employee"/>
-                                <t>
-                                    <td t-foreach="['basic_salary', 'allowance']" t-as="field"
-                                        t-key="field">
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line[field]"
-                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                    <div class="o_pr_scroll" t-if="data.lines.length">
+                        <table
+                               class="table table-bordered table-sm o_pr_table o_pr_month">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width:44px;">م</th>
+                                    <th style="width:170px;">الموظف</th>
+                                    <th class="text-end" style="width:96px;">الأساسي</th>
+                                    <th class="text-end" style="width:96px;">العلاوات</th>
+                                    <th class="text-end" style="width:96px;">الإجمالي</th>
+                                    <th class="text-end" style="width:96px;">الخاضع للضمان</th>
+                                    <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                    <th class="text-end" style="width:96px;">ضريبة الدخل</th>
+                                    <th class="text-end" style="width:96px;">صندوق التقاعد</th>
+                                    <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
+                                    <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
+                                    <th class="text-end" style="width:96px;">الصافي</th>
+                                    <th class="text-end" style="width:96px;">ضمان الشركة</th>
+                                </tr>
+                            </thead>
+                            <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
+                            <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
+                                <tr t-foreach="section.lines" t-as="line" t-key="line.id">
+                                    <td class="text-center text-muted"
+                                        t-esc="section.start + line_index + 1"/>
+                                    <td t-esc="line.employee"/>
+                                    <t>
+                                        <td t-foreach="['basic_salary', 'allowance']" t-as="field"
+                                            t-key="field">
+                                            <input type="number" step="0.001"
+                                                   class="form-control form-control-sm text-end"
+                                                   t-att-value="line[field]"
+                                                   t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                        </td>
+                                        <td class="text-end o_pr_calc" t-esc="fmt(line.gross)"/>
+                                        <td t-foreach="['social_base', 'employee_social', 'income_tax', 'pension', 'other_deduction']"
+                                            t-as="field" t-key="field">
+                                            <input type="number" step="0.001"
+                                                   class="form-control form-control-sm text-end"
+                                                   t-att-value="line[field]"
+                                                   t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                        </td>
+                                        <td class="text-end o_pr_calc" t-esc="fmt(line.total_deduction)"/>
+                                        <td class="text-end o_pr_calc" t-esc="fmt(line.net)"/>
+                                        <td>
+                                            <input type="number" step="0.001"
+                                                   class="form-control form-control-sm text-end"
+                                                   t-att-value="line.employer_social"
+                                                   t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
+                                        </td>
+                                    </t>
+                                </tr>
+                            </tbody>
+                            <tbody t-if="!data.lines.length">
+                                <tr>
+                                    <td colspan="13" class="text-muted text-center py-2">
+                                        لا بنود. أضف موظفين ثم «أعد البناء».
                                     </td>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.gross)"/>
-                                    <td t-foreach="['social_base', 'employee_social', 'income_tax', 'pension', 'other_deduction']"
-                                        t-as="field" t-key="field">
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line[field]"
-                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                </tr>
+                            </tbody>
+                            <tbody t-elif="!visibleSections.length">
+                                <tr>
+                                    <td colspan="13" class="text-muted text-center py-2">
+                                        لا بنود في هذا الكشف.
                                     </td>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.total_deduction)"/>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.net)"/>
-                                    <td>
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line.employer_social"
-                                               t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="o_pr_total">
+                                    <td colspan="2">
+                                        <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
+                                        <t t-else="">مجموع الكشف</t>
                                     </td>
-                                </t>
-                            </tr>
-                        </tbody>
-                        <tbody t-if="!data.lines.length">
-                            <tr>
-                                <td colspan="13" class="text-muted text-center py-2">
-                                    لا بنود. أضف موظفين ثم «أعد البناء».
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tbody t-elif="!visibleSections.length">
-                            <tr>
-                                <td colspan="13" class="text-muted text-center py-2">
-                                    لا بنود في هذا الكشف.
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="o_pr_total">
-                                <td colspan="2">
-                                    <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
-                                    <t t-else="">مجموع الكشف</t>
-                                </td>
-                                <td class="text-end" t-esc="fmt(visibleTotals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.gross)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.social_base)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.pension)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.net)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.employer_social)"/>
-                            </tr>
-                        </tfoot>
-                    </table>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.basic_salary)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.allowance)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.gross)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.social_base)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.employee_social)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.income_tax)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.pension)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.other_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.total_deduction)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.net)"/>
+                                    <td class="text-end" t-esc="fmt(visibleTotals.employer_social)"/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
 
                     <div class="o_pr_note small text-muted">
                         القيد: مصروف الرواتب <t t-esc="fmt(totals.gross)"/> مديناً،
@@ -980,53 +990,55 @@
                                     لا كشف لهذا المشروع في <t t-esc="periodLabel"/>.
                                     وأشهره <b t-esc="projectSpan(openProject)"/>.
                                 </div>
-                                <table t-else=""
-                                       class="table table-bordered table-sm o_pr_table o_pr_wide">
-                                    <thead>
-                                        <tr>
-                                            <th style="width:180px;">الموظف</th>
-                                            <th class="text-end" style="width:96px;">الأساسي</th>
-                                            <th class="text-end" style="width:96px;">العلاوات</th>
-                                            <th class="text-end" style="width:96px;">الإجمالي</th>
-                                            <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                            <th class="text-end" style="width:96px;">ضريبة</th>
-                                            <th class="text-end" style="width:96px;">تقاعد</th>
-                                            <th class="text-end" style="width:96px;">الصافي</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr t-foreach="projectMonth.lines" t-as="line"
-                                            t-key="line.id">
-                                            <td t-esc="line.employee"/>
-                                            <td class="text-end" t-esc="fmt(line.basic_salary)"/>
-                                            <td class="text-end" t-esc="fmt(line.allowance)"/>
-                                            <td class="text-end" t-esc="fmt(line.gross)"/>
-                                            <td class="text-end" t-esc="fmt(line.employee_social)"/>
-                                            <td class="text-end" t-esc="fmt(line.income_tax)"/>
-                                            <td class="text-end" t-esc="fmt(line.pension)"/>
-                                            <td class="text-end" t-esc="fmt(line.net)"/>
-                                        </tr>
-                                    </tbody>
-                                    <tfoot>
-                                        <tr class="o_pr_total">
-                                            <td>المجموع</td>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).basic_salary)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).allowance)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).gross)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).employee_social)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).income_tax)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).pension)"/>
-                                            <td class="text-end"
-                                                t-esc="fmt(monthTotals(projectMonth).net)"/>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                                <div class="o_pr_scroll" t-else="">
+                                    <table
+                                           class="table table-bordered table-sm o_pr_table o_pr_wide">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:180px;">الموظف</th>
+                                                <th class="text-end" style="width:96px;">الأساسي</th>
+                                                <th class="text-end" style="width:96px;">العلاوات</th>
+                                                <th class="text-end" style="width:96px;">الإجمالي</th>
+                                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                                <th class="text-end" style="width:96px;">ضريبة</th>
+                                                <th class="text-end" style="width:96px;">تقاعد</th>
+                                                <th class="text-end" style="width:96px;">الصافي</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr t-foreach="projectMonth.lines" t-as="line"
+                                                t-key="line.id">
+                                                <td t-esc="line.employee"/>
+                                                <td class="text-end" t-esc="fmt(line.basic_salary)"/>
+                                                <td class="text-end" t-esc="fmt(line.allowance)"/>
+                                                <td class="text-end" t-esc="fmt(line.gross)"/>
+                                                <td class="text-end" t-esc="fmt(line.employee_social)"/>
+                                                <td class="text-end" t-esc="fmt(line.income_tax)"/>
+                                                <td class="text-end" t-esc="fmt(line.pension)"/>
+                                                <td class="text-end" t-esc="fmt(line.net)"/>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="o_pr_total">
+                                                <td>المجموع</td>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).basic_salary)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).allowance)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).gross)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).employee_social)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).income_tax)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).pension)"/>
+                                                <td class="text-end"
+                                                    t-esc="fmt(monthTotals(projectMonth).net)"/>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
 
                                 <div class="o_pr_card_sub mt-3">بطاقات موظفيه</div>
                                 <div class="o_pr_people">
@@ -1125,69 +1137,71 @@
                         دفع يرثه كل موظف في الكشف، إلا من كُتب على بطاقته غيره.
                         واليومية يومية قيد الكشف، كما في دفاترك.
                     </div>
-                    <table class="table table-bordered table-sm o_pr_table" style="max-width:1020px;">
-                        <thead>
-                            <tr>
-                                <th style="width:64px;">ترتيب</th>
-                                <th style="width:190px;">الكشف</th>
-                                <th style="width:220px;">حساب المصروف</th>
-                                <th style="width:220px;">يُدفع من</th>
-                                <th style="width:160px;">اليومية</th>
-                                <th style="width:70px;">موظفون</th>
-                                <th style="width:44px;"/>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-foreach="activeGroups" t-as="group" t-key="group._k">
-                                <td>
-                                    <input type="number" class="form-control form-control-sm"
-                                           t-att-value="group.sequence"
-                                           t-on-change="(ev) => this.editGroup(group, 'sequence', ev)"/>
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                           t-att-value="group.name"
-                                           t-on-change="(ev) => this.editGroup(group, 'name', ev)"/>
-                                </td>
-                                <td>
-                                    <RefPicker value="groupAccountToken(group)"
-                                               options="state.accountOptions"
-                                               disabled="state.busy"
-                                               placeholder="'حساب الرواتب العام'"
-                                               onSelect="(token) => this.onGroupAccount(group, token)"/>
-                                </td>
-                                <td>
-                                    <RefPicker value="groupPaymentToken(group)"
-                                               options="state.accountOptions"
-                                               disabled="state.busy"
-                                               placeholder="'حساب الدفع العام'"
-                                               onSelect="(token) => this.onGroupPayment(group, token)"/>
-                                </td>
-                                <td>
-                                    <input type="text" class="form-control form-control-sm"
-                                           placeholder="رواتب المكتب"
-                                           t-att-value="group.journal"
-                                           t-on-change="(ev) => this.editGroup(group, 'journal', ev)"/>
-                                </td>
-                                <td class="text-center" t-esc="countOf(group.id)"/>
-                                <td class="text-center">
-                                    <button t-if="group.id" class="btn btn-sm btn-link p-0 me-1"
-                                            title="أرشِف الكشف"
-                                            t-on-click="() => this.toggleGroupArchive(group)">
-                                        <i class="fa fa-archive"/>
-                                    </button>
-                                    <button class="btn btn-sm btn-link text-danger p-0"
-                                            title="حذف الكشف"
-                                            t-on-click="() => this.removeGroup(group)">
-                                        <i class="fa fa-trash"/>
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr t-if="!activeGroups.length">
-                                <td colspan="7" class="text-muted text-center py-2">لا كشوف بعد</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="o_pr_scroll">
+                        <table class="table table-bordered table-sm o_pr_table" style="max-width:1020px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:64px;">ترتيب</th>
+                                    <th style="width:190px;">الكشف</th>
+                                    <th style="width:220px;">حساب المصروف</th>
+                                    <th style="width:220px;">يُدفع من</th>
+                                    <th style="width:160px;">اليومية</th>
+                                    <th style="width:70px;">موظفون</th>
+                                    <th style="width:44px;"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="activeGroups" t-as="group" t-key="group._k">
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm"
+                                               t-att-value="group.sequence"
+                                               t-on-change="(ev) => this.editGroup(group, 'sequence', ev)"/>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               t-att-value="group.name"
+                                               t-on-change="(ev) => this.editGroup(group, 'name', ev)"/>
+                                    </td>
+                                    <td>
+                                        <RefPicker value="groupAccountToken(group)"
+                                                   options="state.accountOptions"
+                                                   disabled="state.busy"
+                                                   placeholder="'حساب الرواتب العام'"
+                                                   onSelect="(token) => this.onGroupAccount(group, token)"/>
+                                    </td>
+                                    <td>
+                                        <RefPicker value="groupPaymentToken(group)"
+                                                   options="state.accountOptions"
+                                                   disabled="state.busy"
+                                                   placeholder="'حساب الدفع العام'"
+                                                   onSelect="(token) => this.onGroupPayment(group, token)"/>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               placeholder="رواتب المكتب"
+                                               t-att-value="group.journal"
+                                               t-on-change="(ev) => this.editGroup(group, 'journal', ev)"/>
+                                    </td>
+                                    <td class="text-center" t-esc="countOf(group.id)"/>
+                                    <td class="text-center">
+                                        <button t-if="group.id" class="btn btn-sm btn-link p-0 me-1"
+                                                title="أرشِف الكشف"
+                                                t-on-click="() => this.toggleGroupArchive(group)">
+                                            <i class="fa fa-archive"/>
+                                        </button>
+                                        <button class="btn btn-sm btn-link text-danger p-0"
+                                                title="حذف الكشف"
+                                                t-on-click="() => this.removeGroup(group)">
+                                            <i class="fa fa-trash"/>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr t-if="!activeGroups.length">
+                                    <td colspan="7" class="text-muted text-center py-2">لا كشوف بعد</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <button class="btn btn-sm btn-outline-secondary"
                             t-on-click="() => this.addGroup()">
                         <i class="fa fa-plus me-1"/> كشف

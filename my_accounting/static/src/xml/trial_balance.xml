@@ -91,55 +91,57 @@
                         لا توجد حركات ضمن هذه الفترة
                     </div>
 
-                    <table t-if="state.data.rows.length" class="table table-bordered table-sm o_tb_table">
-                        <thead>
-                            <tr class="text-center">
-                                <th rowspan="2" style="width:70px;" class="o_print_no_code">الرمز</th>
-                                <th rowspan="2">الحساب</th>
-                                <th rowspan="2" style="width:110px;">رصيد افتتاحي</th>
-                                <th colspan="2" style="width:220px;">حركة الفترة</th>
-                                <th rowspan="2" style="width:110px;">رصيد ختامي</th>
-                            </tr>
-                            <tr class="text-center">
-                                <th style="width:110px;">مدين</th>
-                                <th style="width:110px;">دائن</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr t-foreach="state.data.rows" t-as="row" t-key="row.id"
-                                style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openAccount(row.id, isMiddleClick)">
-                                <td class="text-muted o_print_no_code" t-esc="row.code"/>
-                                <td>
-                                    <t t-esc="row.name"/>
-                                    <span t-if="row.parent" class="text-muted small"> / <t t-esc="row.parent"/></span>
-                                </td>
-                                <td class="text-end" t-esc="fmt(row.opening)"/>
-                                <td class="text-end" t-esc="fmt(row.debit)"/>
-                                <td class="text-end" t-esc="fmt(row.credit)"/>
-                                <td t-attf-class="text-end {{ row.closing &lt; 0 ? 'text-danger' : '' }}"
-                                    t-esc="fmt(row.closing)"/>
-                            </tr>
-                        </tbody>
-                        <tfoot t-if="state.data.rows.length">
-                            <tr class="fw-bold">
-                                <td colspan="2" class="text-end">الإجمالي (<t t-esc="state.data.rows.length"/> حساب)</td>
-                                <td class="text-end" t-esc="fmt(state.data.totals.opening)"/>
-                                <td class="text-end" t-esc="fmt(state.data.totals.debit)"/>
-                                <td class="text-end" t-esc="fmt(state.data.totals.credit)"/>
-                                <td class="text-end" t-esc="fmt(state.data.totals.closing)"/>
-                            </tr>
-                            <tr>
-                                <td colspan="6" class="small">
-                                    <span t-if="state.data.balanced" class="text-success">
-                                        <i class="fa fa-check-circle me-1"/>الميزان متوازن: إجمالي المدين يساوي إجمالي الدائن.
-                                    </span>
-                                    <span t-else="" class="text-danger">
-                                        <i class="fa fa-exclamation-triangle me-1"/>الميزان غير متوازن — راجع القيود غير المتوازنة.
-                                    </span>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                    <div class="o_ma_scroll" t-if="state.data.rows.length">
+                        <table class="table table-bordered table-sm o_tb_table">
+                            <thead>
+                                <tr class="text-center">
+                                    <th rowspan="2" style="width:70px;" class="o_print_no_code">الرمز</th>
+                                    <th rowspan="2">الحساب</th>
+                                    <th rowspan="2" style="width:110px;">رصيد افتتاحي</th>
+                                    <th colspan="2" style="width:220px;">حركة الفترة</th>
+                                    <th rowspan="2" style="width:110px;">رصيد ختامي</th>
+                                </tr>
+                                <tr class="text-center">
+                                    <th style="width:110px;">مدين</th>
+                                    <th style="width:110px;">دائن</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="state.data.rows" t-as="row" t-key="row.id"
+                                    style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openAccount(row.id, isMiddleClick)">
+                                    <td class="text-muted o_print_no_code" t-esc="row.code"/>
+                                    <td>
+                                        <t t-esc="row.name"/>
+                                        <span t-if="row.parent" class="text-muted small"> / <t t-esc="row.parent"/></span>
+                                    </td>
+                                    <td class="text-end" t-esc="fmt(row.opening)"/>
+                                    <td class="text-end" t-esc="fmt(row.debit)"/>
+                                    <td class="text-end" t-esc="fmt(row.credit)"/>
+                                    <td t-attf-class="text-end {{ row.closing &lt; 0 ? 'text-danger' : '' }}"
+                                        t-esc="fmt(row.closing)"/>
+                                </tr>
+                            </tbody>
+                            <tfoot t-if="state.data.rows.length">
+                                <tr class="fw-bold">
+                                    <td colspan="2" class="text-end">الإجمالي (<t t-esc="state.data.rows.length"/> حساب)</td>
+                                    <td class="text-end" t-esc="fmt(state.data.totals.opening)"/>
+                                    <td class="text-end" t-esc="fmt(state.data.totals.debit)"/>
+                                    <td class="text-end" t-esc="fmt(state.data.totals.credit)"/>
+                                    <td class="text-end" t-esc="fmt(state.data.totals.closing)"/>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" class="small">
+                                        <span t-if="state.data.balanced" class="text-success">
+                                            <i class="fa fa-check-circle me-1"/>الميزان متوازن: إجمالي المدين يساوي إجمالي الدائن.
+                                        </span>
+                                        <span t-else="" class="text-danger">
+                                            <i class="fa fa-exclamation-triangle me-1"/>الميزان غير متوازن — راجع القيود غير المتوازنة.
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </t>
         </div>
