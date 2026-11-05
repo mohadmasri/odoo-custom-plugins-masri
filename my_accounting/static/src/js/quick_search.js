@@ -5,6 +5,7 @@ import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { MONTH_OPTIONS } from "./months";
 import { openRecord } from "./open_record";
+import { router } from "@web/core/browser/router";
 
 const DEBOUNCE_MS = 180;
 const QUICK_LIMIT = 4;
@@ -13,6 +14,26 @@ const QUICK_LIMIT = 4;
  * شريط البحث العام: يكتب المستخدم أي نص فتظهر تحته أهم النتائج من القيود
  * والحسابات والبنود، والضغط على "المزيد" أو Enter يفتح صفحة البحث كاملة.
  */
+
+/**
+ * نتيجة من الرواتب تُفتح في صفحة الرواتب نفسها لا في نموذجٍ عامّ:
+ * الموظف على بطاقته، والمشروع على كشفه، والشهر على كشف شهره.
+ */
+function openPayroll(actionService, item, isMiddleClick) {
+    const target = item.payroll || {};
+    if (isMiddleClick) {
+        const url = router.stateToUrl({
+            action: "my_accounting.action_myaccounting_payroll",
+            ...(target.kind === "employee" ? { resId: target.id } : {}),
+        });
+        window.open(url, "_blank", "noopener");
+        return;
+    }
+    actionService.doAction("my_accounting.action_myaccounting_payroll", {
+        additionalContext: { payroll_open: target },
+    });
+}
+
 export class QuickSearch extends Component {
     static template = "my_accounting.QuickSearch";
     static props = {
@@ -133,7 +154,11 @@ export class QuickSearch extends Component {
 
     openItem(item, isMiddleClick) {
         this.state.open = false;
-        openRecord(this.action, item.model, item.id, isMiddleClick);
+        if (item.action === "payroll") {
+            openPayroll(this.action, item, isMiddleClick);
+        } else {
+            openRecord(this.action, item.model, item.id, isMiddleClick);
+        }
         if (!isMiddleClick && this.props.onNavigate) {
             this.props.onNavigate();
         }
@@ -298,6 +323,10 @@ export class SearchPage extends Component {
     }
 
     openItem(item, isMiddleClick) {
+        if (item.action === "payroll") {
+            openPayroll(this.action, item, isMiddleClick);
+            return;
+        }
         openRecord(this.action, item.model, item.id, isMiddleClick);
     }
 

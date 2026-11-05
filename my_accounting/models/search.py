@@ -9,6 +9,8 @@ import re
 
 from odoo import api, fields, models
 
+from .payroll import MONTH_LABELS
+
 ARABIC_TO_LATIN = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 LATIN_TO_ARABIC = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
 AMOUNT_RE = re.compile(r'^\d+(\.\d+)?$')
@@ -38,6 +40,21 @@ def token_patterns(token):
     """صيغ البحث عن كلمة واحدة: كما كُتبت، وبالأرقام العربية، وبالإنجليزية."""
     forms = {token, token.translate(ARABIC_TO_LATIN), token.translate(LATIN_TO_ARABIC)}
     return [_fuzzy(form) for form in forms if form]
+
+
+def canon(text):
+    """صورة واحدة للنص: أرقامٌ لاتينية وهمزاتٌ وتاءٌ مبسوطة."""
+    text = to_latin(text or '').casefold()
+    for bad, good in (('أ', 'ا'), ('إ', 'ا'), ('آ', 'ا'), ('ٱ', 'ا'),
+                      ('ى', 'ي'), ('ة', 'ه'), ('ـ', '')):
+        text = text.replace(bad, good)
+    return text
+
+
+def holds(text, tokens):
+    """النص يحوي كلمات الطلب كلها (بأي ترتيب)."""
+    body = canon(text)
+    return all(canon(token) in body for token in tokens)
 
 
 def split_tokens(query):
@@ -94,7 +111,7 @@ class MyAccountingSearch(models.AbstractModel):
             'journals': self.env['myaccounting.journal'].get_journal_names(),
             'states': [('posted', 'مرحّل'), ('draft', 'مسودة'), ('incomplete', 'غير مكتمل')],
             'kinds': [('moves', 'القيود والسندات'), ('accounts', 'الحسابات'),
-                      ('lines', 'بنود القيود')],
+                      ('lines', 'بنود القيود'), ('payroll', 'الرواتب')],
             'accounts': [{'id': acc.id, 'label': f'{acc.code} - {acc.name}' if acc.code
                           else acc.name} for acc in accounts],
         }
@@ -226,6 +243,103 @@ class MyAccountingSearch(models.AbstractModel):
         return items
 
     # ------------------------------------------------------------------
+    # الرواتب: الموظف وكشف مشروعه وكشف الشهر، تُفتح في صفحة الرواتب
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _employee_items(self, tokens, limit, filters):
+        """بطاقات الموظفين. وفلاتر القيود لا تخصّها، فوجودها يُخرجها."""
+        if self._has_record_filters(filters) or not tokens:
+            return []
+        Employee = self.env['myaccounting.employee']
+        domain = tokens_domain(
+            tokens, ['name', 'job_title', 'national_id', 'social_number', 'phone'])
+        employees = Employee.with_context(active_test=False).search(
+            domain, limit=limit * 4)
+        items = []
+        for employee in employees:
+            data = employee._payload()
+            sheet = employee.group_id.name or 'بلا كشف'
+            items.append({
+                'kind': 'employee',
+                'kind_label': 'موظف',
+                'icon': 'fa-id-card-o',
+                'model': 'myaccounting.employee',
+                'id': employee.id,
+                'action': 'payroll',
+                'payroll': {'kind': 'employee', 'id': employee.id},
+                'title': employee.name or '—',
+                'subtitle': employee.job_title or '',
+                'extra': 'كشف %s%s' % (sheet,
+                                       '' if employee.active else ' · موقوف'),
+                'amount': data['net'],
+                'rank': self._rank(tokens, employee.name, employee.job_title),
+            })
+        return items
+
+    @api.model
+    def _payroll_items(self, tokens, limit, filters):
+        """كشوف المشاريع وكشوف الأشهر.
+
+        الكشف يُطلب باسمه وحده أو مسبوقاً بـ«رواتب» أو «كشف» أو
+        «مشروع»، فيُقابَل الطلب بنصٍّ مركّبٍ لا بالاسم المجرّد.
+        """
+        if self._has_record_filters(filters) or not tokens:
+            return []
+        Line = self.env['myaccounting.payroll.line']
+        items = []
+        groups = self.env['myaccounting.payroll.group'].with_context(
+            active_test=False).search([])
+        for group in groups:
+            if not holds('كشف رواتب مشروع %s' % (group.name or ''), tokens):
+                continue
+            lines = Line.search([('group_id', '=', group.id)])
+            months = {(line.payroll_id.year, line.payroll_id.month)
+                      for line in lines}
+            items.append({
+                'kind': 'payroll_group',
+                'kind_label': 'كشف مشروع',
+                'icon': 'fa-folder-o',
+                'model': 'myaccounting.payroll.group',
+                'id': group.id,
+                'action': 'payroll',
+                'payroll': {'kind': 'project', 'id': group.id,
+                            'active': group.active},
+                'title': 'رواتب %s' % (group.name or ''),
+                'subtitle': '%d موظفاً · %d كشفاً' % (
+                    len(group.with_context(active_test=False).employee_ids),
+                    len(months)),
+                'extra': 'قائم' if group.active else 'منتهٍ',
+                'amount': round(sum(line.basic_salary + line.allowance
+                                    for line in lines), 3),
+                'rank': self._rank(tokens, group.name),
+            })
+        payrolls = self.env['myaccounting.payroll'].search([])
+        for payroll in payrolls:
+            text = '%s %s %s' % (payroll.name or '',
+                                 MONTH_LABELS.get(payroll.month, ''), payroll.year)
+            if not holds(text, tokens):
+                continue
+            items.append({
+                'kind': 'payroll_month',
+                'kind_label': 'كشف شهر',
+                'icon': 'fa-calendar',
+                'model': 'myaccounting.payroll',
+                'id': payroll.id,
+                'action': 'payroll',
+                'payroll': {'kind': 'month', 'year': payroll.year,
+                            'month': payroll.month},
+                'title': payroll.name or '—',
+                'subtitle': '%s %s' % (MONTH_LABELS.get(payroll.month, ''),
+                                       payroll.year),
+                'extra': '%d بنداً' % len(payroll.line_ids),
+                'amount': round(sum(line.basic_salary + line.allowance
+                                    for line in payroll.line_ids), 3),
+                'rank': self._rank(tokens, payroll.name),
+            })
+        return items
+
+    # ------------------------------------------------------------------
 
     @api.model
     def search_all(self, query, limit=6, filters=None):
@@ -241,7 +355,8 @@ class MyAccountingSearch(models.AbstractModel):
         if (not tokens or len(query) < 2) and not has_filters:
             return {'query': query, 'groups': [], 'total': 0}
         limit = max(1, int(limit))
-        kinds = list(filters.get('kinds') or ['moves', 'accounts', 'lines'])
+        kinds = list(filters.get('kinds')
+                     or ['moves', 'accounts', 'lines', 'payroll'])
         groups = []
         total = 0
         sources = []
@@ -253,6 +368,10 @@ class MyAccountingSearch(models.AbstractModel):
         elif 'accounts' in kinds and filters.get('account_id') and not any(
                 filters.get(key) for key in ('year', 'month', 'states', 'journal')):
             sources.append(('الحسابات', self._account_items(tokens, limit, filters)))
+        # الرواتب قبل بنود القيود: نتائجها قليلةٌ دقيقة، والبنود كثيرة
+        if 'payroll' in kinds:
+            sources.append(('الموظفون', self._employee_items(tokens, limit, filters)))
+            sources.append(('كشوف الرواتب', self._payroll_items(tokens, limit, filters)))
         if 'lines' in kinds:
             sources.append(('بنود القيود', self._line_items(tokens, limit, query, filters)))
         for label, items in sources:

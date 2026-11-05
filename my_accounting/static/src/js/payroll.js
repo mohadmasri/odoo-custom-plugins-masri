@@ -93,8 +93,16 @@ export class Payroll extends Component {
             await this.loadSettings();
             await this.loadFinished();
             this.state.loading = false;
-            // الرابط /odoo/action-.../<رقم> يفتح بطاقة ذلك الموظف وحدها
-            await this.openCardFromUrl();
+            // طلبٌ من البحث العام: موظفٌ أو مشروعٌ أو كشف شهر
+            const target = this.props.action
+                && this.props.action.context
+                && this.props.action.context.payroll_open;
+            if (target && target.kind) {
+                await this.openTarget(target);
+            } else {
+                // الرابط /odoo/action-.../<رقم> يفتح بطاقة ذلك الموظف وحدها
+                await this.openCardFromUrl();
+            }
         });
     }
 
@@ -882,6 +890,29 @@ export class Payroll extends Component {
     get yearOptions() {
         return this.state.years.length ? this.state.years
                                        : [Number(this.state.year)];
+    }
+
+    /** ما يفتحه البحث العام: بطاقة موظف، أو كشف مشروع، أو كشف شهر */
+    async openTarget(target) {
+        if (target.kind === "employee") {
+            this.state.tab = "employees";
+            await this.openCard({ id: target.id });
+            return;
+        }
+        if (target.kind === "project") {
+            this.state.tab = target.active === false ? "finished" : "projects";
+            const project = this.projectList.find((item) => item.id === target.id);
+            if (project) {
+                await this.openProjectCard(project);
+            }
+            return;
+        }
+        if (target.kind === "month") {
+            this.state.tab = "sheet";
+            this.state.year = `${target.year}`;
+            this.state.month = `${target.month}`;
+            await this.refresh();
+        }
     }
 
     async openCardFromUrl() {
