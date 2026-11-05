@@ -126,8 +126,7 @@ export class Payroll extends Component {
         this.state.finished = await this.orm.call("myaccounting.payroll.group",
             "get_finished", []);
         if (!this.state.finished.some((item) => item.id === this.state.finishedId)) {
-            this.state.finishedId = this.state.finished.length
-                ? this.state.finished[0].id : false;
+            this.state.finishedId = false;
         }
     }
 
@@ -979,6 +978,60 @@ export class Payroll extends Component {
     // ------------------------------------------------------------------
     // المشاريع المنتهية
     // ------------------------------------------------------------------
+
+    /** أشهر المشروع المفتوح في السنة المعروضة: ما سواها لا يُضغط */
+    get allowedMonths() {
+        const project = this.state.tab === "finished" ? this.finishedProject : null;
+        if (!project) {
+            return false;
+        }
+        return project.months
+            .filter((month) => String(month.year) === String(this.state.year))
+            .map((month) => Number(month.month));
+    }
+
+    /** كشف المشروع في الشهر المعروض */
+    get finishedMonth() {
+        const project = this.finishedProject;
+        if (!project) {
+            return null;
+        }
+        return project.months.find(
+            (month) => String(month.year) === String(this.state.year)
+                && String(month.month) === String(this.state.month)) || null;
+    }
+
+    /** «3 — 9»: أوّل شهرٍ دخله المشروع وآخره */
+    projectSpan(project) {
+        const numbers = project.months
+            .map((month) => Number(month.month)).sort((one, two) => one - two);
+        if (!numbers.length) {
+            return "—";
+        }
+        return numbers.length === 1 ? `${numbers[0]}`
+            : `${numbers[0]} — ${numbers[numbers.length - 1]}`;
+    }
+
+    projectTotals(project) {
+        return this.sumOf(project.months.flatMap((month) => month.lines));
+    }
+
+    /** بطاقة المشروع تُفتح على آخر شهرٍ له، فالفلتر ينتقل إليه */
+    async openFinished(project) {
+        const last = project.months[0];
+        this.state.finishedId = project.id;
+        if (last) {
+            await this.withBusy(async () => {
+                this.state.year = `${last.year}`;
+                this.state.month = `${last.month}`;
+                await this.refresh();
+            });
+        }
+    }
+
+    closeFinished() {
+        this.state.finishedId = false;
+    }
 
     get finishedProject() {
         return this.state.finished.find(

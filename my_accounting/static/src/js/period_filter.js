@@ -13,6 +13,7 @@ import { monthName as monthNameOf } from "./months";
  *  - year / month: القيمة الحالية ("" أو 0 تعني "الكل").
  *  - allowAllYears: إظهار خيار "كل السنوات" (الصفحات التي تقبل بلا فترة).
  *  - years: قائمة سنوات جاهزة (وإلا تُحمَّل من الخادم).
+ *  - enabled: أرقام الأشهر التي تُضغط وحدها (وغيابها يعني الاثني عشر كلها).
  *  - onChange({ year, month }): تُستدعى بالقيم الجديدة كنصوص.
  */
 export class PeriodFilter extends Component {
@@ -22,6 +23,7 @@ export class PeriodFilter extends Component {
         month: { type: [String, Number, Boolean], optional: true },
         allowAllYears: { type: Boolean, optional: true },
         years: { type: Array, optional: true },
+        enabled: { type: [Array, Boolean], optional: true },
         onChange: Function,
         slots: { type: Object, optional: true },
     };
@@ -66,6 +68,12 @@ export class PeriodFilter extends Component {
 
     isMonthActive(month) {
         return String(month) === this.month;
+    }
+
+    /** الشهر الذي لا كشف له في هذا السياق: يُرى ولا يُضغط */
+    isMonthOn(month) {
+        const enabled = this.props.enabled;
+        return !enabled || enabled.includes(Number(month));
     }
 
     onYear(ev) {

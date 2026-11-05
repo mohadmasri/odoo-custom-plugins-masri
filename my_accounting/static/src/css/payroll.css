@@ -455,3 +455,11 @@
     flex-wrap: wrap;
     gap: 4px;
 }
+
+/* شهرٌ لا كشف له في هذا السياق: يُرى باهتاً ولا يُضغط */
+.o_ma_month_btn.o_ma_month_off,
+.o_ma_month_btn.o_ma_month_off:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}

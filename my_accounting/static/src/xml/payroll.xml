@@ -14,7 +14,7 @@
 
             <!-- فلتر الفترة: هو مَن يقود الصفحة كلها -->
             <PeriodFilter year="state.year" month="state.month"
-                          years="yearOptions"
+                          years="yearOptions" enabled="allowedMonths"
                           onChange.bind="onPeriodChange"/>
 
             <ul class="nav nav-tabs mb-3 no-print">
@@ -850,134 +850,198 @@
                 </div>
 
                 <t t-else="">
-                    <ul class="nav nav-pills o_pr_sheets mb-3">
-                        <li class="nav-item" t-foreach="state.finished" t-as="project"
-                            t-key="project.id">
-                            <a href="#" t-attf-class="nav-link {{ state.finishedId === project.id ? 'active' : '' }}"
-                               t-on-click.prevent="() => this.setFinished(project.id)">
-                                <i class="fa fa-archive me-1"/>
-                                <t t-esc="project.name"/>
+                    <div class="o_pr_layout">
+                        <aside class="o_pr_side no-print">
+                            <div class="o_pr_side_title">المشاريع المنتهية</div>
+                            <button type="button"
+                                    t-attf-class="o_pr_side_item {{ finishedProject ? '' : 'active' }}"
+                                    t-on-click="() => this.closeFinished()">
+                                <span>كل المشاريع</span>
+                                <span class="badge rounded-pill"
+                                      t-esc="state.finished.length"/>
+                            </button>
+                            <button type="button" t-foreach="state.finished" t-as="project"
+                                    t-key="project.id"
+                                    t-attf-class="o_pr_side_item {{ state.finishedId === project.id ? 'active' : '' }}"
+                                    t-on-click="() => this.openFinished(project)">
+                                <span>
+                                    <i class="fa fa-archive me-1"/>
+                                    <t t-esc="project.name"/>
+                                </span>
                                 <span class="badge rounded-pill"
                                       t-esc="project.employees.length"/>
-                            </a>
-                        </li>
-                    </ul>
-
-                    <t t-if="finishedProject">
-                        <div class="o_pr_card_head">
-                            <div>
-                                <div class="o_pr_card_name" t-esc="finishedProject.name"/>
-                                <div class="small text-muted">
-                                    المصروف على <b t-esc="finishedProject.account"/> ·
-                                    يُدفع من <b t-esc="finishedProject.payment_account"/>
-                                    <t t-if="finishedProject.journal">
-                                        · يومية <b t-esc="finishedProject.journal"/>
-                                    </t>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-secondary"
-                                    t-att-disabled="state.busy"
-                                    t-on-click="() => this.reviveProject(finishedProject)">
-                                أعِد المشروع
                             </button>
-                        </div>
+                        </aside>
 
-                        <div class="o_pr_card_sub">كشوف رواتبه</div>
-                        <div t-if="!finishedProject.months.length"
-                             class="text-muted small mb-3">
-                            لم يدخل في كشف رواتبٍ محفوظ.
-                        </div>
-                        <t t-foreach="finishedProject.months" t-as="month"
-                           t-key="month.year + '-' + month.month">
-                            <div class="small fw-bold mt-2">
-                                <t t-esc="month.label"/> <t t-esc="month.year"/>
-                                <span class="o_pr_count" t-esc="month.lines.length"/>
-                            </div>
-                            <table class="table table-bordered table-sm o_pr_table o_pr_wide">
-                                <thead>
-                                    <tr>
-                                        <th style="width:180px;">الموظف</th>
-                                        <th class="text-end" style="width:96px;">الأساسي</th>
-                                        <th class="text-end" style="width:96px;">العلاوات</th>
-                                        <th class="text-end" style="width:96px;">الإجمالي</th>
-                                        <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                        <th class="text-end" style="width:96px;">ضريبة</th>
-                                        <th class="text-end" style="width:96px;">تقاعد</th>
-                                        <th class="text-end" style="width:96px;">الصافي</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr t-foreach="month.lines" t-as="line" t-key="line.id">
-                                        <td t-esc="line.employee"/>
-                                        <td class="text-end" t-esc="fmt(line.basic_salary)"/>
-                                        <td class="text-end" t-esc="fmt(line.allowance)"/>
-                                        <td class="text-end" t-esc="fmt(line.gross)"/>
-                                        <td class="text-end" t-esc="fmt(line.employee_social)"/>
-                                        <td class="text-end" t-esc="fmt(line.income_tax)"/>
-                                        <td class="text-end" t-esc="fmt(line.pension)"/>
-                                        <td class="text-end" t-esc="fmt(line.net)"/>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr class="o_pr_total">
-                                        <td>المجموع</td>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).basic_salary)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).allowance)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).gross)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).employee_social)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).income_tax)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).pension)"/>
-                                        <td class="text-end"
-                                            t-esc="fmt(monthTotals(month).net)"/>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </t>
+                        <div class="o_pr_main">
+                            <!-- لا مشروع مختار: المشاريع بطاقاتٍ -->
+                            <t t-if="!finishedProject">
+                                <div class="o_pr_people_head small text-muted mb-2">
+                                    <b t-esc="state.finished.length"/> مشروعاً انتهى —
+                                    اضغط بطاقةً لتفتح كشفه على آخر شهرٍ دخله.
+                                </div>
+                                <div class="o_pr_people">
+                                    <div t-foreach="state.finished" t-as="project"
+                                         t-key="project.id" class="o_pr_person"
+                                         t-on-click="() => this.openFinished(project)">
+                                        <div class="o_pr_person_head">
+                                            <div class="o_pr_person_name">
+                                                <i class="fa fa-archive me-1 text-muted"/>
+                                                <t t-esc="project.name"/>
+                                            </div>
+                                        </div>
+                                        <div class="o_pr_person_job">
+                                            المصروف على <t t-esc="project.account"/>
+                                        </div>
 
-                        <div class="o_pr_card_sub mt-3">بطاقات موظفيه</div>
-                        <table class="table table-bordered table-sm o_pr_table o_pr_wide">
-                            <thead>
-                                <tr>
-                                    <th style="width:44px;">بطاقة</th>
-                                    <th style="width:200px;">الاسم</th>
-                                    <th style="width:140px;">المسمّى</th>
-                                    <th class="text-end" style="width:96px;">الأساسي</th>
-                                    <th class="text-end" style="width:96px;">العلاوات</th>
-                                    <th class="text-center" style="width:70px;">ضمان</th>
-                                    <th class="text-center" style="width:80px;">الصرف</th>
-                                    <th class="text-center" style="width:90px;">الحال</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="finishedProject.employees" t-as="employee"
-                                    t-key="employee.id">
-                                    <td class="text-center">
-                                        <button class="btn btn-sm btn-link p-0"
-                                                title="بطاقة الموظف"
-                                                t-custom-click="(ev, mid) => this.openCard(employee, mid)">
-                                            <i class="fa fa-id-card-o"/>
-                                        </button>
-                                    </td>
-                                    <td t-esc="employee.name"/>
-                                    <td t-esc="employee.job_title or '—'"/>
-                                    <td class="text-end" t-esc="fmt(employee.basic_salary)"/>
-                                    <td class="text-end" t-esc="fmt(employee.allowance)"/>
-                                    <td class="text-center"
-                                        t-esc="employee.social_security ? 'نعم' : 'لا'"/>
-                                    <td class="text-center"
-                                        t-esc="employee.payment_method === 'cheque' ? 'شيك' : 'تحويل'"/>
-                                    <td class="text-center"
-                                        t-esc="employee.active ? 'على رأس عمله' : 'موقوف'"/>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </t>
+                                        <div class="o_pr_person_rows">
+                                            <div>
+                                                <span class="o_pr_person_label">أشهره</span>
+                                                <b t-esc="projectSpan(project)"/>
+                                            </div>
+                                            <div>
+                                                <span class="o_pr_person_label">موظفوه</span>
+                                                <b t-esc="project.employees.length"/>
+                                            </div>
+                                            <div>
+                                                <span class="o_pr_person_label">إجمالي رواتبه</span>
+                                                <b t-esc="fmt(projectTotals(project).gross)"/>
+                                            </div>
+                                        </div>
+
+                                        <div class="o_pr_person_tags">
+                                            <span class="o_pr_tag o_pr_tag_group">
+                                                <t t-esc="project.months.length"/> كشفاً
+                                            </span>
+                                            <span class="o_pr_tag o_pr_tag_off">منتهٍ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <!-- مشروعٌ مفتوح: كشفه في الشهر المختار من فلتر الصفحة -->
+                            <t t-else="">
+                                <div class="o_pr_card_head">
+                                    <div>
+                                        <div class="o_pr_card_name">
+                                            <button class="btn btn-sm btn-link p-0 me-2 no-print"
+                                                    title="رجوع إلى المشاريع"
+                                                    t-on-click="() => this.closeFinished()">
+                                                <i class="fa fa-arrow-right"/>
+                                            </button>
+                                            <t t-esc="finishedProject.name"/>
+                                        </div>
+                                        <div class="small text-muted">
+                                            أشهره <b t-esc="projectSpan(finishedProject)"/> ·
+                                            المصروف على <b t-esc="finishedProject.account"/> ·
+                                            يُدفع من <b t-esc="finishedProject.payment_account"/>
+                                            <t t-if="finishedProject.journal">
+                                                · يومية <b t-esc="finishedProject.journal"/>
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary no-print"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.reviveProject(finishedProject)">
+                                        أعِد المشروع
+                                    </button>
+                                </div>
+
+                                <div class="o_pr_card_sub">
+                                    كشف رواتبه <t t-esc="periodLabel"/>
+                                </div>
+                                <div t-if="!finishedMonth" class="o_pr_empty">
+                                    لا كشف لهذا المشروع في <t t-esc="periodLabel"/>.
+                                    وأشهره <b t-esc="projectSpan(finishedProject)"/>.
+                                </div>
+                                <table t-else=""
+                                       class="table table-bordered table-sm o_pr_table o_pr_wide">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:180px;">الموظف</th>
+                                            <th class="text-end" style="width:96px;">الأساسي</th>
+                                            <th class="text-end" style="width:96px;">العلاوات</th>
+                                            <th class="text-end" style="width:96px;">الإجمالي</th>
+                                            <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                            <th class="text-end" style="width:96px;">ضريبة</th>
+                                            <th class="text-end" style="width:96px;">تقاعد</th>
+                                            <th class="text-end" style="width:96px;">الصافي</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="finishedMonth.lines" t-as="line"
+                                            t-key="line.id">
+                                            <td t-esc="line.employee"/>
+                                            <td class="text-end" t-esc="fmt(line.basic_salary)"/>
+                                            <td class="text-end" t-esc="fmt(line.allowance)"/>
+                                            <td class="text-end" t-esc="fmt(line.gross)"/>
+                                            <td class="text-end" t-esc="fmt(line.employee_social)"/>
+                                            <td class="text-end" t-esc="fmt(line.income_tax)"/>
+                                            <td class="text-end" t-esc="fmt(line.pension)"/>
+                                            <td class="text-end" t-esc="fmt(line.net)"/>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="o_pr_total">
+                                            <td>المجموع</td>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).basic_salary)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).allowance)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).gross)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).employee_social)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).income_tax)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).pension)"/>
+                                            <td class="text-end"
+                                                t-esc="fmt(monthTotals(finishedMonth).net)"/>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+
+                                <div class="o_pr_card_sub mt-3">بطاقات موظفيه</div>
+                                <div class="o_pr_people">
+                                    <div t-foreach="finishedProject.employees" t-as="employee"
+                                         t-key="employee.id"
+                                         t-attf-class="o_pr_person {{ employee.active ? '' : 'o_pr_person_off' }}"
+                                         t-custom-click="(ev, mid) => this.openCard(employee, mid)">
+                                        <div class="o_pr_person_head">
+                                            <div class="o_pr_person_name" t-esc="employee.name"/>
+                                        </div>
+                                        <div t-if="employee.job_title" class="o_pr_person_job"
+                                             t-esc="employee.job_title"/>
+
+                                        <div class="o_pr_person_rows">
+                                            <div>
+                                                <span class="o_pr_person_label">الأساسي</span>
+                                                <b t-esc="fmt(employee.basic_salary)"/>
+                                            </div>
+                                            <div>
+                                                <span class="o_pr_person_label">العلاوات</span>
+                                                <b t-esc="fmt(employee.allowance)"/>
+                                            </div>
+                                        </div>
+
+                                        <div class="o_pr_person_tags">
+                                            <i t-if="employee.social_security"
+                                               class="fa fa-shield o_pr_shield"
+                                               title="مشمول بالضمان"/>
+                                            <i t-else="" class="fa fa-shield o_pr_shield_off"
+                                               title="غير مشمول بالضمان"/>
+                                            <span class="o_pr_tag">
+                                                <t t-esc="employee.payment_method === 'cheque' ? 'شيك' : 'تحويل'"/>
+                                            </span>
+                                            <span t-if="!employee.active"
+                                                  class="o_pr_tag o_pr_tag_off">موقوف</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
                 </t>
             </t>
 
