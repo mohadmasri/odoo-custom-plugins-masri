@@ -272,12 +272,6 @@ export class Payroll extends Component {
         return section ? section.name : "";
     }
 
-    monthPostedOf(id) {
-        const section = this.sheetSections.find(
-            (item) => item.key === (id === false ? "none" : `g${id}`));
-        return section ? section.posted : false;
-    }
-
     monthCountOf(id) {
         const section = this.sheetSections.find(
             (item) => item.key === (id === false ? "none" : `g${id}`));
@@ -303,75 +297,43 @@ export class Payroll extends Component {
             const index = order.indexOf(id);
             return index < 0 ? 9998 : index;
         };
-        const sheets = this.state.data ? this.state.data.sheets || [] : [];
         return [...buckets.keys()].sort((a, b) => rank(a) - rank(b)).map((id) => {
             const group = this.state.groups.find((item) => item.id === id);
-            const own = buckets.get(id);
-            // حالة القيد تأتي من الخادم: لكل كشف قيده أو لا قيد له
-            const sheet = sheets.find((item) => (item.id || false) === id) || {};
             return {
                 key: id === false ? "none" : `g${id}`,
                 sheet: id === false ? "none" : id,
                 name: group ? group.name : "بلا كشف",
-                lines: own,
-                posted: !!sheet.posted,
-                move: sheet.move || "",
-                move_id: sheet.move_id || false,
+                lines: buckets.get(id),
             };
         });
     }
 
-    /** الكشوف المعروضة التي لم تُرحَّل بعد */
-    get toPost() {
-        return this.visibleSections.filter((section) => !section.posted);
-    }
-
-    /** الكشوف المعروضة المُرحَّلة */
-    get posted() {
-        return this.visibleSections.filter((section) => section.posted);
-    }
-
-    /** اسم الزرّ: الكشف المختار بعينه، أو عدد ما بقي عند «عرض الكل» */
+    /** اسم الزرّ: الكشف المختار بعينه، أو كشوف الشهر كلها */
     get postLabel() {
-        const todo = this.toPost;
-        if (todo.length === 1) {
-            return `أنشئ قيد ${todo[0].name}`;
+        const shown = this.visibleSections;
+        if (shown.length === 1) {
+            return `أنشئ قيد ${shown[0].name}`;
         }
-        return `أنشئ قيود الكشوف (${todo.length})`;
+        return `أنشئ قيود الكشوف (${shown.length})`;
     }
 
-    get unpostLabel() {
-        const done = this.posted;
-        if (done.length === 1) {
-            return `فكّ ترحيل ${done[0].name}`;
-        }
-        return `فكّ ترحيل الكشوف (${done.length})`;
-    }
-
-    async postPayroll() {
-        await this.withBusy(async () => {
-            const count = this.toPost.length;
-            this.state.data = await this.orm.call("myaccounting.payroll", "post_payroll",
-                [[this.state.data.id], this.state.monthSheet]);
-            await this.refresh(this.state.data.id);
-            this.notification.add(count === 1 ? "أُنشئ قيد الكشف مسودةً."
-                                              : `أُنشئت ${count} قيود مسودةً.`,
-                                  { type: "success" });
-        });
-    }
-
-    unpostPayroll() {
-        const done = this.posted;
-        const what = done.length === 1 ? `قيد ${done[0].name}` : `${done.length} قيود`;
+    /**
+     * القيد يخرج من الكشف ولا يبقى موصولاً به: الصفحة لا تتتبّع قيوداً،
+     * فالكشف يُعدَّل ويُحذف بعده، والقيد يبقى في الدفتر وحده.
+     */
+    postPayroll() {
+        const label = this.postLabel;
         this.dialog.add(ConfirmationDialog, {
-            title: "فكّ الترحيل",
-            body: `يبقى ${what} في الدفتر كما هو، ويعود الكشف قابلاً للتعديل`
-                + ` والترحيل من جديد — فإن أنشأت قيداً بعده صار في الدفتر قيدان.`,
-            confirmLabel: "نعم",
+            title: label,
+            body: "يُنشأ القيد مسودةً في الدفتر بلا صلةٍ بالكشف — فإن ضغطتَ"
+                + " الزرّ مرّتين صار في الدفتر قيدان.",
+            confirmLabel: "أنشئ",
             confirm: () => this.withBusy(async () => {
-                this.state.data = await this.orm.call("myaccounting.payroll",
-                    "unpost_payroll", [[this.state.data.id], this.state.monthSheet]);
+                const done = await this.orm.call("myaccounting.payroll",
+                    "post_payroll", [[this.state.data.id], this.state.monthSheet]);
                 await this.refresh(this.state.data.id);
+                this.notification.add(`أُنشئ في الدفتر: ${done.moves.join("، ")}`,
+                                      { type: "success" });
             }),
             cancel: () => {},
         });
@@ -717,50 +679,25 @@ export class Payroll extends Component {
         this.state.uploadSheet = key;
     }
 
-    get uploadToPost() {
-        return this.uploadVisible.filter((section) => !section.posted);
-    }
-
-    get uploadPosted() {
-        return this.uploadVisible.filter((section) => section.posted);
-    }
-
     get uploadPostLabel() {
-        const todo = this.uploadToPost;
-        return todo.length === 1 ? `أنشئ قيد ${todo[0].name}`
-                                 : `أنشئ قيود الكشوف (${todo.length})`;
+        const shown = this.uploadVisible;
+        return shown.length === 1 ? `أنشئ قيد ${shown[0].name}`
+                                  : `أنشئ قيود الكشوف (${shown.length})`;
     }
 
-    get uploadUnpostLabel() {
-        const done = this.uploadPosted;
-        return done.length === 1 ? `فكّ ربط ${done[0].name}`
-                                 : `فكّ ربط الكشوف (${done.length})`;
-    }
-
-    async postUpload() {
-        await this.withBusy(async () => {
-            const count = this.uploadToPost.length;
-            await this.orm.call("myaccounting.payroll.upload", "post_upload",
-                [[this.state.upload.id], this.state.uploadSheet]);
-            await this.loadUploads(this.state.upload.id);
-            this.notification.add(count === 1 ? "أُنشئ قيد الكشف مسودةً."
-                                              : `أُنشئت ${count} قيود مسودةً.`,
-                                  { type: "success" });
-        });
-    }
-
-    unpostUpload() {
-        const done = this.uploadPosted;
-        const what = done.length === 1 ? `قيد ${done[0].move}` : `${done.length} قيود`;
+    postUpload() {
+        const label = this.uploadPostLabel;
         this.dialog.add(ConfirmationDialog, {
-            title: "فكّ الربط",
-            body: `يبقى ${what} في الدفتر كما هو، ويعود الكشف المرفوع قابلاً`
-                + ` لإنشاء قيدٍ جديد — فإن أنشأته صار في الدفتر قيدان.`,
-            confirmLabel: "نعم",
+            title: label,
+            body: "يُنشأ القيد مسودةً في الدفتر بلا صلةٍ بالكشف المرفوع —"
+                + " فإن ضغطتَ الزرّ مرّتين صار في الدفتر قيدان.",
+            confirmLabel: "أنشئ",
             confirm: () => this.withBusy(async () => {
-                await this.orm.call("myaccounting.payroll.upload", "unpost_upload",
-                    [[this.state.upload.id], this.state.uploadSheet]);
+                const done = await this.orm.call("myaccounting.payroll.upload",
+                    "post_upload", [[this.state.upload.id], this.state.uploadSheet]);
                 await this.loadUploads(this.state.upload.id);
+                this.notification.add(`أُنشئ في الدفتر: ${done.moves.join("، ")}`,
+                                      { type: "success" });
             }),
             cancel: () => {},
         });

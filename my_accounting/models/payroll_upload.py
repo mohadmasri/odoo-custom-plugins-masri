@@ -23,8 +23,6 @@ class MyAccountingPayrollUpload(models.Model):
     month = fields.Selection(MONTHS, string='الشهر', required=True)
     line_ids = fields.One2many('myaccounting.payroll.upload.line', 'upload_id',
                                string='البنود')
-    move_ids = fields.One2many('myaccounting.move', 'payroll_upload_id',
-                               string='القيود')
 
     # ------------------------------------------------------------------
     # الكشوف المرفوعة
@@ -42,10 +40,6 @@ class MyAccountingPayrollUpload(models.Model):
             'month_label': MONTH_NAMES.get(self.month, ''),
             'lines': lines,
             'sheets': self._sheets_payload(),
-            'past_moves': [{'id': move.id, 'name': move.name or '',
-                            'sheet': move.payroll_group_id.name or ''}
-                           for move in self.move_ids
-                           if not move.payroll_current],
         }
 
     def _sheets(self):
@@ -72,30 +66,16 @@ class MyAccountingPayrollUpload(models.Model):
                 lambda line: not line.group_id and (line.sheet or '') == name)
         return self.line_ids.filtered(lambda line: line.group_id.id == int(key))
 
-    def _sheet_move(self, sheet):
-        self.ensure_one()
-        key = str(sheet)
-        return self.move_ids.filtered(
-            lambda move: move.payroll_current and move.payroll_sheet_key == key)[:1]
-
     def _sheets_payload(self):
         self.ensure_one()
-        items = []
-        for key, group, label in self._sheets():
-            move = self._sheet_move(key)
-            lines = self._sheet_lines(key)
-            items.append({
-                'key': key,
-                'name': label,
-                'group_id': group.id or False,
-                'count': len(lines),
-                'posted': bool(move),
-                'move_id': move.id or False,
-                'move': move.name or '',
-                'account': (group.account_id.name
-                            or 'حساب الرواتب العام') if group else '—',
-            })
-        return items
+        return [{
+            'key': key,
+            'name': label,
+            'group_id': group.id or False,
+            'count': len(self._sheet_lines(key)),
+            'account': (group.account_id.name
+                        or 'حساب الرواتب العام') if group else '—',
+        } for key, group, label in self._sheets()]
 
     @api.model
     def get_uploads(self):
@@ -105,7 +85,6 @@ class MyAccountingPayrollUpload(models.Model):
             'year': upload.year,
             'month': upload.month,
             'lines': len(upload.line_ids),
-            'posted': len(upload.move_ids.filtered('payroll_current')),
         } for upload in self.search([], limit=60)]
 
     @api.model
@@ -162,7 +141,7 @@ class MyAccountingPayrollUpload(models.Model):
         return upload._payload()
 
     def delete_upload(self):
-        """يحذف الكشف المرفوع، وتبقى قيوده في الدفتر."""
+        """يحذف الكشف المرفوع. والقيود التي أُنشئت منه لا صلة لها به."""
         self.unlink()
         return True
 
@@ -171,20 +150,22 @@ class MyAccountingPayrollUpload(models.Model):
     # ------------------------------------------------------------------
 
     def post_upload(self, sheet='all'):
-        """ينشئ قيد الكشف المعروض من الملف، كقيود كشوف الأشهر."""
+        """ينشئ قيد الكشف المعروض من الملف، كقيود كشوف الأشهر.
+
+        والقيد يخرج حرّاً بلا ربطٍ بالكشف المرفوع، فيُحذف الكشف ولا
+        يتبعه. ويُرجع أسماء ما أُنشئ.
+        """
         self.ensure_one()
         if not self.line_ids:
             raise UserError('لا بنود في هذا الكشف.')
         settings = self.env['myaccounting.payroll.settings']._get()
         keys = ([item[0] for item in self._sheets()] if str(sheet) == 'all'
                 else [str(sheet)])
-        todo = [key for key in keys if not self._sheet_move(key)]
-        if not todo:
-            raise UserError('سبق إنشاء قيد هذا الكشف. القيد لا يتغيّر بعد '
-                            'إنشائه، فافكُك ربطه ثم أنشئه من جديد.')
-        for key in todo:
-            self._post_sheet(key, settings)
-        return self._payload()
+        if not keys:
+            raise UserError('لا كشف لترحيله.')
+        moves = [self._post_sheet(key, settings) for key in keys]
+        return {'data': self._payload(),
+                'moves': [move.name for move in moves]}
 
     def _post_sheet(self, sheet, settings):
         self.ensure_one()
@@ -197,28 +178,8 @@ class MyAccountingPayrollUpload(models.Model):
         return self.env['myaccounting.move'].create({
             'ref': label,
             'journal': journal,
-            'payroll_upload_id': self.id,
-            'payroll_group_id': group.id or False,
-            'payroll_sheet_key': str(sheet),
-            'payroll_current': True,
             'line_ids': entries,
         })
-
-    def unpost_upload(self, sheet='all'):
-        """يفكّ ربط الكشف المرفوع بقيده، والقيد يبقى في الدفتر."""
-        self.ensure_one()
-        keys = ([item[0] for item in self._sheets()] if str(sheet) == 'all'
-                else [str(sheet)])
-        moves = self.env['myaccounting.move']
-        for key in keys:
-            move = self._sheet_move(key)
-            if move:
-                moves |= move
-        if not moves:
-            raise UserError('لا قيد لهذا الكشف.')
-        moves.write({'payroll_current': False})
-        return self._payload()
-
 
 class MyAccountingPayrollUploadLine(models.Model):
     _name = 'myaccounting.payroll.upload.line'
@@ -272,14 +233,3 @@ class MyAccountingPayrollUploadLine(models.Model):
                     else 'x%s' % (self.sheet or '')),
             'method': 'شيك' if self.payment_method == 'cheque' else 'تحويل',
         }
-
-
-class MyAccountingMoveUpload(models.Model):
-    """القيد يحمل كشفه المرفوع، فتُعرف أصوله كما في كشوف الأشهر."""
-    _inherit = 'myaccounting.move'
-
-    payroll_upload_id = fields.Many2one('myaccounting.payroll.upload',
-                                        string='كشف الرواتب المرفوع',
-                                        ondelete='set null', index=True,
-                                        copy=False)
-    payroll_sheet_key = fields.Char(string='مفتاح كشف الموظفين', copy=False)

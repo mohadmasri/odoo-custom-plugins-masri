@@ -10,7 +10,6 @@
 يصلح رفع ملف شهرٍ ماضٍ أو قادم.
 """
 import base64
-import difflib
 import io
 
 from odoo import api, models
@@ -192,16 +191,9 @@ class MyAccountingEmployeeExcel(models.Model):
             values = self._excel_card_values(row)
             values['group_id'] = group.id if group else False
 
-            key = match_key(row['name'])
-            employee = by_key.get(key)
-            near = ''
-            if not employee:
-                # «الشهابي» و«الشهاب»: نقترح الأقرب ولا نُنشئ بطاقةً ثانية
-                pool = [item for item in by_key if item not in seen]
-                close = difflib.get_close_matches(key, pool, n=1, cutoff=0.85)
-                if close:
-                    employee = by_key[close[0]]
-                    near = employee.name
+            # الاسم المختلف شخصٌ مختلف: لا مطابقة تقريبية، إنما الاسم
+            # نفسه بعد تجاهل الهمزات والتطويل والفراغات
+            employee = by_key.get(match_key(row['name']))
             if not employee:
                 plan['new'].append({
                     'name': row['name'], 'sheet': row['sheet'],
@@ -242,7 +234,7 @@ class MyAccountingEmployeeExcel(models.Model):
                                    'old': METHODS.get(old, old or '—'),
                                    'new': METHODS.get(new, new)})
             item = {'id': employee.id, 'name': employee.name,
-                    'file_name': row['name'], 'near': near,
+                    'file_name': row['name'], 'near': '',
                     'sheet': row['sheet'], 'fields': fields, 'values': values}
             if fields:
                 plan['changed'].append(item)

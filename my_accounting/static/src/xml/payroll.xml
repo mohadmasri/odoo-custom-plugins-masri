@@ -130,12 +130,7 @@
                         </thead>
                         <tbody>
                             <tr t-foreach="state.excel.changed" t-as="item" t-key="item.id">
-                                <td>
-                                    <t t-esc="item.name"/>
-                                    <div t-if="item.near" class="small text-muted">
-                                        في الملف: <t t-esc="item.file_name"/>
-                                    </div>
-                                </td>
+                                <td t-esc="item.name"/>
                                 <td t-esc="item.sheet"/>
                                 <td>
                                     <span t-foreach="item.fields" t-as="field"
@@ -203,7 +198,6 @@
                         <option t-foreach="state.payrolls" t-as="item" t-key="item.id"
                                 t-att-value="item.id" t-att-selected="isPayroll(item.id)">
                             <t t-esc="item.name"/>
-                            <t t-if="item.state === 'posted'"> — مُرحَّل</t>
                         </option>
                     </select>
 
@@ -236,36 +230,12 @@
                             <t t-if="monthLabel"> — <t t-esc="monthLabel"/></t>
                         </div>
                         <div class="small text-muted">
-                            <t t-esc="visibleCount"/> موظفاً ·
-                            <t t-if="posted.length">
-                                مُرحَّل إلى
-                                <t t-foreach="posted" t-as="done" t-key="done.key">
-                                    <a href="#" class="o_pr_link"
-                                       t-custom-click="(ev, mid) => this.openMove(done.move_id, mid)">
-                                        قيد <t t-esc="done.move"/>
-                                    </a><t t-if="!done_last">،</t>
-                                </t>
-                            </t>
-                            <t t-if="toPost.length">
-                                <t t-if="posted.length"> · </t>
-                                <t t-if="toPost.length === 1">مسودة</t>
-                                <t t-else=""><t t-esc="toPost.length"/> كشوف مسودة</t>
-                            </t>
-                            <!-- قيودٌ خرجت من هذا الكشف ثم فُكّ ترحيلها -->
-                            <div t-if="data.past_moves.length" class="small text-muted">
-                                قيودٌ سابقة من هذا الكشف:
-                                <t t-foreach="data.past_moves" t-as="past" t-key="past.id">
-                                    <a href="#" class="o_pr_link"
-                                       t-custom-click="(ev, mid) => this.openMove(past.id, mid)">
-                                        <t t-esc="past.name"/>
-                                    </a><t t-if="!past_last">، </t>
-                                </t>
-                            </div>
+                            <t t-esc="visibleCount"/> موظفاً
                         </div>
                     </div>
 
                     <div class="o_pr_bar no-print">
-                        <button t-if="!data.posted_any" class="btn btn-sm btn-outline-secondary"
+                        <button class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.fillFromEmployees()">
                             <t t-if="data.lines.length">أعد البناء من بطاقات الموظفين</t>
@@ -276,26 +246,21 @@
                                 t-on-click="() => this.pickExcel()">
                             <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
                         </button>
-                        <button t-if="!data.posted_all" class="btn btn-sm btn-primary"
+                        <button class="btn btn-sm btn-primary"
                                 t-att-disabled="state.busy or !linesDirty"
                                 t-on-click="() => this.saveLines()">حفظ</button>
-                        <button t-if="!data.posted_all" class="btn btn-sm btn-outline-secondary"
+                        <button class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy or !linesDirty"
                                 t-on-click="() => this.cancelLines()">إلغاء</button>
                         <span t-if="linesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
                         <span class="o_pr_sep"/>
-                        <!-- القيد للكشف المعروض وحده: قيدٌ لكل كشف كما في الدفاتر -->
-                        <button t-if="toPost.length" class="btn btn-sm btn-success"
+                        <!-- القيد للكشف المعروض وحده، ويخرج حرّاً بلا صلةٍ به -->
+                        <button t-if="data.lines.length" class="btn btn-sm btn-success"
                                 t-att-disabled="state.busy or linesDirty"
                                 t-on-click="() => this.postPayroll()">
                             <i class="fa fa-check me-1"/> <t t-esc="postLabel"/>
                         </button>
-                        <button t-if="posted.length" class="btn btn-sm btn-outline-danger"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.unpostPayroll()">
-                            <t t-esc="unpostLabel"/>
-                        </button>
-                        <button t-if="!data.posted_any" class="btn btn-sm btn-link text-danger"
+                        <button class="btn btn-sm btn-link text-danger"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.deletePayroll()">احذف الكشف</button>
                     </div>
@@ -332,8 +297,6 @@
                                 <a href="#" t-attf-class="nav-link {{ state.monthSheet === group.id ? 'active' : '' }}"
                                    t-on-click.prevent="() => this.setMonthSheet(group.id)">
                                     <t t-esc="group.name"/>
-                                    <i t-if="monthPostedOf(group.id)"
-                                       class="fa fa-check-circle ms-1" title="مُرحَّل"/>
                                     <span class="badge rounded-pill" t-esc="monthCountOf(group.id)"/>
                                 </a>
                             </li>
@@ -342,8 +305,6 @@
                             <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'none' ? 'active' : '' }}"
                                t-on-click.prevent="() => this.setMonthSheet('none')">
                                 بلا كشف
-                                <i t-if="monthPostedOf(false)"
-                                   class="fa fa-check-circle ms-1" title="مُرحَّل"/>
                                 <span class="badge rounded-pill" t-esc="monthCountOf(false)"/>
                             </a>
                         </li>
@@ -374,7 +335,7 @@
                                 <td class="text-center text-muted"
                                     t-esc="section.start + line_index + 1"/>
                                 <td t-esc="line.employee"/>
-                                <t t-if="!section.posted">
+                                <t>
                                     <td t-foreach="['basic_salary', 'allowance']" t-as="field"
                                         t-key="field">
                                         <input type="number" step="0.001"
@@ -398,19 +359,6 @@
                                                t-att-value="line.employer_social"
                                                t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
                                     </td>
-                                </t>
-                                <t t-else="">
-                                    <td class="text-end" t-esc="fmt(line.basic_salary)"/>
-                                    <td class="text-end" t-esc="fmt(line.allowance)"/>
-                                    <td class="text-end" t-esc="fmt(line.gross)"/>
-                                    <td class="text-end" t-esc="fmt(line.social_base)"/>
-                                    <td class="text-end" t-esc="fmt(line.employee_social)"/>
-                                    <td class="text-end" t-esc="fmt(line.income_tax)"/>
-                                    <td class="text-end" t-esc="fmt(line.pension)"/>
-                                    <td class="text-end" t-esc="fmt(line.other_deduction)"/>
-                                    <td class="text-end" t-esc="fmt(line.total_deduction)"/>
-                                    <td class="text-end" t-esc="fmt(line.net)"/>
-                                    <td class="text-end" t-esc="fmt(line.employer_social)"/>
                                 </t>
                             </tr>
                         </tbody>
@@ -609,7 +557,6 @@
                                 <th class="text-end" style="width:96px;">تقاعد</th>
                                 <th class="text-end" style="width:96px;">استقطاع</th>
                                 <th class="text-end" style="width:96px;">الصافي</th>
-                                <th style="width:120px;">القيد</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -626,15 +573,9 @@
                                 <td class="text-end" t-esc="fmt(row.pension)"/>
                                 <td class="text-end" t-esc="fmt(row.other_deduction)"/>
                                 <td class="text-end" t-esc="fmt(row.net)"/>
-                                <td>
-                                    <a t-if="row.posted" href="#" class="o_pr_link"
-                                       t-custom-click="(ev, mid) => this.openMove(row.move_id, mid)"
-                                       t-esc="row.move"/>
-                                    <span t-else="" class="text-muted">مسودة</span>
-                                </td>
                             </tr>
                             <tr t-if="!state.card.history.length">
-                                <td colspan="11" class="text-muted text-center py-2">
+                                <td colspan="10" class="text-muted text-center py-2">
                                     لم يدخل في كشف رواتب بعد.
                                 </td>
                             </tr>
@@ -650,7 +591,6 @@
                                 <td class="text-end" t-esc="fmt(state.card.totals.pension)"/>
                                 <td class="text-end" t-esc="fmt(state.card.totals.other_deduction)"/>
                                 <td class="text-end" t-esc="fmt(state.card.totals.net)"/>
-                                <td/>
                             </tr>
                         </tfoot>
                     </table>
@@ -830,7 +770,6 @@
                         <option t-foreach="state.uploads" t-as="item" t-key="item.id"
                                 t-att-value="item.id" t-att-selected="isUpload(item.id)">
                             <t t-esc="item.name"/> — <t t-esc="item.lines"/> بنداً
-                            <t t-if="item.posted"> · <t t-esc="item.posted"/> قيود</t>
                         </option>
                     </select>
                     <span t-if="state.uploads.length" class="o_pr_sep"/>
@@ -869,38 +808,14 @@
                         <div class="small text-muted">
                             <t t-esc="state.upload.filename or state.upload.name"/> ·
                             <t t-esc="uploadCount"/> موظفاً
-                            <t t-if="uploadPosted.length">
-                                · مُرحَّل إلى
-                                <t t-foreach="uploadPosted" t-as="done" t-key="done.key">
-                                    <a href="#" class="o_pr_link"
-                                       t-custom-click="(ev, mid) => this.openMove(done.move_id, mid)">
-                                        قيد <t t-esc="done.move"/>
-                                    </a><t t-if="!done_last">، </t>
-                                </t>
-                            </t>
-                            <div t-if="state.upload.past_moves.length" class="small text-muted">
-                                قيودٌ سابقة من هذا الكشف:
-                                <t t-foreach="state.upload.past_moves" t-as="past"
-                                   t-key="past.id">
-                                    <a href="#" class="o_pr_link"
-                                       t-custom-click="(ev, mid) => this.openMove(past.id, mid)">
-                                        <t t-esc="past.name"/>
-                                    </a><t t-if="!past_last">، </t>
-                                </t>
-                            </div>
                         </div>
                     </div>
 
                     <div class="o_pr_bar no-print">
-                        <button t-if="uploadToPost.length" class="btn btn-sm btn-success"
+                        <button t-if="uploadCount" class="btn btn-sm btn-success"
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.postUpload()">
                             <i class="fa fa-check me-1"/> <t t-esc="uploadPostLabel"/>
-                        </button>
-                        <button t-if="uploadPosted.length" class="btn btn-sm btn-outline-danger"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.unpostUpload()">
-                            <t t-esc="uploadUnpostLabel"/>
                         </button>
                         <button class="btn btn-sm btn-secondary"
                                 t-on-click="() => this.print()">
@@ -926,8 +841,6 @@
                             <a href="#" t-attf-class="nav-link {{ state.uploadSheet === section.key ? 'active' : '' }}"
                                t-on-click.prevent="() => this.setUploadSheet(section.key)">
                                 <t t-esc="section.name"/>
-                                <i t-if="section.posted" class="fa fa-check-circle ms-1"
-                                   title="له قيد"/>
                                 <span class="badge rounded-pill" t-esc="section.count"/>
                             </a>
                         </li>

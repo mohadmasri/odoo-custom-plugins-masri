@@ -413,7 +413,6 @@ class MyAccountingEmployee(models.Model):
         rows = []
         for line in lines:
             payroll = line.payroll_id
-            move = payroll._sheet_move(line.group_id.id or 'none')
             data = line._payload()
             rows.append({
                 'id': line.id,
@@ -432,9 +431,6 @@ class MyAccountingEmployee(models.Model):
                 'other_deduction': data['other_deduction'],
                 'total_deduction': data['total_deduction'],
                 'net': data['net'],
-                'posted': bool(move),
-                'move_id': move.id or False,
-                'move': move.name or '',
             })
         rows.sort(key=lambda row: (row['year'], int(row['month'])), reverse=True)
         return rows
@@ -609,12 +605,8 @@ class MyAccountingPayroll(models.Model):
     year = fields.Integer(string='السنة', required=True)
     month = fields.Selection(MONTHS, string='الشهر', required=True)
     date = fields.Date(string='تاريخ القيد', default=fields.Date.context_today)
-    state = fields.Selection([('draft', 'مسودة'), ('posted', 'مُرحَّل')],
-                             string='الحالة', default='draft')
-    line_ids = fields.One2many('myaccounting.payroll.line', 'payroll_id', string='البنود')
-    # لكل كشف قيده، كما في دفاتره: قيد لرواتب المكتب وآخر لكل مشروع.
-    # وتبقى فيها القيود التي فُكّ ترحيلها، صلةً تُعرف بها أصول القيود.
-    move_ids = fields.One2many('myaccounting.move', 'payroll_id', string='القيود')
+    line_ids = fields.One2many('myaccounting.payroll.line', 'payroll_id',
+                               string='البنود')
 
     _year_month_unique = models.Constraint('unique(year, month)',
                                            'لكل شهر كشف رواتب واحد.')
@@ -622,36 +614,12 @@ class MyAccountingPayroll(models.Model):
     # ------------------------------------------------------------------
 
     @api.model
-    def _seed_current_moves(self):
-        """القيود التي أُنشئت قبل هذه الميزة كانت قيود كشوفها الحالية.
-
-        فكّ الترحيل كان يحذف القيد، فما بقي مربوطاً بكشفٍ فهو قيده. ولو
-        وُجد لكشفٍ أكثر من قيد فأحدثها هو الحالي.
-        """
-        param = self.env['ir.config_parameter'].sudo()
-        if param.get_param('my_accounting.payroll_current_moves'):
-            return
-        moves = self.env['myaccounting.move'].search(
-            [('payroll_id', '!=', False)], order='id desc')
-        seen = set()
-        for move in moves:
-            key = (move.payroll_id.id, move.payroll_group_id.id or False)
-            if key in seen:
-                continue
-            seen.add(key)
-            if not move.payroll_current:
-                move.payroll_current = True
-        param.set_param('my_accounting.payroll_current_moves', '1')
-
-    @api.model
     def get_payrolls(self):
-        self._seed_current_moves()
         return [{
             'id': payroll.id,
             'name': payroll.name,
             'year': payroll.year,
             'month': payroll.month,
-            'state': payroll.state,
             'lines': len(payroll.line_ids),
         } for payroll in self.search([], limit=60)]
 
@@ -685,24 +653,6 @@ class MyAccountingPayroll(models.Model):
             return self.line_ids.filtered(lambda line: not line.group_id)
         return self.line_ids.filtered(lambda line: line.group_id.id == int(sheet))
 
-    def _sheet_move(self, sheet):
-        """قيد هذا الكشف الحالي إن كان مُرحَّلاً.
-
-        ما فُكّ ترحيله يبقى في الدفتر وفي move_ids، ولكنه لا يُعدّ قيد
-        الكشف بعد ذلك، فيستطيع الكشف أن يُرحَّل من جديد.
-        """
-        self.ensure_one()
-        group_id = False if str(sheet) == 'none' else int(sheet)
-        found = self.move_ids.filtered(
-            lambda move: move.payroll_current
-            and (move.payroll_group_id.id or False) == group_id)
-        return found[:1]
-
-    def _past_moves(self):
-        """قيودٌ أُنشئت من هذا الكشف ثم فُكّ ترحيلها، وما زالت في الدفتر."""
-        self.ensure_one()
-        return self.move_ids.filtered(lambda move: not move.payroll_current)
-
     def _sheet_keys(self, sheet):
         """ما يشمله الزرّ: كشوف الشهر كلها عند «عرض الكل»، أو الكشف المختار."""
         self.ensure_one()
@@ -711,28 +661,14 @@ class MyAccountingPayroll(models.Model):
         key = str(sheet)
         return [key] if key in [item for item, _group in self._sheets()] else []
 
-    def _sync_state(self):
-        """الكشف مُرحَّل متى رُحِّلت كشوفه كلها."""
-        self.ensure_one()
-        sheets = self._sheets()
-        posted = [key for key, _group in sheets if self._sheet_move(key)]
-        self.state = 'posted' if sheets and len(posted) == len(sheets) else 'draft'
-
     def _sheets_payload(self):
         self.ensure_one()
-        items = []
-        for key, group in self._sheets():
-            move = self._sheet_move(key)
-            items.append({
-                'key': key,
-                'id': group.id or False,
-                'name': group.name or 'بلا كشف',
-                'count': len(self._sheet_lines(key)),
-                'posted': bool(move),
-                'move_id': move.id or False,
-                'move': move.name or '',
-            })
-        return items
+        return [{
+            'key': key,
+            'id': group.id or False,
+            'name': group.name or 'بلا كشف',
+            'count': len(self._sheet_lines(key)),
+        } for key, group in self._sheets()]
 
     def _payload(self):
         self.ensure_one()
@@ -748,7 +684,6 @@ class MyAccountingPayroll(models.Model):
             'month': self.month,
             'month_label': MONTH_NAMES.get(self.month, ''),
             'date': self.date and fields.Date.to_string(self.date) or '',
-            'state': self.state,
             'lines': lines,
             'totals': dict({key: total(key) for key in (
                 'basic_salary', 'allowance', 'gross', 'social_base',
@@ -756,11 +691,6 @@ class MyAccountingPayroll(models.Model):
                 'other_deduction', 'total_deduction', 'net')},
                 employer_social=employer),
             'sheets': sheets,
-            'past_moves': [{'id': move.id, 'name': move.name or '',
-                            'sheet': move.payroll_group_id.name or ''}
-                           for move in self._past_moves()],
-            'posted_any': any(sheet['posted'] for sheet in sheets),
-            'posted_all': bool(sheets) and all(sheet['posted'] for sheet in sheets),
         }
 
     @api.model
@@ -780,8 +710,6 @@ class MyAccountingPayroll(models.Model):
     def fill_from_employees(self):
         """يعيد بناء بنود الكشف من بطاقات الموظفين على رأس عملهم."""
         self.ensure_one()
-        if self.move_ids.filtered('payroll_current'):
-            raise UserError('في الشهر كشوفٌ مُرحَّلة، فُكَّ ترحيلها قبل إعادة البناء.')
         self.line_ids.unlink()
         settings = self.env['myaccounting.payroll.settings']._get()
         Line = self.env['myaccounting.payroll.line']
@@ -810,7 +738,6 @@ class MyAccountingPayroll(models.Model):
     @api.model
     def save_lines(self, payroll_id, items):
         payroll = self.browse(int(payroll_id))
-        posted = {key for key, _group in payroll._sheets() if payroll._sheet_move(key)}
         by_id = {line.id: line for line in payroll.line_ids}
         changed = self.env['myaccounting.payroll.line']
         names = ('basic_salary', 'allowance', 'social_base', 'employee_social',
@@ -823,10 +750,6 @@ class MyAccountingPayroll(models.Model):
             # الشاشة ترسل بنود الشهر كلها، فما لم يتغيّر لا يُكتب ولا يُمنع
             if all(abs(values[name] - (line[name] or 0.0)) < 0.0005 for name in names):
                 continue
-            key = str(line.group_id.id) if line.group_id else 'none'
-            if key in posted:
-                raise UserError('كشف «%s» له قيد، فلا تُعدَّل بنوده.'
-                                % (line.group_id.name or 'بلا كشف'))
             line.write(values)
             changed |= line
         if changed:
@@ -856,13 +779,10 @@ class MyAccountingPayroll(models.Model):
                     lambda item: item.employee_id == line.employee_id)
                 if not twin:
                     continue
-                key = str(twin[0].group_id.id) if twin[0].group_id else 'none'
-                if payroll._sheet_move(key):
-                    continue
                 twin.write(values)
 
     def delete_payroll(self):
-        """يحذف الكشف وبنوده، وتبقى قيوده في الدفتر كما هي."""
+        """يحذف الكشف وبنوده. والقيود التي أُنشئت منه لا صلة لها به."""
         self.unlink()
         return True
 
@@ -874,8 +794,12 @@ class MyAccountingPayroll(models.Model):
         """ينشئ قيد الكشف المعروض مسودةً: قيداً لكل كشف على حِدة.
 
         هكذا دفاتره: قيدٌ لرواتب المكتب وقيدٌ لكل مشروع، لا قيدٌ واحد
-        يجمعها. فالزرّ يرحّل الكشف المختار من الشريط، وعند «عرض الكل»
-        يرحّل ما بقي من الكشوف، كلَّ واحدٍ في قيده.
+        يجمعها. فالزرّ ينشئ قيد الكشف المختار من الشريط، وعند «عرض
+        الكل» ينشئ قيد كل كشف.
+
+        والقيد يخرج حرّاً: لا يُحفظ له ربطٌ بالكشف، فالكشف يُعدَّل
+        ويُحذف بعده ولا يتبعه، وإن أنشأتَه مرّتين صار في الدفتر قيدان.
+        ويُرجع أسماء ما أُنشئ.
         """
         self.ensure_one()
         if not self.line_ids:
@@ -888,14 +812,11 @@ class MyAccountingPayroll(models.Model):
             raise UserError('حدّد في الإعدادات: %s' % '، '.join(missing))
 
         keys = self._sheet_keys(sheet)
-        todo = [key for key in keys if not self._sheet_move(key)]
-        if not todo:
-            raise UserError('سبق ترحيل هذا الكشف. القيد لا يتغيّر بعد إنشائه، '
-                            'فإن عدّلت بطاقةً أو بنداً فُكَّ الترحيل ثم أنشئه من جديد.')
-        for key in todo:
-            self._post_sheet(key, settings)
-        self._sync_state()
-        return self._payload()
+        if not keys:
+            raise UserError('لا كشف لترحيله.')
+        moves = [self._post_sheet(key, settings) for key in keys]
+        return {'data': self._payload(),
+                'moves': [move.name for move in moves]}
 
     def _post_sheet(self, sheet, settings):
         """قيد كشفٍ واحد من بنوده (انظر sheet_entries)."""
@@ -911,31 +832,8 @@ class MyAccountingPayroll(models.Model):
         return self.env['myaccounting.move'].create({
             'ref': label,
             'journal': journal,
-            'payroll_id': self.id,
-            'payroll_group_id': group.id or False,
-            'payroll_current': True,
             'line_ids': entries,
         })
-
-    def unpost_payroll(self, sheet='all'):
-        """يفكّ ربط الكشف بقيده، والقيد يبقى في الدفتر كما هو.
-
-        فالكشف يعود مسودةً قابلاً للتعديل والترحيل من جديد، والقيد
-        الأول لا يُمسّ — تبقى صلته بالكشف مكتوبةً فيه، ويبقى مرجعه
-        يقول من أيّ كشفٍ خرج.
-        """
-        self.ensure_one()
-        moves = self.env['myaccounting.move']
-        for key in self._sheet_keys(sheet):
-            move = self._sheet_move(key)
-            if move:
-                moves |= move
-        if not moves:
-            raise UserError('لا قيد لهذا الكشف.')
-        moves.write({'payroll_current': False})
-        self._sync_state()
-        return self._payload()
-
 
 class MyAccountingPayrollLine(models.Model):
     _name = 'myaccounting.payroll.line'
@@ -990,18 +888,3 @@ class MyAccountingPayrollLine(models.Model):
             'group_id': self.group_id.id or False,
             'group': self.group_id.name or '',
         }
-
-
-class MyAccountingMovePayroll(models.Model):
-    """القيد يحمل كشفه، فيُعرف أيُّ كشفٍ رُحِّل وأيُّه ما زال مسودة."""
-    _inherit = 'myaccounting.move'
-
-    payroll_id = fields.Many2one('myaccounting.payroll', string='كشف الرواتب',
-                                 ondelete='set null', index=True, copy=False)
-    payroll_group_id = fields.Many2one('myaccounting.payroll.group',
-                                       string='كشف الموظفين',
-                                       ondelete='set null', copy=False)
-    payroll_current = fields.Boolean(
-        string='قيد الكشف الحالي', default=False, copy=False,
-        help='القيد الذي يَعدّه الكشف قيدَه الآن. وفكّ الترحيل يُنزل هذه '
-             'الصفة ولا يحذف القيد، فتبقى صلته بالكشف معروفة.')
