@@ -465,6 +465,28 @@
                         </div>
                     </div>
 
+                    <!-- تبويبا البطاقة: سجلّه أولاً، ومعلوماته بعده -->
+                    <ul class="nav nav-pills o_pr_sheets mb-3 no-print">
+                        <li class="nav-item" t-if="state.card.employee.id">
+                            <a href="#"
+                               t-attf-class="nav-link {{ state.cardTab === 'history' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setCardTab('history')">
+                                كشف الرواتب
+                                <span t-if="state.card.months" class="badge rounded-pill"
+                                      t-esc="state.card.months"/>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#"
+                               t-attf-class="nav-link {{ state.cardTab === 'info' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setCardTab('info')">
+                                معلومات الموظف
+                            </a>
+                        </li>
+                    </ul>
+
+                    <t t-if="state.cardTab === 'info' or !state.card.employee.id">
+
                     <!-- بيانات البطاقة: تُكتب هنا لا في جدول الموظفين -->
                     <div class="o_pr_card_grid">
                         <div class="o_pr_card_field" t-foreach="cardFields" t-as="field"
@@ -563,9 +585,11 @@
                         </div>
                     </div>
 
-                    <div t-if="state.card.employee.id" class="o_pr_card_sub">سجلّه الشهري</div>
-                    <table t-if="state.card.employee.id"
-                           class="table table-bordered table-sm o_pr_table o_pr_hist">
+                    </t>
+
+                    <t t-else="">
+                    <div class="o_pr_card_sub">سجلّ رواتبه الشهري</div>
+                    <table class="table table-bordered table-sm o_pr_table o_pr_hist">
                         <thead>
                             <tr>
                                 <th style="width:150px;">الشهر</th>
@@ -615,6 +639,7 @@
                             </tr>
                         </tfoot>
                     </table>
+                    </t>
                 </div>
             </t>
 
@@ -638,7 +663,7 @@
                 </div>
 
                 <!-- فلاتر الحال والضمان، تعمل مع تبويبات المشاريع والبحث -->
-                <div class="o_pr_bar">
+                <div t-if="!noMonthSheet" class="o_pr_bar">
                     <span class="small text-muted">الحال:</span>
                     <div class="btn-group btn-group-sm">
                         <button t-foreach="stateFilters" t-as="item" t-key="item[0]"
@@ -665,7 +690,7 @@
                     </t>
                 </div>
 
-                <div class="o_pr_note small mb-2">
+                <div t-if="!noMonthSheet" class="o_pr_note small mb-2">
                     <t t-if="state.allEmployees">
                         كل البطاقات (<t t-esc="state.employees.length"/>)، بما فيها
                         الموقوفة ومن ليس في كشف هذا الشهر.
@@ -682,7 +707,7 @@
                 </div>
 
                 <!-- كشوف الموظفين كتبويبات ملف الرواتب نفسها -->
-                <ul class="nav nav-pills o_pr_sheets mb-2">
+                <ul t-if="!noMonthSheet" class="nav nav-pills o_pr_sheets mb-2">
                     <li class="nav-item">
                         <a href="#" t-attf-class="nav-link {{ state.sheet === 'all' ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setSheet('all')">
@@ -714,7 +739,7 @@
                     وما يُكتب على بطاقةٍ هنا يغلب حساب الكشف.
                 </div>
 
-                <div class="o_pr_people_head small text-muted mb-2">
+                <div t-if="!noMonthSheet" class="o_pr_people_head small text-muted mb-2">
                     <b t-esc="visibleEmployees.length"/> بطاقة
                     <t t-if="visibleEmployees.length !== monthEmployees.length">
                         من <t t-esc="monthEmployees.length"/>
@@ -723,12 +748,26 @@
                     · العلاوات <b t-esc="fmt(employeeTotals.allowance)"/>
                 </div>
 
-                <div t-if="!visibleEmployees.length" class="o_pr_empty">
+                <div t-if="noMonthSheet" class="o_pr_empty">
+                    <div class="mb-2">
+                        لا كشف لشهر <b t-esc="periodLabel"/> بعد، فلا موظفين له.
+                    </div>
+                    <button class="btn btn-sm btn-primary me-2"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.pickExcel()">
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-on-click="() => this.toggleAllEmployees()">
+                        <i class="fa fa-users me-1"/> اعرض كل البطاقات
+                    </button>
+                </div>
+                <div t-elif="!visibleEmployees.length" class="o_pr_empty">
                     لا بطاقة بهذه الفلاتر.
                 </div>
 
                 <!-- بطاقات الموظفين: الاسم والراتب والضمان والمشروع والحال -->
-                <div class="o_pr_people">
+                <div t-if="!noMonthSheet" class="o_pr_people">
                     <div t-foreach="visibleEmployees" t-as="employee" t-key="employee._k"
                          t-attf-class="o_pr_person {{ employee.active ? '' : 'o_pr_person_off' }}"
                          t-custom-click="(ev, mid) => this.openCard(employee, mid)">
