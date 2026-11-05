@@ -13,8 +13,10 @@
     'category': 'Accounting',
     'author': 'Custom',
     'license': 'LGPL-3',
+    # محاسبة أودو (account) ليست من حاجتنا في شيء: نماذجنا كلها myaccounting.*
+    # وقد بُنيت من الصفر. وتركها يُثقل النظام بعشرات الوحدات بلا فائدة.
     'depends': [
-        'base', 'mail', 'web', 'project', 'calendar', 'contacts', 'account',
+        'base', 'mail', 'web', 'project', 'calendar', 'contacts',
         'spreadsheet_dashboard', 'project_todo',
     ],
     'post_init_hook': 'post_init_hook',

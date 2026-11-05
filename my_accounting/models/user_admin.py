@@ -112,6 +112,9 @@ class MyAccountingUserAdmin(models.AbstractModel):
         for app in APP_DEFINITIONS:
             view_group = self.env.ref(app['view_group'], raise_if_not_found=False)
             edit_group = self.env.ref(app['edit_group'], raise_if_not_found=False)
+            # تطبيقٌ غير مثبّتٍ في هذا النظام لا يُعرض صفّه أصلاً
+            if not edit_group and not view_group:
+                continue
             has_edit = bool(edit_group and edit_group.id in user_group_ids)
             has_view = has_edit or bool(view_group and view_group.id in user_group_ids)
             level = 'edit' if has_edit else ('view' if has_view else 'none')
