@@ -654,6 +654,15 @@
                                 t-on-click="() => this.setFilter('onlySocial', item[0])"
                                 t-esc="item[1]"/>
                     </div>
+                    <!-- بطاقتان معروضتان: زرٌّ يدمجهما إن كانتا لرجلٍ واحد -->
+                    <t t-if="visibleEmployees.length === 2">
+                        <span class="o_pr_sep"/>
+                        <button class="btn btn-sm btn-outline-primary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.mergeShown()">
+                            <i class="fa fa-compress me-1"/> ادمج البطاقتين
+                        </button>
+                    </t>
                 </div>
 
                 <div class="o_pr_note small mb-2">

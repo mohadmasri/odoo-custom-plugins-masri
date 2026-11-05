@@ -201,7 +201,10 @@ class MyAccountingEmployeeExcel(models.Model):
         rows, skipped, periods = self._excel_rows(content)
         Group = self.env['myaccounting.payroll.group']
         employees = self.with_context(active_test=False).search([])
-        by_key = {match_key(employee.name): employee for employee in employees}
+        # الهوية هي الاسم مع كشفه: الاسم نفسه في كشفين مشروعين شخصان،
+        # وفي الكشف نفسه هو هو
+        by_key = {(match_key(employee.name), employee.group_id.id or False): employee
+                  for employee in employees}
         groups = {clean(group.name): group
                   for group in Group.with_context(active_test=False).search([])}
 
@@ -226,8 +229,9 @@ class MyAccountingEmployeeExcel(models.Model):
             values['group_id'] = group.id if group else False
 
             # الاسم المختلف شخصٌ مختلف: لا مطابقة تقريبية، إنما الاسم
-            # نفسه بعد تجاهل الهمزات والتطويل والفراغات
-            employee = by_key.get(match_key(row['name']))
+            # نفسه بعد تجاهل الهمزات والتطويل والفراغات، في كشفه نفسه
+            employee = by_key.get((match_key(row['name']),
+                                   group.id if group else False))
             if not employee:
                 plan['new'].append({
                     'name': row['name'], 'sheet': row['sheet'],

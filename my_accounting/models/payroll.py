@@ -594,6 +594,52 @@ class MyAccountingEmployee(models.Model):
                 for employee in self.with_context(active_test=False).search([])]
 
     @api.model
+    def merge_employees(self, employee_ids):
+        """يدمج بطاقات رجلٍ واحدٍ كُتب اسمه هجاءً مختلفاً في الملفات.
+
+        الاسم الأطول هو الباقي (فهو أتمّ)، وتنتقل إليه بنود كشوف
+        الرواتب من البطاقات الأخرى، وتُنقل إليه بياناتها التي لا يحملها،
+        ويبقى على رأس العمل إن كانت إحداها كذلك. ثم تُحذف الأخرى.
+        """
+        cards = self.with_context(active_test=False).browse(
+            [int(item) for item in employee_ids or []]).exists()
+        if len(cards) < 2:
+            raise UserError('اختر بطاقتين على الأقل للدمج.')
+        groups = cards.mapped('group_id')
+        if len(groups) > 1:
+            raise UserError('البطاقات في كشوفٍ مختلفة (%s)، وهم أشخاصٌ مختلفون.'
+                            % '، '.join(groups.mapped('name')))
+        keep = max(cards, key=lambda card: (len(card.name or ''), card.id))
+        gone = cards - keep
+        Line = self.env['myaccounting.payroll.line']
+        moved = 0
+        for card in gone:
+            lines = Line.search([('employee_id', '=', card.id)])
+            # شهرٌ فيه بندان للرجل نفسه لا يُجمع: الأحدث بطاقةً هو الباقي
+            for line in lines:
+                twin = Line.search([('payroll_id', '=', line.payroll_id.id),
+                                    ('employee_id', '=', keep.id)], limit=1)
+                if twin:
+                    line.unlink()
+                    continue
+                line.employee_id = keep.id
+                moved += 1
+        # ما ينقص الباقية من بيانات تُؤخذ من الذاهبة
+        for field in ('job_title', 'national_id', 'social_number', 'phone',
+                      'address', 'note', 'hire_date'):
+            if keep[field]:
+                continue
+            for card in gone:
+                if card[field]:
+                    keep[field] = card[field]
+                    break
+        if any(card.active for card in cards):
+            keep.active = True
+        names = gone.mapped('name')
+        gone.unlink()
+        return {'keep': keep.name, 'merged': names, 'lines': moved}
+
+    @api.model
     def delete_employee(self, employee_id):
         """يحذف بطاقة موظفٍ لم يدخل كشفاً. ومن دخل يُوقف ولا يُحذف."""
         employee = self.with_context(active_test=False).browse(int(employee_id))

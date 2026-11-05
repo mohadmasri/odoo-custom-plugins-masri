@@ -453,6 +453,31 @@ export class Payroll extends Component {
         return group || null;
     }
 
+    /** البطاقتان المعروضتان رجلٌ واحد: الاسم الأطول يبقى */
+    mergeShown() {
+        const cards = this.visibleEmployees;
+        const keep = cards.reduce(
+            (best, card) => (card.name.length > best.name.length ? card : best),
+            cards[0]);
+        this.dialog.add(ConfirmationDialog, {
+            title: "دمج البطاقتين",
+            body: `${cards.map((card) => card.name).join(" و")} رجلٌ واحد؟`
+                + ` يبقى «${keep.name}» وتنتقل إليه أشهر الأخرى، ثم تُحذف.`,
+            confirmLabel: "ادمج",
+            confirm: () => this.withBusy(async () => {
+                const done = await this.orm.call("myaccounting.employee",
+                    "merge_employees", [cards.map((card) => card.id)]);
+                this.state.search = "";
+                await this.loadSettings();
+                await this.refresh();
+                this.notification.add(
+                    `بقيت «${done.keep}» ونُقل إليها ${done.lines} بنداً.`,
+                    { type: "success" });
+            }),
+            cancel: () => {},
+        });
+    }
+
     deleteEmployee(employee) {
         this.dialog.add(ConfirmationDialog, {
             title: `حذف بطاقة "${employee.name}"`,
