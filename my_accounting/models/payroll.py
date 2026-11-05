@@ -594,6 +594,21 @@ class MyAccountingEmployee(models.Model):
                 for employee in self.with_context(active_test=False).search([])]
 
     @api.model
+    def delete_employee(self, employee_id):
+        """يحذف بطاقة موظفٍ لم يدخل كشفاً. ومن دخل يُوقف ولا يُحذف."""
+        employee = self.with_context(active_test=False).browse(int(employee_id))
+        if not employee.exists():
+            return True
+        lines = self.env['myaccounting.payroll.line'].search_count(
+            [('employee_id', '=', employee.id)])
+        if lines:
+            raise UserError(
+                'للموظف «%s» بنودٌ في %d كشف رواتب، فلا تُحذف بطاقته — '
+                'أوقِفه من بطاقته بدلاً من ذلك.' % (employee.name, lines))
+        employee.unlink()
+        return True
+
+    @api.model
     def save_employees(self, items):
         """يحفظ قائمة الموظفين كاملة: ما حُذف يُحذف وما استجدّ يُنشأ."""
         existing = {employee.id: employee

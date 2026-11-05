@@ -620,19 +620,40 @@
 
             <t t-elif="state.tab === 'employees'">
                 <div class="o_pr_bar">
+                    <input type="text" class="form-control form-control-sm"
+                           style="width:260px;" placeholder="ابحث بالاسم أو المسمّى أو المشروع"
+                           t-att-value="state.search"
+                           t-on-input="(ev) => this.onSearch(ev)"/>
                     <button class="btn btn-sm btn-primary"
-                            t-att-disabled="state.busy or !employeesDirty"
-                            t-on-click="() => this.saveEmployees()">حفظ</button>
-                    <button class="btn btn-sm btn-outline-secondary"
-                            t-att-disabled="state.busy or !employeesDirty"
-                            t-on-click="() => this.cancelEmployees()">إلغاء</button>
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.newEmployeeCard()">
+                        <i class="fa fa-plus me-1"/> بطاقة جديدة
+                    </button>
                     <span class="o_pr_sep"/>
                     <button class="btn btn-sm btn-outline-secondary"
                             t-att-disabled="state.busy"
                             t-on-click="() => this.pickExcel()">
-                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
                     </button>
-                    <span t-if="employeesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                </div>
+
+                <!-- فلاتر الحال والضمان، تعمل مع تبويبات المشاريع والبحث -->
+                <div class="o_pr_bar">
+                    <span class="small text-muted">الحال:</span>
+                    <div class="btn-group btn-group-sm">
+                        <button t-foreach="stateFilters" t-as="item" t-key="item[0]"
+                                t-attf-class="btn {{ state.onlyState === item[0] ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.setFilter('onlyState', item[0])"
+                                t-esc="item[1]"/>
+                    </div>
+                    <span class="o_pr_sep"/>
+                    <span class="small text-muted">الضمان:</span>
+                    <div class="btn-group btn-group-sm">
+                        <button t-foreach="socialFilters" t-as="item" t-key="item[0]"
+                                t-attf-class="btn {{ state.onlySocial === item[0] ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.setFilter('onlySocial', item[0])"
+                                t-esc="item[1]"/>
+                    </div>
                 </div>
 
                 <div class="o_pr_note small mb-2">
@@ -684,121 +705,60 @@
                     وما يُكتب على بطاقةٍ هنا يغلب حساب الكشف.
                 </div>
 
-                <table class="table table-bordered table-sm o_pr_table o_pr_emp">
-                    <thead>
-                        <tr>
-                            <th style="width:60px;">ترتيب</th>
-                            <th class="text-center" style="width:44px;">بطاقة</th>
-                            <th style="width:170px;">الاسم</th>
-                            <th style="width:140px;">الكشف</th>
-                            <th class="text-end" style="width:96px;">الأساسي</th>
-                            <th class="text-end" style="width:96px;">العلاوات</th>
-                            <th class="text-center" style="width:56px;">ضمان</th>
-                            <th class="text-end" style="width:96px;">الخاضع للضمان</th>
-                            <th class="text-end" style="width:96px;">ضريبة</th>
-                            <th class="text-end" style="width:96px;">تقاعد</th>
-                            <th class="text-end" style="width:96px;">استقطاع</th>
-                            <th style="width:170px;">حساب المصروف</th>
-                            <th style="width:170px;">يُدفع من</th>
-                            <th class="text-center" style="width:56px;">فعّال</th>
-                            <th style="width:40px;"/>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr t-foreach="visibleEmployees" t-as="employee" t-key="employee._k">
-                            <td>
-                                <input type="number" class="form-control form-control-sm"
-                                       t-att-value="employee.sequence"
-                                       t-on-change="(ev) => this.editEmployee(employee, 'sequence', ev)"/>
-                            </td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-link p-0"
-                                        title="بطاقة الموظف — الزرّ الأوسط يفتحها في تبويب جديد"
-                                        t-custom-click="(ev, mid) => this.openCard(employee, mid)">
-                                    <i class="fa fa-id-card-o"/>
-                                </button>
-                            </td>
-                            <td>
-                                <input type="text" class="form-control form-control-sm"
-                                       t-att-value="employee.name"
-                                       t-on-change="(ev) => this.editEmployee(employee, 'name', ev)"/>
-                            </td>
-                            <td>
-                                <RefPicker value="groupToken(employee)"
-                                           options="groupOptions"
-                                           disabled="state.busy"
-                                           placeholder="'بلا كشف'"
-                                           onSelect="(token) => this.onEmployeeGroup(employee, token)"/>
-                            </td>
-                            <td t-foreach="['basic_salary', 'allowance']" t-as="field" t-key="field">
-                                <input type="number" step="0.001"
-                                       class="form-control form-control-sm text-end"
-                                       t-att-value="employee[field]"
-                                       t-on-change="(ev) => this.editEmployee(employee, field, ev)"/>
-                            </td>
-                            <td class="text-center">
-                                <input type="checkbox" class="form-check-input"
-                                       t-att-checked="employee.social_security"
-                                       t-on-change="(ev) => this.editEmployee(employee, 'social_security', ev)"/>
-                            </td>
-                            <td t-foreach="['social_base', 'income_tax', 'pension', 'other_deduction']"
-                                t-as="field" t-key="field">
-                                <input type="number" step="0.001"
-                                       class="form-control form-control-sm text-end"
-                                       t-att-value="employee[field]"
-                                       t-on-change="(ev) => this.editEmployee(employee, field, ev)"/>
-                            </td>
-                            <td>
-                                <RefPicker value="accountToken(employee)"
-                                           options="state.accountOptions"
-                                           disabled="state.busy"
-                                           placeholder="placeholderAccount(employee)"
-                                           onSelect="(token) => this.onEmployeeAccount(employee, token)"/>
-                            </td>
-                            <td>
-                                <RefPicker value="paymentToken(employee)"
-                                           options="state.accountOptions"
-                                           disabled="state.busy"
-                                           placeholder="placeholderPayment(employee)"
-                                           onSelect="(token) => this.onEmployeePayment(employee, token)"/>
-                            </td>
-                            <td class="text-center">
-                                <input type="checkbox" class="form-check-input"
-                                       t-att-checked="employee.active"
-                                       t-on-change="(ev) => this.editEmployee(employee, 'active', ev)"/>
-                            </td>
-                            <td class="text-center">
-                                <button class="btn btn-sm btn-link text-danger p-0"
-                                        title="حذف الموظف"
-                                        t-on-click="() => this.removeEmployee(employee)">
-                                    <i class="fa fa-trash"/>
-                                </button>
-                            </td>
-                        </tr>
-                        <tr t-if="!visibleEmployees.length">
-                            <td colspan="15" class="text-muted text-center py-2">لا موظفين في هذا الكشف</td>
-                        </tr>
-                    </tbody>
-                    <tfoot t-if="visibleEmployees.length">
-                        <tr class="o_pr_total">
-                            <td colspan="4">المجاميع</td>
-                            <td class="text-end" t-esc="fmt(employeeTotals.basic_salary)"/>
-                            <td class="text-end" t-esc="fmt(employeeTotals.allowance)"/>
-                            <td/>
-                            <td class="text-end" t-esc="fmt(employeeTotals.social_base)"/>
-                            <td class="text-end" t-esc="fmt(employeeTotals.income_tax)"/>
-                            <td class="text-end" t-esc="fmt(employeeTotals.pension)"/>
-                            <td class="text-end" t-esc="fmt(employeeTotals.other_deduction)"/>
-                            <td colspan="4"/>
-                        </tr>
-                    </tfoot>
-                </table>
-                <button class="btn btn-sm btn-outline-secondary"
-                        t-att-disabled="state.busy"
-                        t-on-click="() => this.newEmployeeCard()">
-                    <i class="fa fa-plus me-1"/> بطاقة موظف جديد
-                    <t t-if="currentGroup"> في <t t-esc="currentGroup.name"/></t>
-                </button>
+                <div class="o_pr_people_head small text-muted mb-2">
+                    <b t-esc="visibleEmployees.length"/> بطاقة
+                    <t t-if="visibleEmployees.length !== monthEmployees.length">
+                        من <t t-esc="monthEmployees.length"/>
+                    </t>
+                    · الأساسي <b t-esc="fmt(employeeTotals.basic_salary)"/>
+                    · العلاوات <b t-esc="fmt(employeeTotals.allowance)"/>
+                </div>
+
+                <div t-if="!visibleEmployees.length" class="o_pr_empty">
+                    لا بطاقة بهذه الفلاتر.
+                </div>
+
+                <!-- بطاقات الموظفين: الاسم والراتب والضمان والمشروع والحال -->
+                <div class="o_pr_people">
+                    <div t-foreach="visibleEmployees" t-as="employee" t-key="employee._k"
+                         t-attf-class="o_pr_person {{ employee.active ? '' : 'o_pr_person_off' }}"
+                         t-custom-click="(ev, mid) => this.openCard(employee, mid)">
+                        <div class="o_pr_person_head">
+                            <div class="o_pr_person_name" t-esc="employee.name"/>
+                            <button class="btn btn-sm btn-link text-danger p-0 no-print"
+                                    title="حذف البطاقة"
+                                    t-on-click.stop="() => this.deleteEmployee(employee)">
+                                <i class="fa fa-trash"/>
+                            </button>
+                        </div>
+                        <div t-if="employee.job_title" class="o_pr_person_job"
+                             t-esc="employee.job_title"/>
+
+                        <div class="o_pr_person_rows">
+                            <div>
+                                <span class="o_pr_person_label">الأساسي</span>
+                                <b t-esc="fmt(employee.basic_salary)"/>
+                            </div>
+                            <div>
+                                <span class="o_pr_person_label">الإجمالي</span>
+                                <b t-esc="fmt(employee.gross)"/>
+                            </div>
+                        </div>
+
+                        <div class="o_pr_person_tags">
+                            <span class="o_pr_tag o_pr_tag_group">
+                                <i class="fa fa-folder-o me-1"/>
+                                <t t-esc="employee.group or 'بلا مشروع'"/>
+                            </span>
+                            <span t-if="employee.social_security"
+                                  class="o_pr_tag o_pr_tag_social">مشمول بالضمان</span>
+                            <span t-else="" class="o_pr_tag">غير مشمول</span>
+                            <span t-if="employee.active"
+                                  class="o_pr_tag o_pr_tag_on">فعّال</span>
+                            <span t-else="" class="o_pr_tag o_pr_tag_off">منتهي</span>
+                        </div>
+                    </div>
+                </div>
             </t>
 
             <!-- ======================================= مشاريع منتهية -->

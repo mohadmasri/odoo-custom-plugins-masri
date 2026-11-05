@@ -47,7 +47,7 @@ export class Payroll extends Component {
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.excelInput = useRef("excelInput");
         this.months = MONTH_OPTIONS;
-        this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
+        this.saved = { lines: [], settings: null, groups: [], card: null };
         const today = new Date();
         this.state = useState({
             loading: true,
@@ -67,6 +67,9 @@ export class Payroll extends Component {
             excelName: "",
             excelOptions: { edit: true, add: true, stop: true },
             allEmployees: false,
+            search: "",
+            onlyState: "all",
+            onlySocial: "all",
             sheet: "all",
             monthSheet: "all",
             settings: null,
@@ -130,7 +133,6 @@ export class Payroll extends Component {
         this.state.employees = keyed(employees);
         this.state.settings = settings;
         this.state.groups = keyed(groups);
-        this.saved.employees = clone(this.state.employees);
         this.saved.settings = clone(settings);
         this.saved.groups = clone(this.state.groups);
         if (this.state.sheet !== "all" && this.state.sheet !== "none"
@@ -384,26 +386,6 @@ export class Payroll extends Component {
     // الموظفون
     // ------------------------------------------------------------------
 
-    get employeesDirty() {
-        return !same(this.state.employees, this.saved.employees);
-    }
-
-    editEmployee(employee, field, ev) {
-        // المسمّى والبيانات الشخصية تُعدَّل من البطاقة، والجدول للراتب
-        const numbers = ["sequence", "basic_salary", "allowance", "social_base",
-                         "income_tax", "pension", "other_deduction"];
-        if (numbers.includes(field)) {
-            employee[field] = field === "sequence"
-                ? parseInt(ev.target.value, 10) || 0
-                : parseFloat(ev.target.value) || 0;
-        } else if (field === "social_security" || field === "active") {
-            employee[field] = ev.target.checked;
-        } else {
-            employee[field] = ev.target.value;
-        }
-        employee.gross = this.round(employee.basic_salary + employee.allowance);
-    }
-
     setSheet(sheet) {
         this.state.sheet = sheet;
     }
@@ -417,17 +399,74 @@ export class Payroll extends Component {
         return this.state.employees.filter((employee) => ids.has(employee.id));
     }
 
-    /** موظفو الكشف المعروض: «عرض الكل» أو كشفٌ بعينه أو بلا كشف */
+    /**
+     * بطاقات الموظفين المعروضة: بعد الشهر والكشف والبحث والفلاتر.
+     * والكل يعمل معاً، فتُقرأ النتيجة في عدّاد البطاقات فوق الشبكة.
+     */
     get visibleEmployees() {
         const sheet = this.state.sheet;
-        const pool = this.monthEmployees;
-        if (sheet === "all") {
-            return pool;
-        }
+        const text = this.state.search.trim();
+        let shown = this.monthEmployees;
         if (sheet === "none") {
-            return pool.filter((employee) => !employee.group_id);
+            shown = shown.filter((employee) => !employee.group_id);
+        } else if (sheet !== "all") {
+            shown = shown.filter((employee) => employee.group_id === sheet);
         }
-        return pool.filter((employee) => employee.group_id === sheet);
+        if (this.state.onlyState !== "all") {
+            const wanted = this.state.onlyState === "active";
+            shown = shown.filter((employee) => !!employee.active === wanted);
+        }
+        if (this.state.onlySocial !== "all") {
+            const wanted = this.state.onlySocial === "yes";
+            shown = shown.filter(
+                (employee) => !!employee.social_security === wanted);
+        }
+        if (text) {
+            shown = shown.filter((employee) => [
+                employee.name, employee.job_title, employee.group,
+                employee.national_id, employee.phone,
+            ].some((field) => (field || "").includes(text)));
+        }
+        return shown;
+    }
+
+    onSearch(ev) {
+        this.state.search = ev.target.value;
+    }
+
+    setFilter(field, value) {
+        this.state[field] = value;
+    }
+
+    get stateFilters() {
+        return [["all", "الكل"], ["active", "على رأس العمل"], ["stopped", "موقوف"]];
+    }
+
+    get socialFilters() {
+        return [["all", "الكل"], ["yes", "مشمول بالضمان"], ["no", "غير مشمول"]];
+    }
+
+    /** ما يُكتب على البطاقة: المشروع وحاله */
+    groupOf(employee) {
+        const group = this.state.groups.find(
+            (item) => item.id === employee.group_id);
+        return group || null;
+    }
+
+    deleteEmployee(employee) {
+        this.dialog.add(ConfirmationDialog, {
+            title: `حذف بطاقة "${employee.name}"`,
+            body: "تُحذف البطاقة نفسها. ومن دخل كشف رواتبٍ لا تُحذف بطاقته،"
+                + " فأوقِفه من بطاقته بدلاً من ذلك.",
+            confirmLabel: "احذف",
+            confirm: () => this.withBusy(async () => {
+                await this.orm.call("myaccounting.employee", "delete_employee",
+                    [employee.id]);
+                await this.loadSettings();
+                this.notification.add("حُذفت البطاقة.", { type: "success" });
+            }),
+            cancel: () => {},
+        });
     }
 
     toggleAllEmployees() {
@@ -463,6 +502,7 @@ export class Payroll extends Component {
             (employee) => (employee.group_id || false) === groupId).length;
     }
 
+    /** مجاميع البطاقات المعروضة */
     get employeeTotals() {
         const keys = ["basic_salary", "allowance", "social_base", "income_tax",
                       "pension", "other_deduction"];
@@ -481,48 +521,8 @@ export class Payroll extends Component {
             .map((group) => ({ token: `${group.id}`, display: group.name, hint: "" }));
     }
 
-    groupToken(employee) {
-        return employee.group_id ? `${employee.group_id}` : "";
-    }
-
-    onEmployeeGroup(employee, token) {
-        employee.group_id = parseInt(token, 10) || false;
-    }
-
-    /** الفارغ يرث حساب كشفه، فنُظهر في الحقل ما سيورثه */
-    placeholderAccount(employee) {
-        const group = this.state.groups.find((item) => item.id === employee.group_id);
-        return (group && group.account) || "حساب الرواتب العام";
-    }
-
-    placeholderPayment(employee) {
-        const group = this.state.groups.find((item) => item.id === employee.group_id);
-        return (group && group.payment_account) || "حساب الدفع العام";
-    }
-
-    onEmployeeAccount(employee, token) {
-        employee.account_id = parseInt(token, 10) || false;
-    }
-
-    accountToken(employee) {
-        return employee.account_id ? `${employee.account_id}` : "";
-    }
-
-    onEmployeePayment(employee, token) {
-        employee.payment_account_id = parseInt(token, 10) || false;
-    }
-
-    paymentToken(employee) {
-        return employee.payment_account_id ? `${employee.payment_account_id}` : "";
-    }
-
     /** الموظف الجديد يُدخل من بطاقته لا من سطرٍ في الجدول */
     async newEmployeeCard() {
-        if (this.employeesDirty) {
-            this.notification.add("احفظ تغييرات الجدول قبل فتح بطاقة جديدة.",
-                                  { type: "warning" });
-            return;
-        }
         const group = this.currentGroup;
         await this.withBusy(async () => {
             const card = await this.orm.call("myaccounting.employee",
@@ -530,26 +530,6 @@ export class Payroll extends Component {
                 [group ? group.id : false, 10 * (this.state.employees.length + 1)]);
             this.setCard(card);
         });
-    }
-
-    removeEmployee(employee) {
-        const index = this.state.employees.indexOf(employee);
-        if (index >= 0) {
-            this.state.employees.splice(index, 1);
-        }
-    }
-
-    async saveEmployees() {
-        await this.withBusy(async () => {
-            await this.orm.call("myaccounting.employee", "save_employees",
-                [clone(this.state.employees)]);
-            await this.loadSettings();
-            this.notification.add("حُفظ الموظفون.", { type: "success" });
-        });
-    }
-
-    cancelEmployees() {
-        this.state.employees = clone(this.saved.employees);
     }
 
     // ------------------------------------------------------------------
@@ -624,11 +604,6 @@ export class Payroll extends Component {
     // ------------------------------------------------------------------
 
     pickExcel() {
-        if (this.employeesDirty) {
-            this.notification.add("احفظ تغييرات الجدول قبل رفع ملف.",
-                                  { type: "warning" });
-            return;
-        }
         this.excelInput.el.click();
     }
 
@@ -860,11 +835,6 @@ export class Payroll extends Component {
         if (isMiddleClick) {
             // الزرّ الأوسط (أو Ctrl + نقر): تبويب جديد من المتصفح
             window.open(this.cardHref(employee.id), "_blank", "noopener");
-            return;
-        }
-        if (this.employeesDirty) {
-            this.notification.add("احفظ تغييرات الجدول قبل فتح البطاقة.",
-                                  { type: "warning" });
             return;
         }
         await this.withBusy(async () => {
