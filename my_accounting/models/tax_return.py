@@ -11,10 +11,13 @@ from odoo import api, fields, models
 # بند الضريبة الذي نصّه يذكر "إقرار" هو تسديد إقرار سابق، لا ضريبة مشتريات
 SETTLEMENT_RE = re.compile(r'[اأإ]قرار')
 
-MONTH_NAMES = [
+_MONTH_NAMES = [
     '', 'كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران',
     'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول',
 ]
+# كل تاريخٍ يُكتب برقم شهره قبل اسمه: «4 - نيسان»
+MONTH_NAMES = ['' if not index else '%d - %s' % (index, name)
+               for index, name in enumerate(_MONTH_NAMES)]
 
 
 class MyAccountingTaxReturn(models.AbstractModel):

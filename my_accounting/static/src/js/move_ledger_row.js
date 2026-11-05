@@ -4,7 +4,7 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { standardWidgetProps } from "@web/views/widgets/standard_widget_props";
-import { monthName } from "./months";
+import { monthLabel } from "./months";
 
 /**
  * سطر القيد الظاهر كما يظهر في دفتر الأستاذ العام: نفس الأعمدة (مدين/دائن لكل
@@ -102,7 +102,7 @@ export class MoveLedgerRow extends Component {
         if (!month || !year) {
             return "";
         }
-        return `${monthName(month)} ${year}`;
+        return `${monthLabel(month)} ${year}`;
     }
 
     fmt(value) {

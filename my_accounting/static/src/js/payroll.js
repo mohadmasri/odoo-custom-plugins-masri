@@ -2,7 +2,7 @@
 
 import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
-import { MONTH_OPTIONS, monthName } from "./months";
+import { MONTH_OPTIONS, monthLabel } from "./months";
 import { registry } from "@web/core/registry";
 import { router } from "@web/core/browser/router";
 import { useService } from "@web/core/utils/hooks";
@@ -63,6 +63,7 @@ export class Payroll extends Component {
             month: `${today.getMonth() + 1}`,
             card: null,
             cardDraft: null,
+            cardTab: "history",
             excel: null,
             excelName: "",
             excelOptions: { edit: true, add: true, stop: true },
@@ -110,9 +111,9 @@ export class Payroll extends Component {
         });
     }
 
-    /** «تشرين الثاني 2026»: الاسم للعنوان، والرقم في الفلتر */
+    /** «11 - تشرين الثاني 2026»: كل تاريخٍ يُرقّم شهره قبل اسمه */
     get periodLabel() {
-        return `${monthName(this.state.month)} ${this.state.year}`;
+        return `${monthLabel(this.state.month)} ${this.state.year}`;
     }
 
     async loadFinished() {
@@ -390,10 +391,18 @@ export class Payroll extends Component {
         this.state.sheet = sheet;
     }
 
+    /** الشهر الذي لم يُرفع كشفه: لا موظفين له، فلا يُعرض شيء */
+    get noMonthSheet() {
+        return !this.state.data && !this.state.allEmployees;
+    }
+
     /** بطاقات موظفي الشهر المختار، أو كل البطاقات إن طُلبت */
     get monthEmployees() {
-        if (this.state.allEmployees || !this.state.data) {
+        if (this.state.allEmployees) {
             return this.state.employees;
+        }
+        if (!this.state.data) {
+            return [];
         }
         const ids = new Set(this.state.data.lines.map((line) => line.employee_id));
         return this.state.employees.filter((employee) => ids.has(employee.id));
@@ -869,8 +878,14 @@ export class Payroll extends Component {
         });
     }
 
+    setCardTab(tab) {
+        this.state.cardTab = tab;
+    }
+
     setCard(card) {
         this.state.card = card;
+        // الجديد لا سجلّ له، فيُفتح على معلوماته
+        this.state.cardTab = card.employee.id ? "history" : "info";
         const draft = {};
         for (const field of this.cardFields) {
             draft[field.name] = card.employee[field.name] || "";

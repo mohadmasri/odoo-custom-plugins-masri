@@ -22,6 +22,10 @@ export function monthLabel(month) {
     return name ? `${Number(month)} - ${name}` : "";
 }
 
+/** ["1 - كانون الثاني", ...]: الأشهر الاثنا عشر مرقَّمةً، للمحاور والقوائم */
+export const MONTH_LABELS = MONTH_NAMES.map(
+    (name, index) => `${index + 1} - ${name}`);
+
 /** [["1", "1 - كانون الثاني"], ...] لقوائم <option> */
 export const MONTH_OPTIONS = MONTH_NAMES.map(
     (name, index) => [String(index + 1), `${index + 1} - ${name}`]);

@@ -8,7 +8,8 @@
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
-# القائمة ترقّم الشهر قبل اسمه، وأسماؤه وحدها في MONTH_NAMES للعناوين
+# القائمة ترقّم الشهر قبل اسمه، وكذلك كل تاريخٍ يُكتب: MONTH_LABELS للعناوين
+# وMONTH_NAMES للاسم وحده حيث يُحتاج
 MONTHS = [
     ('1', '1 - كانون الثاني'), ('2', '2 - شباط'), ('3', '3 - آذار'),
     ('4', '4 - نيسان'), ('5', '5 - أيار'), ('6', '6 - حزيران'),
@@ -19,6 +20,7 @@ MONTHS = [
 
 # العناوين تأخذ الاسم وحده: «كشف رواتب أيلول 2026» لا «9 - أيلول»
 MONTH_NAMES = {key: label.split(' - ', 1)[-1] for key, label in MONTHS}
+MONTH_LABELS = dict(MONTHS)
 
 # الحسابات التي يحتاجها قيد الرواتب، واسم كل منها في الإعدادات
 SETTING_ACCOUNTS = [
@@ -308,7 +310,7 @@ class MyAccountingPayrollGroup(models.Model):
                 month = months.setdefault(key, {
                     'year': payroll.year,
                     'month': payroll.month,
-                    'label': MONTH_NAMES.get(payroll.month, ''),
+                    'label': MONTH_LABELS.get(payroll.month, ''),
                     'lines': [],
                 })
                 month['lines'].append(line._payload())
@@ -463,7 +465,7 @@ class MyAccountingEmployee(models.Model):
                 'payroll': payroll.name or '',
                 'year': payroll.year,
                 'month': payroll.month,
-                'month_label': MONTH_NAMES.get(payroll.month, ''),
+                'month_label': MONTH_LABELS.get(payroll.month, ''),
                 'group': line.group_id.name or 'بلا كشف',
                 'basic_salary': data['basic_salary'],
                 'allowance': data['allowance'],
@@ -800,7 +802,7 @@ class MyAccountingPayroll(models.Model):
             'name': self.name,
             'year': self.year,
             'month': self.month,
-            'month_label': MONTH_NAMES.get(self.month, ''),
+            'month_label': MONTH_LABELS.get(self.month, ''),
             'date': self.date and fields.Date.to_string(self.date) or '',
             'lines': lines,
             'totals': dict({key: total(key) for key in (

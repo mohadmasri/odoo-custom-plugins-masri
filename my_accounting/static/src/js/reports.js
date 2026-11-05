@@ -5,7 +5,7 @@ import { PeriodFilter } from "./period_filter";
 import { loadBundle } from "@web/core/assets";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { MONTH_NAMES, monthName } from "./months";
+import { MONTH_LABELS, monthLabel } from "./months";
 
 const PALETTE = ["#2E86DE", "#E67E22", "#28A745", "#DC3545", "#8E44AD", "#17A2B8",
     "#F1C40F", "#714B67", "#95A5A6"];
@@ -19,7 +19,7 @@ export const fmt = (value) => (Math.abs(value || 0) < 0.0005 ? 0 : value)
     .toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 export function periodLabel(data) {
-    return data.month ? `${monthName(data.month)} ${data.year}` : `سنة ${data.year}`;
+    return data.month ? `${monthLabel(data.month)} ${data.year}` : `سنة ${data.year}`;
 }
 
 // ----------------------------------------------------------------------
@@ -101,7 +101,7 @@ function pie(slices, { colors = null, onClick = null, doughnut = true } = {}) {
  * المفتاح ثابت (يُحفظ عند التثبيت في الرئيسية). nav: {openCustomers, openCustomer}.
  */
 export function buildReportCards(data, nav) {
-    const labels = MONTH_NAMES;
+    const labels = MONTH_LABELS;
     const highlight = (color) => labels.map((_l, i) => (!data.month || data.month === i + 1 ? color : color + "55"));
     const m = data.monthly;
     const period = periodLabel(data);
