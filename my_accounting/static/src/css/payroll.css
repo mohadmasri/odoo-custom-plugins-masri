@@ -279,12 +279,96 @@
     margin-bottom: 6px;
 }
 
-/* الموظفون بطاقاتٍ: الاسم والراتب والضمان والمشروع والحال */
+/* صفحة الموظفين: عمودٌ جانبيّ للكشوف والفلاتر، والبطاقات تملأ الباقي */
+.o_pr_layout {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+    max-width: 1420px;
+}
+
+@media (max-width: 900px) {
+    .o_pr_layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.o_pr_side {
+    border: 1px solid var(--gray-300, #dee2e6);
+    border-radius: 12px;
+    padding: 10px 8px;
+    background: var(--o-surface-2, #f2f3f5);
+    position: sticky;
+    top: 8px;
+}
+
+.o_pr_side_title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-600, #6c757d);
+    margin: 10px 6px 4px;
+}
+
+.o_pr_side_title:first-child {
+    margin-top: 2px;
+}
+
+.o_pr_side_item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--body-color, #212529);
+    font-size: 0.85rem;
+    text-align: start;
+}
+
+.o_pr_side_item:hover {
+    background: var(--o-surface-hover, #e7e9ee);
+}
+
+.o_pr_side_item.active {
+    background: var(--nav-pills-link-active-bg, #714B67);
+    color: var(--nav-pills-link-active-color, #fff);
+}
+
+.o_pr_side_item .badge {
+    background: rgba(128, 128, 128, 0.28);
+    background: color-mix(in srgb, currentColor 18%, transparent);
+    color: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.o_pr_side_sep {
+    height: 1px;
+    margin: 10px 4px;
+    background: var(--gray-300, #dee2e6);
+}
+
+/* الموظفون بطاقاتٍ: الاسم والراتب، والوسم لما خرج عن المعتاد */
 .o_pr_people {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
     gap: 12px;
-    max-width: 1180px;
+}
+
+/* الضمان درعٌ صغير: ظاهرٌ لمن شمله، باهتٌ لمن لا */
+.o_pr_shield {
+    color: #28A745;
+    font-size: 0.95rem;
+}
+
+.o_pr_shield_off {
+    color: var(--gray-600, #6c757d);
+    opacity: 0.35;
+    font-size: 0.95rem;
 }
 
 .o_pr_person {
@@ -366,5 +450,8 @@
 }
 
 .o_pr_people_head {
-    max-width: 1180px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
 }

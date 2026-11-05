@@ -531,9 +531,14 @@ export class Payroll extends Component {
         });
     }
 
-    toggleAllEmployees() {
-        this.state.allEmployees = !this.state.allEmployees;
+    /** النطاق: موظفو الشهر المختار، أو البطاقات كلها */
+    setScope(all) {
+        this.state.allEmployees = all;
         this.state.sheet = "all";
+    }
+
+    toggleAllEmployees() {
+        this.setScope(!this.state.allEmployees);
     }
 
     /** الكشوف الفعّالة، ومعها المؤرشف الذي ما زال فيه موظفون */
