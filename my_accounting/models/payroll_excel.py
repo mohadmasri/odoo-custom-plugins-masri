@@ -56,6 +56,11 @@ def match_key(name):
     return text.replace(' ', '')
 
 
+def word_keys(name):
+    """كلمات الاسم مفاتيحَ: الهمزات والتاء المربوطة والتطويل سواء."""
+    return [match_key(word) for word in clean(name).split() if word]
+
+
 def number(value):
     try:
         return round(float(value or 0.0), 3)
@@ -311,6 +316,52 @@ class MyAccountingEmployeeExcel(models.Model):
                 'names': [employee.name for employee in on_duty],
             })
         return plan
+
+    @api.model
+    def merge_candidates(self):
+        """بطاقتان في كشفٍ واحد، واسم إحداهما كلماتٌ من الأخرى.
+
+        فهما رجلٌ واحدٌ غالباً، كُتب اسمه مرةً مختصراً ومرةً تامّاً.
+        ولا تُدمجان من تلقائهما — الاسم المختلف شخصٌ مختلف — إنما
+        تُعرَضان لتُقرَّهما أو تتركهما. وأقوى الدلالة ألّا تتقاطع
+        أشهرهما، كأنّ الاسم تغيّر في الملف من شهرٍ معيّن.
+        """
+        cards = self.with_context(active_test=False).search([])
+        Line = self.env['myaccounting.payroll.line']
+        months = {}
+        for line in Line.search([]):
+            months.setdefault(line.employee_id.id, set()).add(
+                (line.payroll_id.year, int(line.payroll_id.month)))
+        by_group = {}
+        for card in cards:
+            # بلا كشف: لا كشف يشهد أنهما واحد، فلا نرشّحهما
+            if card.group_id:
+                by_group.setdefault(card.group_id.id, []).append(card)
+        found = []
+        for group_cards in by_group.values():
+            for index, one in enumerate(group_cards):
+                for two in group_cards[index + 1:]:
+                    short, full = sorted((one, two),
+                                         key=lambda card: len(card.name or ''))
+                    small, big = word_keys(short.name), word_keys(full.name)
+                    if len(small) < 2 or len(small) >= len(big):
+                        continue
+                    if not set(small) <= set(big):
+                        continue
+                    his, hers = months.get(short.id, set()), months.get(full.id, set())
+                    found.append({
+                        'ids': [short.id, full.id],
+                        'keep': full.name,
+                        'drop': short.name,
+                        'group': full.group_id.name or '',
+                        'months': sorted('%s/%s' % (month, year)
+                                         for year, month in his | hers),
+                        'overlap': sorted('%s/%s' % (month, year)
+                                          for year, month in his & hers),
+                        'same_salary': abs((short.basic_salary or 0.0)
+                                           - (full.basic_salary or 0.0)) < 0.0005,
+                    })
+        return found
 
     @api.model
     def preview_excel(self, content):

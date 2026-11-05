@@ -662,6 +662,27 @@
                     </button>
                 </div>
 
+                <!-- بطاقتان في كشفٍ واحد واسم إحداهما كلماتٌ من الأخرى -->
+                <div t-foreach="state.mergeHints" t-as="pair"
+                     t-key="pair.ids[0] + '-' + pair.ids[1]"
+                     class="o_pr_note small mb-2">
+                    في كشف <b t-esc="pair.group"/>:
+                    «<b t-esc="pair.drop"/>» و«<b t-esc="pair.keep"/>»
+                    <t t-if="!pair.overlap.length">
+                        لا يظهران في شهرٍ واحد
+                    </t>
+                    <t t-else="">
+                        ويظهران معاً في <t t-esc="pair.overlap.join('، ')"/>
+                    </t>
+                    <t t-if="pair.same_salary">وراتبهما الأساسي واحد</t>
+                    — رجلٌ واحد؟
+                    <button class="btn btn-sm btn-link p-0 ms-1"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.mergePair(pair)">
+                        ادمج البطاقتين
+                    </button>
+                </div>
+
                 <!-- فلاتر الحال والضمان، تعمل مع تبويبات المشاريع والبحث -->
                 <div t-if="!noMonthSheet" class="o_pr_bar">
                     <span class="small text-muted">الحال:</span>

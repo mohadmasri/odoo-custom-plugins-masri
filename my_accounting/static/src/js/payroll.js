@@ -73,6 +73,7 @@ export class Payroll extends Component {
             onlySocial: "all",
             sheet: "all",
             monthSheet: "all",
+            mergeHints: [],
             settings: null,
             accountOptions: [],
         });
@@ -126,11 +127,13 @@ export class Payroll extends Component {
     }
 
     async loadSettings() {
-        const [employees, settings, groups] = await Promise.all([
+        const [employees, settings, groups, hints] = await Promise.all([
             this.orm.call("myaccounting.employee", "get_employees", []),
             this.orm.call("myaccounting.payroll.settings", "get_settings", []),
             this.orm.call("myaccounting.payroll.group", "get_groups", []),
+            this.orm.call("myaccounting.employee", "merge_candidates", []),
         ]);
+        this.state.mergeHints = hints;
         this.state.employees = keyed(employees);
         this.state.settings = settings;
         this.state.groups = keyed(groups);
@@ -477,6 +480,26 @@ export class Payroll extends Component {
                 const done = await this.orm.call("myaccounting.employee",
                     "merge_employees", [cards.map((card) => card.id)]);
                 this.state.search = "";
+                await this.loadSettings();
+                await this.refresh();
+                this.notification.add(
+                    `بقيت «${done.keep}» ونُقل إليها ${done.lines} بنداً.`,
+                    { type: "success" });
+            }),
+            cancel: () => {},
+        });
+    }
+
+    /** بطاقتان رُشِّحتا: الاسم التامّ يبقى، ويأخذ أشهر المختصر */
+    mergePair(pair) {
+        this.dialog.add(ConfirmationDialog, {
+            title: "دمج البطاقتين",
+            body: `«${pair.drop}» هو «${pair.keep}»؟ يبقى الاسم التامّ`
+                + ` وتنتقل إليه أشهر الآخر، ثم تُحذف بطاقته.`,
+            confirmLabel: "ادمج",
+            confirm: () => this.withBusy(async () => {
+                const done = await this.orm.call("myaccounting.employee",
+                    "merge_employees", [pair.ids]);
                 await this.loadSettings();
                 await this.refresh();
                 this.notification.add(
