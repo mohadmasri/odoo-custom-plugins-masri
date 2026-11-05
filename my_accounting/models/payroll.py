@@ -742,6 +742,22 @@ class MyAccountingPayroll(models.Model):
         return payroll._payload() if payroll else False
 
     @api.model
+    def get_last_period(self):
+        """آخر شهرٍ له كشف: هو ما تُفتح عليه الصفحة، لا شهر اليوم.
+
+        فالعمل في آخر كشفٍ مرفوع، ودخولُ شهرٍ فارغٍ لا معنى له.
+        وإن لم يكن ثمّة كشفٌ بعد فشهر اليوم.
+        """
+        periods = sorted(((payroll.year, int(payroll.month))
+                          for payroll in self.search([])), reverse=True)
+        if periods:
+            year, month = periods[0]
+        else:
+            today = fields.Date.context_today(self)
+            year, month = today.year, today.month
+        return {'year': year, 'month': month}
+
+    @api.model
     def get_years(self):
         """السنوات التي فيها كشوف، ومعها السنة الحالية."""
         years = sorted({payroll.year for payroll in self.search([])}

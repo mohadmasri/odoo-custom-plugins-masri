@@ -82,6 +82,11 @@ export class Payroll extends Component {
                 "myaccounting.bank.statement", "get_account_options", []);
             this.state.years = await this.orm.call("myaccounting.payroll",
                 "get_years", []);
+            // الصفحة تُفتح على آخر شهرٍ له كشف، لا على شهر اليوم
+            const last = await this.orm.call("myaccounting.payroll",
+                "get_last_period", []);
+            this.state.year = `${last.year}`;
+            this.state.month = `${last.month}`;
             await this.refresh();
             await this.loadSettings();
             await this.loadFinished();
