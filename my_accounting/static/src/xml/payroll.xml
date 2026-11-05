@@ -765,8 +765,8 @@
                             <t t-if="visibleEmployees.length !== monthEmployees.length">
                                 من <t t-esc="monthEmployees.length"/>
                             </t>
-                            · الأساسي <b t-esc="fmt(employeeTotals.basic_salary)"/>
-                            · العلاوات <b t-esc="fmt(employeeTotals.allowance)"/>
+                            · الإجمالي <b t-esc="fmt(employeeTotals.gross)"/>
+                            · الصافي <b t-esc="fmt(employeeTotals.net)"/>
                             <t t-if="state.allEmployees">
                                 · كل البطاقات، بما فيها الموقوفة ومن ليس في كشف الشهر
                             </t>
@@ -808,12 +808,12 @@
 
                                 <div class="o_pr_person_rows">
                                     <div>
-                                        <span class="o_pr_person_label">الأساسي</span>
-                                        <b t-esc="fmt(employee.basic_salary)"/>
-                                    </div>
-                                    <div>
                                         <span class="o_pr_person_label">الإجمالي</span>
                                         <b t-esc="fmt(employee.gross)"/>
+                                    </div>
+                                    <div>
+                                        <span class="o_pr_person_label">صافي الراتب</span>
+                                        <b t-esc="fmt(employee.net)"/>
                                     </div>
                                 </div>
 
@@ -1016,12 +1016,12 @@
 
                                         <div class="o_pr_person_rows">
                                             <div>
-                                                <span class="o_pr_person_label">الأساسي</span>
-                                                <b t-esc="fmt(employee.basic_salary)"/>
+                                                <span class="o_pr_person_label">الإجمالي</span>
+                                                <b t-esc="fmt(employee.gross)"/>
                                             </div>
                                             <div>
-                                                <span class="o_pr_person_label">العلاوات</span>
-                                                <b t-esc="fmt(employee.allowance)"/>
+                                                <span class="o_pr_person_label">صافي الراتب</span>
+                                                <b t-esc="fmt(employee.net)"/>
                                             </div>
                                         </div>
 

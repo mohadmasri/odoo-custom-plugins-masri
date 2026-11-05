@@ -570,8 +570,8 @@ export class Payroll extends Component {
 
     /** مجاميع البطاقات المعروضة */
     get employeeTotals() {
-        const keys = ["basic_salary", "allowance", "social_base", "income_tax",
-                      "pension", "other_deduction"];
+        const keys = ["basic_salary", "allowance", "gross", "net", "social_base",
+                      "income_tax", "pension", "other_deduction"];
         const totals = {};
         for (const key of keys) {
             totals[key] = this.round(this.visibleEmployees.reduce(

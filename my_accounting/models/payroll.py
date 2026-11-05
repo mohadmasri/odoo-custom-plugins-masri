@@ -412,6 +412,12 @@ class MyAccountingEmployee(models.Model):
     def _payload(self):
         self.ensure_one()
         gross = round((self.basic_salary or 0.0) + (self.allowance or 0.0), 3)
+        # ما يقبضه فعلاً: الإجمالي بعد ضمانه وضريبته وتقاعده واستقطاعاته
+        settings = self.env['myaccounting.payroll.settings']._get()
+        base = (self.social_base or gross) if self.social_security else 0.0
+        social = round(base * (settings.employee_rate or 0.0) / 100.0, 3)
+        net = round(gross - social - (self.income_tax or 0.0)
+                    - (self.pension or 0.0) - (self.other_deduction or 0.0), 3)
         return {
             'id': self.id,
             'name': self.name or '',
@@ -429,6 +435,8 @@ class MyAccountingEmployee(models.Model):
             'basic_salary': self.basic_salary,
             'allowance': self.allowance,
             'gross': gross,
+            'employee_social': social,
+            'net': net,
             'social_security': self.social_security,
             'social_base': self.social_base,
             'income_tax': self.income_tax,
