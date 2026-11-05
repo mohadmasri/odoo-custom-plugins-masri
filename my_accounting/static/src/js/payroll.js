@@ -2,10 +2,11 @@
 
 import { Component, onWillStart, useRef, useState } from "@odoo/owl";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
-import { MONTH_OPTIONS } from "./months";
+import { MONTH_OPTIONS, monthName } from "./months";
 import { registry } from "@web/core/registry";
 import { router } from "@web/core/browser/router";
 import { useService } from "@web/core/utils/hooks";
+import { PeriodFilter } from "./period_filter";
 import { RefPicker } from "./balance_sheet";
 import { openRecord } from "./open_record";
 import { usePrintPageSize } from "./print_page_size";
@@ -35,7 +36,7 @@ function same(first, second) {
  */
 export class Payroll extends Component {
     static template = "my_accounting.Payroll";
-    static components = { RefPicker };
+    static components = { PeriodFilter, RefPicker };
     static props = ["*"];
 
     setup() {
@@ -45,7 +46,6 @@ export class Payroll extends Component {
         this.notification = useService("notification");
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.excelInput = useRef("excelInput");
-        this.uploadInput = useRef("uploadInput");
         this.months = MONTH_OPTIONS;
         this.saved = { employees: [], lines: [], settings: null, groups: [], card: null };
         const today = new Date();
@@ -53,48 +53,71 @@ export class Payroll extends Component {
             loading: true,
             busy: false,
             tab: "sheet",
-            payrolls: [],
             data: null,
             employees: [],
             groups: [],
+            finished: [],
+            finishedId: false,
+            years: [],
+            year: `${today.getFullYear()}`,
+            month: `${today.getMonth() + 1}`,
             card: null,
             cardDraft: null,
-            uploads: [],
-            upload: null,
-            uploadSheet: "all",
             excel: null,
             excelName: "",
-            excelOptions: { edit: true, add: true, stop: true, archive: false },
+            excelOptions: { edit: true, add: true, stop: true },
+            allEmployees: false,
             sheet: "all",
             monthSheet: "all",
             settings: null,
             accountOptions: [],
-            newYear: `${today.getFullYear()}`,
-            newMonth: `${today.getMonth() + 1}`,
         });
         onWillStart(async () => {
             this.state.accountOptions = await this.orm.call(
                 "myaccounting.bank.statement", "get_account_options", []);
+            this.state.years = await this.orm.call("myaccounting.payroll",
+                "get_years", []);
             await this.refresh();
             await this.loadSettings();
-            await this.loadUploads();
+            await this.loadFinished();
             this.state.loading = false;
             // الرابط /odoo/action-.../<رقم> يفتح بطاقة ذلك الموظف وحدها
             await this.openCardFromUrl();
         });
     }
 
-    async refresh(payrollId) {
-        const [payrolls, data] = await Promise.all([
-            this.orm.call("myaccounting.payroll", "get_payrolls", []),
-            this.orm.call("myaccounting.payroll", "get_payroll", [payrollId || false]),
-        ]);
-        this.state.payrolls = payrolls;
-        this.state.data = data || null;
-        this.saved.lines = data ? clone(data.lines) : [];
+    /** كشف الشهر المختار في الفلتر، إن كان مبنيّاً */
+    async refresh() {
+        this.state.data = await this.orm.call("myaccounting.payroll", "get_month",
+            [this.state.year, this.state.month]);
+        this.saved.lines = clone(this.state.data ? this.state.data.lines : []);
         // كشف الشهر الجديد قد لا يحوي الكشف المختار، فنعود إلى عرض الكل
         if (this.state.monthSheet !== "all" && !this.visibleSections.length) {
             this.state.monthSheet = "all";
+        }
+    }
+
+    async onPeriodChange({ year, month }) {
+        await this.withBusy(async () => {
+            this.state.year = `${year || this.state.year}`;
+            this.state.month = `${month || this.state.month}`;
+            this.state.monthSheet = "all";
+            this.closeCard();
+            await this.refresh();
+        });
+    }
+
+    /** «تشرين الثاني 2026»: الاسم للعنوان، والرقم في الفلتر */
+    get periodLabel() {
+        return `${monthName(this.state.month)} ${this.state.year}`;
+    }
+
+    async loadFinished() {
+        this.state.finished = await this.orm.call("myaccounting.payroll.group",
+            "get_finished", []);
+        if (!this.state.finished.some((item) => item.id === this.state.finishedId)) {
+            this.state.finishedId = this.state.finished.length
+                ? this.state.finished[0].id : false;
         }
     }
 
@@ -157,27 +180,22 @@ export class Payroll extends Component {
     // كشف الشهر
     // ------------------------------------------------------------------
 
-    isPayroll(id) {
-        return this.state.data && this.state.data.id === id;
-    }
-
-    async openPayroll(ev) {
-        const id = parseInt(ev.target.value, 10);
-        if (id) {
-            await this.refresh(id);
-        }
-    }
-
-    onNew(field, ev) {
-        this.state[field] = ev.target.value;
-    }
-
-    async createPayroll() {
+    /** كشف الشهر المختار إن لم يكن مبنيّاً: يُنشأ ويُبنى من البطاقات */
+    async buildMonth() {
         await this.withBusy(async () => {
-            const id = await this.orm.call("myaccounting.payroll", "create_payroll",
-                [this.state.newYear, this.state.newMonth]);
-            await this.refresh(id);
-            this.notification.add("أُنشئ كشف الشهر من بطاقات الموظفين.",
+            if (!this.state.data) {
+                await this.orm.call("myaccounting.payroll", "create_payroll",
+                    [this.state.year, this.state.month]);
+                this.state.years = await this.orm.call("myaccounting.payroll",
+                    "get_years", []);
+            }
+            await this.refresh();
+            if (this.state.data) {
+                this.state.data = await this.orm.call("myaccounting.payroll",
+                    "fill_from_employees", [[this.state.data.id]]);
+                this.saved.lines = clone(this.state.data.lines);
+            }
+            this.notification.add(`بُني كشف ${this.periodLabel} من البطاقات.`,
                 { type: "success" });
         });
     }
@@ -331,7 +349,7 @@ export class Payroll extends Component {
             confirm: () => this.withBusy(async () => {
                 const done = await this.orm.call("myaccounting.payroll",
                     "post_payroll", [[this.state.data.id], this.state.monthSheet]);
-                await this.refresh(this.state.data.id);
+                await this.refresh();
                 this.notification.add(`أُنشئ في الدفتر: ${done.moves.join("، ")}`,
                                       { type: "success" });
             }),
@@ -348,6 +366,8 @@ export class Payroll extends Component {
             confirm: () => this.withBusy(async () => {
                 await this.orm.call("myaccounting.payroll", "delete_payroll",
                     [[payroll.id]]);
+                this.state.years = await this.orm.call("myaccounting.payroll",
+                    "get_years", []);
                 await this.refresh();
             }),
             cancel: () => {},
@@ -388,16 +408,31 @@ export class Payroll extends Component {
         this.state.sheet = sheet;
     }
 
+    /** بطاقات موظفي الشهر المختار، أو كل البطاقات إن طُلبت */
+    get monthEmployees() {
+        if (this.state.allEmployees || !this.state.data) {
+            return this.state.employees;
+        }
+        const ids = new Set(this.state.data.lines.map((line) => line.employee_id));
+        return this.state.employees.filter((employee) => ids.has(employee.id));
+    }
+
     /** موظفو الكشف المعروض: «عرض الكل» أو كشفٌ بعينه أو بلا كشف */
     get visibleEmployees() {
         const sheet = this.state.sheet;
+        const pool = this.monthEmployees;
         if (sheet === "all") {
-            return this.state.employees;
+            return pool;
         }
         if (sheet === "none") {
-            return this.state.employees.filter((employee) => !employee.group_id);
+            return pool.filter((employee) => !employee.group_id);
         }
-        return this.state.employees.filter((employee) => employee.group_id === sheet);
+        return pool.filter((employee) => employee.group_id === sheet);
+    }
+
+    toggleAllEmployees() {
+        this.state.allEmployees = !this.state.allEmployees;
+        this.state.sheet = "all";
     }
 
     /** الكشوف الفعّالة، ومعها المؤرشف الذي ما زال فيه موظفون */
@@ -424,7 +459,7 @@ export class Payroll extends Component {
     }
 
     countOf(groupId) {
-        return this.state.employees.filter(
+        return this.monthEmployees.filter(
             (employee) => (employee.group_id || false) === groupId).length;
     }
 
@@ -585,144 +620,6 @@ export class Payroll extends Component {
     }
 
     // ------------------------------------------------------------------
-    // كشف مرفوع: يُقرأ ويُحفظ وتُنشأ منه القيود، بلا بطاقات ولا تعديل
-    // ------------------------------------------------------------------
-
-    async loadUploads(uploadId = false) {
-        const [uploads, upload] = await Promise.all([
-            this.orm.call("myaccounting.payroll.upload", "get_uploads", []),
-            this.orm.call("myaccounting.payroll.upload", "get_upload",
-                [uploadId || (this.state.upload ? this.state.upload.id : false)]),
-        ]);
-        this.state.uploads = uploads;
-        this.state.upload = upload || null;
-        if (this.state.uploadSheet !== "all" && !this.uploadVisible.length) {
-            this.state.uploadSheet = "all";
-        }
-    }
-
-    pickUpload() {
-        this.uploadInput.el.click();
-    }
-
-    async onUploadFile(ev) {
-        const file = ev.target.files && ev.target.files[0];
-        ev.target.value = "";
-        if (!file) {
-            return;
-        }
-        const content = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(",")[1]);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
-        await this.withBusy(async () => {
-            const upload = await this.orm.call("myaccounting.payroll.upload",
-                "read_excel", [content, file.name, this.state.newYear,
-                    this.state.newMonth]);
-            this.state.uploadSheet = "all";
-            await this.loadUploads(upload.id);
-            this.notification.add(`رُفع الكشف: ${upload.lines.length} بنداً.`,
-                                  { type: "success" });
-        });
-    }
-
-    async openUpload(ev) {
-        const id = parseInt(ev.target.value, 10);
-        await this.withBusy(async () => {
-            this.state.uploadSheet = "all";
-            await this.loadUploads(id);
-        });
-    }
-
-    isUpload(id) {
-        return this.state.upload && this.state.upload.id === id;
-    }
-
-    deleteUpload() {
-        const upload = this.state.upload;
-        this.dialog.add(ConfirmationDialog, {
-            title: `حذف "${upload.name}"`,
-            body: "سيُحذف الكشف المرفوع بكل بنوده، وتبقى قيوده في الدفتر كما هي.",
-            confirmLabel: "احذف",
-            confirm: () => this.withBusy(async () => {
-                await this.orm.call("myaccounting.payroll.upload", "delete_upload",
-                    [[upload.id]]);
-                this.state.upload = null;
-                await this.loadUploads();
-            }),
-            cancel: () => {},
-        });
-    }
-
-    /** كشوف الملف: بنود كل ورقة ومجاميعها، بترتيب كشوف النظام */
-    get uploadSections() {
-        const data = this.state.upload;
-        if (!data) {
-            return [];
-        }
-        return data.sheets.map((sheet) => {
-            const own = data.lines.filter((line) => line.key === sheet.key);
-            return { ...sheet, lines: own, totals: this.sumOf(own) };
-        });
-    }
-
-    get uploadVisible() {
-        const sheet = this.state.uploadSheet;
-        const shown = sheet === "all" ? this.uploadSections
-            : this.uploadSections.filter((item) => item.key === sheet);
-        let start = 0;
-        return shown.map((section) => {
-            const numbered = { ...section, start };
-            start += section.lines.length;
-            return numbered;
-        });
-    }
-
-    get uploadTotals() {
-        return this.sumOf(this.uploadVisible.flatMap((section) => section.lines));
-    }
-
-    get uploadCount() {
-        return this.uploadVisible.reduce(
-            (sum, section) => sum + section.lines.length, 0);
-    }
-
-    get uploadLabel() {
-        const section = this.state.uploadSheet === "all" ? null : this.uploadVisible[0];
-        return section ? section.name : "";
-    }
-
-    setUploadSheet(key) {
-        this.state.uploadSheet = key;
-    }
-
-    get uploadPostLabel() {
-        const shown = this.uploadVisible;
-        return shown.length === 1 ? `أنشئ قيد ${shown[0].name}`
-                                  : `أنشئ قيود الكشوف (${shown.length})`;
-    }
-
-    postUpload() {
-        const label = this.uploadPostLabel;
-        this.dialog.add(ConfirmationDialog, {
-            title: label,
-            body: "يُنشأ القيد مسودةً في الدفتر بلا صلةٍ بالكشف المرفوع —"
-                + " فإن ضغطتَ الزرّ مرّتين صار في الدفتر قيدان.",
-            confirmLabel: "أنشئ",
-            confirm: () => this.withBusy(async () => {
-                const done = await this.orm.call("myaccounting.payroll.upload",
-                    "post_upload", [[this.state.upload.id], this.state.uploadSheet]);
-                await this.loadUploads(this.state.upload.id);
-                this.notification.add(`أُنشئ في الدفتر: ${done.moves.join("، ")}`,
-                                      { type: "success" });
-            }),
-            cancel: () => {},
-        });
-    }
-
-    // ------------------------------------------------------------------
     // رفع كشف إكسل: يعدّل البطاقات، والكشف يُبنى منها
     // ------------------------------------------------------------------
 
@@ -753,6 +650,9 @@ export class Payroll extends Component {
             this.excelContent = content;
             this.state.excelName = file.name;
             this.state.excel = plan;
+            // شهر الملف من ترويسة أوراقه، ويبقى قابلاً للتعديل قبل الموافقة
+            this.state.excelMonth = plan.month ? `${plan.month}` : this.state.month;
+            this.state.excelYear = plan.year ? `${plan.year}` : this.state.year;
         });
     }
 
@@ -774,12 +674,28 @@ export class Payroll extends Component {
              + (options.archive ? plan.archive.length : 0);
     }
 
+    onExcelPeriod(field, ev) {
+        this.state[field] = ev.target.value;
+    }
+
+    /** الموافقة: تُطبَّق على البطاقات ثم يُبنى كشف الشهر منها */
     async applyExcel() {
         await this.withBusy(async () => {
-            const done = await this.orm.call("myaccounting.employee", "apply_excel",
-                [this.excelContent, { ...this.state.excelOptions }]);
+            const result = await this.orm.call("myaccounting.payroll",
+                "apply_sheet_file",
+                [this.excelContent, { ...this.state.excelOptions },
+                    this.state.excelYear, this.state.excelMonth]);
+            const done = result.applied;
+            this.state.year = `${this.state.excelYear}`;
+            this.state.month = `${this.state.excelMonth}`;
             this.closeExcel();
+            this.state.tab = "sheet";
+            this.state.monthSheet = "all";
+            this.state.years = await this.orm.call("myaccounting.payroll",
+                "get_years", []);
             await this.loadSettings();
+            await this.loadFinished();
+            await this.refresh();
             const parts = [];
             if (done.edited) {
                 parts.push(`عُدِّلت ${done.edited} بطاقة`);
@@ -794,14 +710,13 @@ export class Payroll extends Component {
                 parts.push(`واستجدّ كشف ${done.groups.join("، ")}`);
             }
             if (done.archived.length) {
-                parts.push(`وأُرشف ${done.archived.join("، ")}`);
+                parts.push(`وانتهى مشروع ${done.archived.join("، ")}`);
             }
             if (done.revived.length) {
                 parts.push(`وعاد ${done.revived.join("، ")}`);
             }
-            this.notification.add(parts.length ? parts.join(" · ")
-                                               : "لا تغيير على البطاقات.",
-                                  { type: "success" });
+            parts.push(`وبُني كشف ${this.periodLabel}`);
+            this.notification.add(parts.join(" · "), { type: "success" });
         });
     }
 
@@ -913,6 +828,11 @@ export class Payroll extends Component {
     }
 
     /** بطاقة الرابط: ما فُتح في تبويبٍ جديد يُظهر صاحبه لا الجدول */
+    get yearOptions() {
+        return this.state.years.length ? this.state.years
+                                       : [Number(this.state.year)];
+    }
+
     async openCardFromUrl() {
         const employeeId = router.current.resId;
         if (!employeeId || !this.state.employees.some(
@@ -1011,6 +931,38 @@ export class Payroll extends Component {
 
     cancelCard() {
         this.state.cardDraft = clone(this.saved.card);
+    }
+
+    // ------------------------------------------------------------------
+    // المشاريع المنتهية
+    // ------------------------------------------------------------------
+
+    get finishedProject() {
+        return this.state.finished.find(
+            (item) => item.id === this.state.finishedId) || null;
+    }
+
+    setFinished(id) {
+        this.state.finishedId = id;
+    }
+
+    monthTotals(month) {
+        return this.sumOf(month.lines);
+    }
+
+    async reviveProject(project) {
+        await this.withBusy(async () => {
+            const groups = clone(this.state.groups);
+            const group = groups.find((item) => item.id === project.id);
+            if (group) {
+                group.active = true;
+                await this.orm.call("myaccounting.payroll.group", "save_groups",
+                    [groups]);
+            }
+            await this.loadSettings();
+            await this.loadFinished();
+            this.notification.add(`عاد كشف ${project.name}.`, { type: "success" });
+        });
     }
 
     // ------------------------------------------------------------------

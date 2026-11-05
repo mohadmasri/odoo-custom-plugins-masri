@@ -24,4 +24,3 @@ from . import bank_statement
 from . import bank_rule
 from . import payroll
 from . import payroll_excel
-from . import payroll_upload

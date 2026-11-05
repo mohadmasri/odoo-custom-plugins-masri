@@ -12,23 +12,30 @@
                 </button>
             </div>
 
+            <!-- فلتر الفترة: هو مَن يقود الصفحة كلها -->
+            <PeriodFilter year="state.year" month="state.month"
+                          years="yearOptions"
+                          onChange.bind="onPeriodChange"/>
+
             <ul class="nav nav-tabs mb-3 no-print">
                 <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.tab === 'sheet' ? 'active' : '' }}"
-                       t-on-click.prevent="() => this.setTab('sheet')">كشف الشهر</a>
+                       t-on-click.prevent="() => this.setTab('sheet')">
+                        كشف <t t-esc="periodLabel"/>
+                    </a>
                 </li>
                 <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.tab === 'employees' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('employees')">
-                        الموظفون <span class="o_pr_count" t-esc="state.employees.length"/>
+                        الموظفون <span class="o_pr_count" t-esc="monthEmployees.length"/>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" t-attf-class="nav-link {{ state.tab === 'upload' ? 'active' : '' }}"
-                       t-on-click.prevent="() => this.setTab('upload')">
-                        كشف مرفوع
-                        <span t-if="state.uploads.length" class="o_pr_count"
-                              t-esc="state.uploads.length"/>
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'finished' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('finished')">
+                        مشاريع منتهية
+                        <span t-if="state.finished.length" class="o_pr_count"
+                              t-esc="state.finished.length"/>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -41,9 +48,6 @@
             <input type="file" class="d-none" t-ref="excelInput"
                    accept=".xlsx"
                    t-on-change="(ev) => this.onExcelFile(ev)"/>
-            <input type="file" class="d-none" t-ref="uploadInput"
-                   accept=".xlsx"
-                   t-on-change="(ev) => this.onUploadFile(ev)"/>
 
             <div t-if="state.loading" class="text-muted py-5 text-center">يُحمّل...</div>
 
@@ -55,10 +59,22 @@
                         <i class="fa fa-arrow-right me-1"/> رجوع
                     </button>
                     <span class="o_pr_sep"/>
+                    <span class="o_pr_sep"/>
+                    <label class="form-label small mb-0">شهر الملف</label>
+                    <select class="form-select form-select-sm" style="width:150px;"
+                            t-on-change="(ev) => this.onExcelPeriod('excelMonth', ev)">
+                        <option t-foreach="months" t-as="month" t-key="month[0]"
+                                t-att-value="month[0]"
+                                t-att-selected="month[0] === state.excelMonth"
+                                t-esc="month[1]"/>
+                    </select>
+                    <input type="number" class="form-control form-control-sm"
+                           style="width:90px;" t-att-value="state.excelYear"
+                           t-on-change="(ev) => this.onExcelPeriod('excelYear', ev)"/>
                     <button class="btn btn-sm btn-primary"
-                            t-att-disabled="state.busy or !excelCount"
+                            t-att-disabled="state.busy"
                             t-on-click="() => this.applyExcel()">
-                        طبّق على البطاقات (<t t-esc="excelCount"/>)
+                        <i class="fa fa-check me-1"/> وافِق وابْنِ الكشف
                     </button>
                 </div>
 
@@ -71,10 +87,14 @@
                                 <t t-esc="state.excel.count"/> سطراً في
                                 <t t-esc="state.excel.sheets.length"/> كشوف:
                                 <t t-esc="state.excel.sheets.join('، ')"/>
+                                <t t-if="state.excel.periods.length > 1">
+                                    · ترويسات أوراقه تقول
+                                    <t t-esc="state.excel.periods.join(' و')"/>
+                                </t>
                             </div>
                         </div>
                         <div class="text-end small text-muted">
-                            الملف لا يبني كشف الشهر،<br/>إنما يعدّل البطاقات.
+                            يُطبَّق على البطاقات،<br/>ثم يُبنى كشف الشهر منها.
                         </div>
                     </div>
 
@@ -91,9 +111,8 @@
                                 (ومعه <t t-esc="item.count"/>: <t t-esc="item.names.join('، ')"/>)
                             </t><t t-if="!item_last">، </t>
                         </t>
-                        — بتأشير «أرشفة» تخرج من التبويبات إلى «أرشيف الكشوف»
-                        بموظفيها وحساباتها، ويُوقَف من بقي منهم. واتركها بلا
-                        تأشيرٍ إن كان الملف جزئياً.
+                        — مشاريع انتهت، فتذهب إلى تبويب «مشاريع منتهية»
+                        بموظفيها وحساباتها، ويُوقَف من بقي منهم.
                     </div>
                     <div t-if="state.excel.revive.length" class="o_pr_note small mb-2">
                         كشوفٌ ستعود من الأرشيف لأنها في الملف:
@@ -129,15 +148,7 @@
                                 إيقاف <t t-esc="state.excel.stop.length"/> من غاب
                             </label>
                         </div>
-                        <div class="form-check" t-if="state.excel.archive.length">
-                            <input type="checkbox" class="form-check-input"
-                                   t-att-checked="state.excelOptions.archive"
-                                   t-on-change="(ev) => this.toggleExcel('archive', ev)"/>
-                            <label class="form-check-label">
-                                أرشفة <t t-esc="state.excel.archive.length"/>
-                                كشوفٍ غابت عن الملف
-                            </label>
-                        </div>
+
                     </div>
 
                     <div t-if="state.excel.changed.length" class="o_pr_card_sub">
@@ -216,35 +227,22 @@
 
             <!-- ======================================= كشف الشهر -->
             <t t-elif="state.tab === 'sheet'">
-                <div class="o_pr_bar no-print">
-                    <select t-if="state.payrolls.length" class="form-select form-select-sm"
-                            style="width:260px;" t-on-change="(ev) => this.openPayroll(ev)">
-                        <option t-foreach="state.payrolls" t-as="item" t-key="item.id"
-                                t-att-value="item.id" t-att-selected="isPayroll(item.id)">
-                            <t t-esc="item.name"/>
-                        </option>
-                    </select>
-
-                    <span class="o_pr_sep"/>
-                    <label class="form-label small mb-0">كشف جديد</label>
-                    <select class="form-select form-select-sm" style="width:130px;"
-                            t-on-change="(ev) => this.onNew('newMonth', ev)">
-                        <option t-foreach="months" t-as="month" t-key="month[0]"
-                                t-att-value="month[0]"
-                                t-att-selected="month[0] === state.newMonth"
-                                t-esc="month[1]"/>
-                    </select>
-                    <input type="number" class="form-control form-control-sm" style="width:90px;"
-                           t-att-value="state.newYear"
-                           t-on-change="(ev) => this.onNew('newYear', ev)"/>
-                    <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
-                            t-on-click="() => this.createPayroll()">
-                        <i class="fa fa-plus me-1"/> أنشئ
+                <div t-if="!data" class="o_pr_empty">
+                    <div class="mb-2">لا كشف لشهر <b t-esc="periodLabel"/> بعد.</div>
+                    <button class="btn btn-sm btn-primary me-2"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.pickExcel()">
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
                     </button>
-                </div>
-
-                <div t-if="!data" class="text-muted py-5 text-center">
-                    لا كشف بعد. أضف الموظفين ثم أنشئ كشف الشهر.
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.buildMonth()">
+                        <i class="fa fa-users me-1"/> ابْنِ من البطاقات
+                    </button>
+                    <div class="small text-muted mt-2">
+                        رفع الملف يعرض لك التعديل على البطاقات، فإن وافقتَ
+                        طُبِّق وبُني الكشف بعده.
+                    </div>
                 </div>
 
                 <t t-else="">
@@ -259,16 +257,15 @@
                     </div>
 
                     <div class="o_pr_bar no-print">
-                        <button class="btn btn-sm btn-outline-secondary"
+                        <button class="btn btn-sm btn-primary"
                                 t-att-disabled="state.busy"
-                                t-on-click="() => this.fillFromEmployees()">
-                            <t t-if="data.lines.length">أعد البناء من بطاقات الموظفين</t>
-                            <t t-else="">ابْنِ من بطاقات الموظفين</t>
+                                t-on-click="() => this.pickExcel()">
+                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
                         </button>
                         <button class="btn btn-sm btn-outline-secondary"
                                 t-att-disabled="state.busy"
-                                t-on-click="() => this.pickExcel()">
-                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                                t-on-click="() => this.fillFromEmployees()">
+                            أعد البناء من البطاقات
                         </button>
                         <button class="btn btn-sm btn-primary"
                                 t-att-disabled="state.busy or !linesDirty"
@@ -638,13 +635,29 @@
                     <span t-if="employeesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
                 </div>
 
+                <div class="o_pr_note small mb-2">
+                    <t t-if="state.allEmployees">
+                        كل البطاقات (<t t-esc="state.employees.length"/>)، بما فيها
+                        الموقوفة ومن ليس في كشف هذا الشهر.
+                    </t>
+                    <t t-else="">
+                        بطاقات موظفي <b t-esc="periodLabel"/>
+                        (<t t-esc="monthEmployees.length"/>) — كما في كشف الشهر.
+                    </t>
+                    <button class="btn btn-sm btn-link p-0 ms-1"
+                            t-on-click="() => this.toggleAllEmployees()">
+                        <t t-if="state.allEmployees">اعرض موظفي الشهر</t>
+                        <t t-else="">اعرض كل البطاقات</t>
+                    </button>
+                </div>
+
                 <!-- كشوف الموظفين كتبويبات ملف الرواتب نفسها -->
                 <ul class="nav nav-pills o_pr_sheets mb-2">
                     <li class="nav-item">
                         <a href="#" t-attf-class="nav-link {{ state.sheet === 'all' ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setSheet('all')">
                             عرض الكل
-                            <span class="badge rounded-pill" t-esc="state.employees.length"/>
+                            <span class="badge rounded-pill" t-esc="monthEmployees.length"/>
                         </a>
                     </li>
                     <li class="nav-item" t-foreach="liveGroups" t-as="group" t-key="group.id">
@@ -788,162 +801,145 @@
                 </button>
             </t>
 
-            <!-- ======================================= كشف مرفوع -->
-            <t t-elif="state.tab === 'upload'">
-                <div class="o_pr_bar no-print">
-                    <select t-if="state.uploads.length" class="form-select form-select-sm"
-                            style="width:300px;" t-on-change="(ev) => this.openUpload(ev)">
-                        <option t-foreach="state.uploads" t-as="item" t-key="item.id"
-                                t-att-value="item.id" t-att-selected="isUpload(item.id)">
-                            <t t-esc="item.name"/> — <t t-esc="item.lines"/> بنداً
-                        </option>
-                    </select>
-                    <span t-if="state.uploads.length" class="o_pr_sep"/>
-                    <label class="form-label small mb-0">شهر الملف</label>
-                    <select class="form-select form-select-sm" style="width:150px;"
-                            t-on-change="(ev) => this.onNew('newMonth', ev)">
-                        <option t-foreach="months" t-as="month" t-key="month[0]"
-                                t-att-value="month[0]"
-                                t-att-selected="month[0] === state.newMonth"
-                                t-esc="month[1]"/>
-                    </select>
-                    <input type="number" class="form-control form-control-sm" style="width:90px;"
-                           t-att-value="state.newYear"
-                           t-on-change="(ev) => this.onNew('newYear', ev)"/>
-                    <button class="btn btn-sm btn-primary" t-att-disabled="state.busy"
-                            t-on-click="() => this.pickUpload()">
-                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
-                    </button>
-                </div>
-
-                <div t-if="!state.upload" class="o_pr_empty">
-                    <div class="mb-2">لا كشف مرفوع بعد.</div>
+            <!-- ======================================= مشاريع منتهية -->
+            <t t-elif="state.tab === 'finished'">
+                <div t-if="!state.finished.length" class="o_pr_empty">
+                    <div class="mb-2">لا مشروع منتهٍ بعد.</div>
                     <div class="small text-muted">
-                        ارفع ملف كشف الرواتب كما هو، فيُعرض ويُحفظ وتُنشأ منه القيود —
-                        بلا بطاقات ولا تعديلٍ على كشوف الأشهر.
+                        المشروع الذي يغيب عن كشفٍ مرفوع ينتهي، فينتقل إلى هنا
+                        بكشوف رواتبه وبطاقات موظفيه.
                     </div>
                 </div>
 
                 <t t-else="">
-                    <div class="o_pr_head">
-                        <div class="o_pr_print_title">
-                            كشف رواتب <t t-esc="state.upload.month_label"/>
-                            <t t-esc="state.upload.year"/>
-                            <t t-if="uploadLabel"> — <t t-esc="uploadLabel"/></t>
-                        </div>
-                        <div class="small text-muted">
-                            <t t-esc="state.upload.filename or state.upload.name"/> ·
-                            <t t-esc="uploadCount"/> موظفاً
-                        </div>
-                    </div>
-
-                    <div class="o_pr_bar no-print">
-                        <button t-if="uploadCount" class="btn btn-sm btn-success"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.postUpload()">
-                            <i class="fa fa-check me-1"/> <t t-esc="uploadPostLabel"/>
-                        </button>
-                        <button class="btn btn-sm btn-secondary"
-                                t-on-click="() => this.print()">
-                            <i class="fa fa-print me-1"/> طباعة
-                        </button>
-                        <button class="btn btn-sm btn-link text-danger"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.deleteUpload()">احذف الكشف المرفوع</button>
-                    </div>
-
-                    <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
-                        t-if="uploadSections.length > 1">
-                        <li class="nav-item">
-                            <a href="#" t-attf-class="nav-link {{ state.uploadSheet === 'all' ? 'active' : '' }}"
-                               t-on-click.prevent="() => this.setUploadSheet('all')">
-                                عرض الكل
+                    <ul class="nav nav-pills o_pr_sheets mb-3">
+                        <li class="nav-item" t-foreach="state.finished" t-as="project"
+                            t-key="project.id">
+                            <a href="#" t-attf-class="nav-link {{ state.finishedId === project.id ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setFinished(project.id)">
+                                <i class="fa fa-archive me-1"/>
+                                <t t-esc="project.name"/>
                                 <span class="badge rounded-pill"
-                                      t-esc="state.upload.lines.length"/>
-                            </a>
-                        </li>
-                        <li class="nav-item" t-foreach="uploadSections" t-as="section"
-                            t-key="section.key">
-                            <a href="#" t-attf-class="nav-link {{ state.uploadSheet === section.key ? 'active' : '' }}"
-                               t-on-click.prevent="() => this.setUploadSheet(section.key)">
-                                <t t-esc="section.name"/>
-                                <span class="badge rounded-pill" t-esc="section.count"/>
+                                      t-esc="project.employees.length"/>
                             </a>
                         </li>
                     </ul>
 
-                    <table class="table table-bordered table-sm o_pr_table o_pr_month">
-                        <thead>
-                            <tr>
-                                <th class="text-center" style="width:44px;">م</th>
-                                <th style="width:170px;">الموظف</th>
-                                <th class="text-end" style="width:96px;">الأساسي</th>
-                                <th class="text-end" style="width:96px;">العلاوات</th>
-                                <th class="text-end" style="width:96px;">الإجمالي</th>
-                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
-                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
-                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
-                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
-                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
-                                <th class="text-end" style="width:96px;">الصافي</th>
-                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
-                                <th class="text-center" style="width:70px;">الصرف</th>
-                            </tr>
-                        </thead>
-                        <tbody t-foreach="uploadVisible" t-as="section" t-key="section.key">
-                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
-                                <td class="text-center text-muted"
-                                    t-esc="section.start + line_index + 1"/>
-                                <td t-esc="line.employee"/>
-                                <td class="text-end" t-esc="fmt(line.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(line.allowance)"/>
-                                <td class="text-end" t-esc="fmt(line.gross)"/>
-                                <td class="text-end" t-esc="fmt(line.social_base)"/>
-                                <td class="text-end" t-esc="fmt(line.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(line.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(line.pension)"/>
-                                <td class="text-end" t-esc="fmt(line.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(line.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(line.net)"/>
-                                <td class="text-end" t-esc="fmt(line.employer_social)"/>
-                                <td class="text-center small" t-esc="line.method"/>
-                            </tr>
-                        </tbody>
-                        <tbody t-if="!uploadCount">
-                            <tr>
-                                <td colspan="14" class="text-muted text-center py-2">
-                                    لا بنود في هذا الكشف.
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot t-if="uploadCount">
-                            <tr class="o_pr_total">
-                                <td colspan="2">
-                                    <t t-if="uploadLabel">مجموع <t t-esc="uploadLabel"/></t>
-                                    <t t-else="">مجموع الكشف</t>
-                                </td>
-                                <td class="text-end" t-esc="fmt(uploadTotals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.gross)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.social_base)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.pension)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.net)"/>
-                                <td class="text-end" t-esc="fmt(uploadTotals.employer_social)"/>
-                                <td/>
-                            </tr>
-                        </tfoot>
-                    </table>
+                    <t t-if="finishedProject">
+                        <div class="o_pr_card_head">
+                            <div>
+                                <div class="o_pr_card_name" t-esc="finishedProject.name"/>
+                                <div class="small text-muted">
+                                    المصروف على <b t-esc="finishedProject.account"/> ·
+                                    يُدفع من <b t-esc="finishedProject.payment_account"/>
+                                    <t t-if="finishedProject.journal">
+                                        · يومية <b t-esc="finishedProject.journal"/>
+                                    </t>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.reviveProject(finishedProject)">
+                                أعِد المشروع
+                            </button>
+                        </div>
 
-                    <div class="o_pr_note small text-muted no-print">
-                        هذا الكشف محفوظٌ كما رُفع: لا يمسّ البطاقات ولا كشوف الأشهر،
-                        ومنه تُنشأ القيود وحدها. وحسابات كل كشفٍ تأتي من «الكشوف»
-                        في الإعدادات.
-                    </div>
+                        <div class="o_pr_card_sub">كشوف رواتبه</div>
+                        <div t-if="!finishedProject.months.length"
+                             class="text-muted small mb-3">
+                            لم يدخل في كشف رواتبٍ محفوظ.
+                        </div>
+                        <t t-foreach="finishedProject.months" t-as="month"
+                           t-key="month.year + '-' + month.month">
+                            <div class="small fw-bold mt-2">
+                                <t t-esc="month.label"/> <t t-esc="month.year"/>
+                                <span class="o_pr_count" t-esc="month.lines.length"/>
+                            </div>
+                            <table class="table table-bordered table-sm o_pr_table o_pr_wide">
+                                <thead>
+                                    <tr>
+                                        <th style="width:180px;">الموظف</th>
+                                        <th class="text-end" style="width:96px;">الأساسي</th>
+                                        <th class="text-end" style="width:96px;">العلاوات</th>
+                                        <th class="text-end" style="width:96px;">الإجمالي</th>
+                                        <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                        <th class="text-end" style="width:96px;">ضريبة</th>
+                                        <th class="text-end" style="width:96px;">تقاعد</th>
+                                        <th class="text-end" style="width:96px;">الصافي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="month.lines" t-as="line" t-key="line.id">
+                                        <td t-esc="line.employee"/>
+                                        <td class="text-end" t-esc="fmt(line.basic_salary)"/>
+                                        <td class="text-end" t-esc="fmt(line.allowance)"/>
+                                        <td class="text-end" t-esc="fmt(line.gross)"/>
+                                        <td class="text-end" t-esc="fmt(line.employee_social)"/>
+                                        <td class="text-end" t-esc="fmt(line.income_tax)"/>
+                                        <td class="text-end" t-esc="fmt(line.pension)"/>
+                                        <td class="text-end" t-esc="fmt(line.net)"/>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="o_pr_total">
+                                        <td>المجموع</td>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).basic_salary)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).allowance)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).gross)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).employee_social)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).income_tax)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).pension)"/>
+                                        <td class="text-end"
+                                            t-esc="fmt(monthTotals(month).net)"/>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </t>
+
+                        <div class="o_pr_card_sub mt-3">بطاقات موظفيه</div>
+                        <table class="table table-bordered table-sm o_pr_table o_pr_wide">
+                            <thead>
+                                <tr>
+                                    <th style="width:44px;">بطاقة</th>
+                                    <th style="width:200px;">الاسم</th>
+                                    <th style="width:140px;">المسمّى</th>
+                                    <th class="text-end" style="width:96px;">الأساسي</th>
+                                    <th class="text-end" style="width:96px;">العلاوات</th>
+                                    <th class="text-center" style="width:70px;">ضمان</th>
+                                    <th class="text-center" style="width:80px;">الصرف</th>
+                                    <th class="text-center" style="width:90px;">الحال</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="finishedProject.employees" t-as="employee"
+                                    t-key="employee.id">
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-link p-0"
+                                                title="بطاقة الموظف"
+                                                t-custom-click="(ev, mid) => this.openCard(employee, mid)">
+                                            <i class="fa fa-id-card-o"/>
+                                        </button>
+                                    </td>
+                                    <td t-esc="employee.name"/>
+                                    <td t-esc="employee.job_title or '—'"/>
+                                    <td class="text-end" t-esc="fmt(employee.basic_salary)"/>
+                                    <td class="text-end" t-esc="fmt(employee.allowance)"/>
+                                    <td class="text-center"
+                                        t-esc="employee.social_security ? 'نعم' : 'لا'"/>
+                                    <td class="text-center"
+                                        t-esc="employee.payment_method === 'cheque' ? 'شيك' : 'تحويل'"/>
+                                    <td class="text-center"
+                                        t-esc="employee.active ? 'على رأس عمله' : 'موقوف'"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </t>
                 </t>
             </t>
 
@@ -1069,46 +1065,10 @@
                         <i class="fa fa-plus me-1"/> كشف
                     </button>
 
-                    <!-- أرشيف الكشوف: مشاريع انتهت، بموظفيها وحساباتها -->
-                    <t t-if="archivedGroups.length">
-                        <h4 class="o_pr_section_title mt-4">
-                            <i class="fa fa-archive me-1"/> أرشيف الكشوف
-                            <span class="o_pr_count" t-esc="archivedGroups.length"/>
-                        </h4>
-                        <div class="o_pr_note small text-muted mb-2">
-                            مشاريع انتهت فخرجت من التبويبات، وبقيت هنا بموظفيها
-                            (موقوفين) وحساباتها. وتعود إن عادت في كشفٍ مرفوع، أو
-                            بزرّ «أعِده».
-                        </div>
-                        <table class="table table-bordered table-sm o_pr_table"
-                               style="max-width:1020px;">
-                            <thead>
-                                <tr>
-                                    <th style="width:190px;">الكشف</th>
-                                    <th style="width:220px;">حساب المصروف</th>
-                                    <th style="width:220px;">يُدفع من</th>
-                                    <th style="width:160px;">اليومية</th>
-                                    <th style="width:70px;">موظفون</th>
-                                    <th style="width:80px;"/>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="archivedGroups" t-as="group" t-key="group._k">
-                                    <td t-esc="group.name"/>
-                                    <td t-esc="group.account or 'حساب الرواتب العام'"/>
-                                    <td t-esc="group.payment_account or 'حساب الدفع العام'"/>
-                                    <td t-esc="group.journal or '—'"/>
-                                    <td class="text-center" t-esc="countOf(group.id)"/>
-                                    <td class="text-center">
-                                        <button class="btn btn-sm btn-link p-0"
-                                                t-on-click="() => this.toggleGroupArchive(group)">
-                                            أعِده
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </t>
+                    <div t-if="archivedGroups.length" class="o_pr_note small mt-3">
+                        ومشاريع منتهية: <b t-esc="archivedGroups.map((item) => item.name).join('، ')"/>
+                        — في تبويب «مشاريع منتهية».
+                    </div>
                 </div>
             </t>
         </div>

@@ -291,6 +291,41 @@ class MyAccountingPayrollGroup(models.Model):
                 for group in self.with_context(active_test=False).search([])]
 
     @api.model
+    def get_finished(self):
+        """المشاريع المنتهية: كشوف رواتبها شهراً شهراً وبطاقات موظفيها.
+
+        الكشف المؤرشف يبقى كما كان: موظفوه (موقوفين) وبنوده في كل شهرٍ
+        دخل فيه، فيُقرأ تاريخ المشروع كاملاً في مكانٍ واحد.
+        """
+        Line = self.env['myaccounting.payroll.line']
+        items = []
+        for group in self.with_context(active_test=False).search(
+                [('active', '=', False)]):
+            months = {}
+            for line in Line.search([('group_id', '=', group.id)]):
+                payroll = line.payroll_id
+                key = (payroll.year, int(payroll.month))
+                month = months.setdefault(key, {
+                    'year': payroll.year,
+                    'month': payroll.month,
+                    'label': MONTH_NAMES.get(payroll.month, ''),
+                    'lines': [],
+                })
+                month['lines'].append(line._payload())
+            items.append({
+                'id': group.id,
+                'name': group.name,
+                'account': group.account_id.name or 'حساب الرواتب العام',
+                'payment_account': (group.payment_account_id.name
+                                    or 'حساب الدفع العام'),
+                'journal': group.journal or '',
+                'employees': [employee._payload() for employee
+                              in group.with_context(active_test=False).employee_ids],
+                'months': [months[key] for key in sorted(months, reverse=True)],
+            })
+        return items
+
+    @api.model
     def save_groups(self, items):
         """يحفظ الكشوف كاملةً: ما حُذف يُحذف وما استجدّ يُنشأ."""
         existing = {group.id: group
@@ -636,6 +671,20 @@ class MyAccountingPayroll(models.Model):
         payroll = self.browse(int(payroll_id)) if payroll_id else self.search([], limit=1)
         return payroll._payload() if payroll else False
 
+    @api.model
+    def get_month(self, year, month):
+        """كشف شهرٍ بعينه، أو لا شيء إن لم يُبنَ بعد."""
+        payroll = self.search([('year', '=', int(year)),
+                               ('month', '=', str(month))], limit=1)
+        return payroll._payload() if payroll else False
+
+    @api.model
+    def get_years(self):
+        """السنوات التي فيها كشوف، ومعها السنة الحالية."""
+        years = sorted({payroll.year for payroll in self.search([])}
+                       | {fields.Date.context_today(self).year}, reverse=True)
+        return years
+
     def _employer_share(self, lines=None):
         """حصة الشركة من الضمان لكل حساب (انظر employer_share)."""
         self.ensure_one()
@@ -700,6 +749,29 @@ class MyAccountingPayroll(models.Model):
                 employer_social=employer),
             'sheets': sheets,
         }
+
+    @api.model
+    def apply_sheet_file(self, content, options=None, year=False, month=False):
+        """عملية الصفحة: ملف الشهر يُطبَّق على البطاقات ثم يُبنى منه الكشف.
+
+        فالموافقة على الفرق تفعل الأمرين معاً: تعديل البطاقات وإضافة من
+        استجدّ وإيقاف من غاب وأرشفة ما انتهى من المشاريع، ثم بناء كشف
+        ذلك الشهر من البطاقات بعدها.
+        """
+        year, month = int(year or 0), str(month or '')
+        if not (year and month and month.isdigit() and 1 <= int(month) <= 12):
+            raise UserError('لم أعرف شهر الملف، فاختره بنفسك قبل الموافقة.')
+        applied = self.env['myaccounting.employee'].apply_excel(
+            content, options or {})
+        payroll = self.search([('year', '=', year), ('month', '=', month)], limit=1)
+        if not payroll:
+            payroll = self.create({
+                'name': 'رواتب شهر %s/%s' % (month, year),
+                'year': year,
+                'month': month,
+            })
+        payroll.fill_from_employees()
+        return {'applied': applied, 'data': payroll._payload()}
 
     @api.model
     def create_payroll(self, year, month):

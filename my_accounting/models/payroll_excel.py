@@ -71,6 +71,26 @@ class MyAccountingEmployeeExcel(models.Model):
     # ------------------------------------------------------------------
 
     @api.model
+    def _sheet_period(self, grid, head):
+        """شهر الورقة وسنتها من ترويستها: الخانة تحت «شهر» وتحت «سنة»."""
+        month = year = 0
+        for index, line in enumerate(grid[:head]):
+            for position, cell in enumerate(line or ()):
+                label = clean(cell)
+                if label not in ('شهر', 'سنة'):
+                    continue
+                below = grid[index + 1] if index + 1 < len(grid) else ()
+                value = below[position] if position < len(below) else None
+                found = int(number(value))
+                if not found:
+                    continue
+                if label == 'شهر' and 1 <= found <= 12:
+                    month = found
+                elif label == 'سنة' and found > 1900:
+                    year = found
+        return month, year
+
+    @api.model
     def _excel_rows(self, content):
         """صفوف الملف: لكل موظفٍ سطرٌ يحمل ورقته وأرقامه."""
         try:
@@ -85,6 +105,7 @@ class MyAccountingEmployeeExcel(models.Model):
 
         rows = []
         skipped = []
+        periods = []
         for sheet in book.worksheets:
             grid = list(sheet.iter_rows(values_only=True))
             columns, head = {}, None
@@ -105,6 +126,8 @@ class MyAccountingEmployeeExcel(models.Model):
             if head is None or not ('gross' in columns or 'due' in columns):
                 skipped.append(sheet.title)
                 continue
+            month, year = self._sheet_period(grid, head)
+            counted = False
             for line in grid[head + 1:]:
                 if not line:
                     continue
@@ -125,6 +148,9 @@ class MyAccountingEmployeeExcel(models.Model):
                 allowance = round(number(cell('allowance'))
                                   + number(cell('overtime')), 3)
                 gross = number(cell('gross')) or round(due + allowance, 3)
+                if not counted and month and year:
+                    periods.append((month, year))
+                    counted = True
                 rows.append({
                     'sheet': clean(sheet.title),
                     'name': name,
@@ -140,7 +166,7 @@ class MyAccountingEmployeeExcel(models.Model):
         if not rows:
             raise UserError('لم أجد صفوف موظفين في الملف. '
                             'المنتظر ملف كشف الرواتب بأوراقه وأعمدته المعتادة.')
-        return rows, skipped
+        return rows, skipped, periods
 
     def _excel_card_values(self, row):
         """قيم البطاقة من صف الملف: الضمان يُستنتج من المقتطع."""
@@ -172,14 +198,21 @@ class MyAccountingEmployeeExcel(models.Model):
     @api.model
     def _excel_plan(self, content):
         """خطة الرفع: ما يُعدَّل وما يُضاف وما يُوقف، وما استجدّ من كشوف."""
-        rows, skipped = self._excel_rows(content)
+        rows, skipped, periods = self._excel_rows(content)
         Group = self.env['myaccounting.payroll.group']
         employees = self.with_context(active_test=False).search([])
         by_key = {match_key(employee.name): employee for employee in employees}
         groups = {clean(group.name): group
                   for group in Group.with_context(active_test=False).search([])}
 
-        plan = {'sheets': [], 'count': len(rows), 'skipped': skipped,
+        # الشهر من ترويسات الأوراق: الأكثر تكراراً، وتُذكر المخالفة
+        tally = {}
+        for period in periods:
+            tally[period] = tally.get(period, 0) + 1
+        best = max(tally.items(), key=lambda item: item[1])[0] if tally else (0, 0)
+        plan = {'month': best[0], 'year': best[1],
+                'periods': ['%d/%d' % (month, year) for (month, year) in tally],
+                'sheets': [], 'count': len(rows), 'skipped': skipped,
                 'changed': [], 'new': [], 'stop': [], 'same': [],
                 'untouched': [], 'new_groups': [], 'archive': [], 'revive': []}
         seen = set()
@@ -321,16 +354,14 @@ class MyAccountingEmployeeExcel(models.Model):
             for item in plan['stop']:
                 self.browse(item['id']).write({'active': False})
                 stopped += 1
-        # الكشف الغائب عن الملف يُؤرشف بطلبٍ صريح، لأن الملف قد يكون
-        # جزئياً. ومن بقي على رأس عمله فيه يُوقَف معه.
+        # المشروع الذي غاب عن الملف انتهى: يُؤرشف ويُوقَف من بقي فيه
         Group = self.env['myaccounting.payroll.group']
         archived = []
-        if options.get('archive'):
-            for item in plan['archive']:
-                self.browse(item['employees']).write({'active': False})
-                stopped += len(item['employees'])
-                Group.browse(item['id']).write({'active': False})
-                archived.append(item['name'])
+        for item in plan['archive']:
+            self.browse(item['employees']).write({'active': False})
+            stopped += len(item['employees'])
+            Group.browse(item['id']).write({'active': False})
+            archived.append(item['name'])
         revived = [item['name'] for item in plan['revive']]
         if revived:
             Group.with_context(active_test=False).browse(
