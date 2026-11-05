@@ -176,11 +176,12 @@ class MyAccountingEmployeeExcel(models.Model):
         Group = self.env['myaccounting.payroll.group']
         employees = self.with_context(active_test=False).search([])
         by_key = {match_key(employee.name): employee for employee in employees}
-        groups = {clean(group.name): group for group in Group.search([])}
+        groups = {clean(group.name): group
+                  for group in Group.with_context(active_test=False).search([])}
 
         plan = {'sheets': [], 'count': len(rows), 'skipped': skipped,
                 'changed': [], 'new': [], 'stop': [], 'same': [],
-                'untouched': [], 'new_groups': []}
+                'untouched': [], 'new_groups': [], 'archive': [], 'revive': []}
         seen = set()
         for row in rows:
             if row['sheet'] not in plan['sheets']:
@@ -252,6 +253,26 @@ class MyAccountingEmployeeExcel(models.Model):
                 continue
             plan['stop'].append({'id': employee.id, 'name': employee.name,
                                  'sheet': employee.group_id.name or 'بلا كشف'})
+
+        # الكشف الغائب عن الملف: مشروعٌ انتهى، فيُرشَّح للأرشفة ومعه من
+        # بقي على رأس عمله فيه. والمؤرشف الذي عاد في الملف يعود معه.
+        stopping = {item['id'] for item in plan['stop']}
+        for group in Group.with_context(active_test=False).search([]):
+            name = clean(group.name)
+            if name in plan['sheets']:
+                if not group.active:
+                    plan['revive'].append({'id': group.id, 'name': group.name})
+                continue
+            if not group.active:
+                continue
+            on_duty = [employee for employee in group.employee_ids
+                       if employee.active and employee.id not in stopping]
+            plan['archive'].append({
+                'id': group.id, 'name': group.name,
+                'count': len(on_duty),
+                'employees': [employee.id for employee in on_duty],
+                'names': [employee.name for employee in on_duty],
+            })
         return plan
 
     @api.model
@@ -263,6 +284,8 @@ class MyAccountingEmployeeExcel(models.Model):
                              if key != 'values'} for item in plan['changed']]
         light['new'] = [{key: value for key, value in item.items()
                          if key != 'values'} for item in plan['new']]
+        light['archive'] = [{key: value for key, value in item.items()
+                             if key != 'employees'} for item in plan['archive']]
         return light
 
     @api.model
@@ -298,5 +321,20 @@ class MyAccountingEmployeeExcel(models.Model):
             for item in plan['stop']:
                 self.browse(item['id']).write({'active': False})
                 stopped += 1
+        # الكشف الغائب عن الملف يُؤرشف بطلبٍ صريح، لأن الملف قد يكون
+        # جزئياً. ومن بقي على رأس عمله فيه يُوقَف معه.
+        Group = self.env['myaccounting.payroll.group']
+        archived = []
+        if options.get('archive'):
+            for item in plan['archive']:
+                self.browse(item['employees']).write({'active': False})
+                stopped += len(item['employees'])
+                Group.browse(item['id']).write({'active': False})
+                archived.append(item['name'])
+        revived = [item['name'] for item in plan['revive']]
+        if revived:
+            Group.with_context(active_test=False).browse(
+                [item['id'] for item in plan['revive']]).write({'active': True})
         return {'edited': edited, 'added': added, 'stopped': stopped,
-                'groups': created_groups, 'employees': self.get_employees()}
+                'groups': created_groups, 'archived': archived,
+                'revived': revived, 'employees': self.get_employees()}

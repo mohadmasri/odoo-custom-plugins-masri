@@ -240,6 +240,10 @@ class MyAccountingPayrollGroup(models.Model):
     payment_account_id = fields.Many2one(
         'myaccounting.account', string='يُدفع من',
         help='اتركه فارغاً ليُستعمل حساب الدفع العام.')
+    active = fields.Boolean(
+        string='فعّال', default=True,
+        help='المشروع الذي انتهى يُؤرشف: يخرج من التبويبات ويبقى في الأرشيف '
+             'بموظفيه وحساباته، ويعود إن عاد في كشفٍ مرفوع.')
     journal = fields.Char(
         string='اليومية',
         help='يومية قيد هذا الكشف، كما في دفاتره: «رواتب المكتب 1» '
@@ -258,6 +262,7 @@ class MyAccountingPayrollGroup(models.Model):
             'payment_account_id': self.payment_account_id.id or False,
             'payment_account': self.payment_account_id.name or '',
             'journal': self.journal or '',
+            'active': self.active,
             'count': len(self.with_context(active_test=False).employee_ids),
         }
 
@@ -272,7 +277,7 @@ class MyAccountingPayrollGroup(models.Model):
         param = self.env['ir.config_parameter'].sudo()
         if param.get_param('my_accounting.payroll_group_journals'):
             return
-        for group in self.search([]):
+        for group in self.with_context(active_test=False).search([]):
             if group.journal:
                 continue
             group.journal = self.JOURNALS.get(
@@ -282,12 +287,14 @@ class MyAccountingPayrollGroup(models.Model):
     @api.model
     def get_groups(self):
         self._seed_journals()
-        return [group._payload() for group in self.search([])]
+        return [group._payload()
+                for group in self.with_context(active_test=False).search([])]
 
     @api.model
     def save_groups(self, items):
         """يحفظ الكشوف كاملةً: ما حُذف يُحذف وما استجدّ يُنشأ."""
-        existing = {group.id: group for group in self.search([])}
+        existing = {group.id: group
+                    for group in self.with_context(active_test=False).search([])}
         kept = set()
         for item in items or []:
             name = (item.get('name') or '').strip()
@@ -300,6 +307,7 @@ class MyAccountingPayrollGroup(models.Model):
                 'payment_account_id': int(item['payment_account_id'])
                                       if item.get('payment_account_id') else False,
                 'journal': (item.get('journal') or '').strip(),
+                'active': bool(item.get('active', True)),
             }
             group = existing.get(item.get('id'))
             if group:

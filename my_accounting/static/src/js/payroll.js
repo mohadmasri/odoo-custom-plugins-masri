@@ -64,7 +64,7 @@ export class Payroll extends Component {
             uploadSheet: "all",
             excel: null,
             excelName: "",
-            excelOptions: { edit: true, add: true, stop: true },
+            excelOptions: { edit: true, add: true, stop: true, archive: false },
             sheet: "all",
             monthSheet: "all",
             settings: null,
@@ -400,6 +400,25 @@ export class Payroll extends Component {
         return this.state.employees.filter((employee) => employee.group_id === sheet);
     }
 
+    /** الكشوف الفعّالة، ومعها المؤرشف الذي ما زال فيه موظفون */
+    get liveGroups() {
+        return this.state.groups.filter(
+            (group) => group.active || this.countOf(group.id));
+    }
+
+    /** أرشيف الكشوف: مشاريع انتهت، تبقى بموظفيها وحساباتها */
+    get archivedGroups() {
+        return this.state.groups.filter((group) => !group.active);
+    }
+
+    get activeGroups() {
+        return this.state.groups.filter((group) => group.active);
+    }
+
+    toggleGroupArchive(group) {
+        group.active = !group.active;
+    }
+
     get currentGroup() {
         return this.state.groups.find((group) => group.id === this.state.sheet) || null;
     }
@@ -423,7 +442,7 @@ export class Payroll extends Component {
     /** خيارات الكشوف للاختيار: المحفوظة منها فقط، فهي وحدها لها معرّف */
     get groupOptions() {
         return this.state.groups
-            .filter((group) => group.id)
+            .filter((group) => group.id && group.active)
             .map((group) => ({ token: `${group.id}`, display: group.name, hint: "" }));
     }
 
@@ -541,7 +560,7 @@ export class Payroll extends Component {
         this.state.groups.push(keyed([{
             id: false, name: "كشف جديد", sequence: 10 * (this.state.groups.length + 1),
             account_id: false, account: "", payment_account_id: false,
-            payment_account: "", journal: "", count: 0,
+            payment_account: "", journal: "", active: true, count: 0,
         }])[0]);
     }
 
@@ -751,7 +770,8 @@ export class Payroll extends Component {
         const options = this.state.excelOptions;
         return (options.edit ? plan.changed.length : 0)
              + (options.add ? plan.new.length : 0)
-             + (options.stop ? plan.stop.length : 0);
+             + (options.stop ? plan.stop.length : 0)
+             + (options.archive ? plan.archive.length : 0);
     }
 
     async applyExcel() {
@@ -772,6 +792,12 @@ export class Payroll extends Component {
             }
             if (done.groups.length) {
                 parts.push(`واستجدّ كشف ${done.groups.join("، ")}`);
+            }
+            if (done.archived.length) {
+                parts.push(`وأُرشف ${done.archived.join("، ")}`);
+            }
+            if (done.revived.length) {
+                parts.push(`وعاد ${done.revived.join("، ")}`);
             }
             this.notification.add(parts.length ? parts.join(" · ")
                                                : "لا تغيير على البطاقات.",

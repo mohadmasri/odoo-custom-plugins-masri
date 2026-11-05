@@ -84,6 +84,21 @@
                         <b t-esc="state.excel.new_groups.join('، ')"/>
                         — حدّد لها حساباتها من تبويب الإعدادات بعد الرفع.
                     </div>
+                    <div t-if="state.excel.archive.length" class="o_pr_note small mb-2">
+                        كشوفٌ غابت عن الملف:
+                        <t t-foreach="state.excel.archive" t-as="item" t-key="item.id">
+                            <b t-esc="item.name"/><t t-if="item.count">
+                                (ومعه <t t-esc="item.count"/>: <t t-esc="item.names.join('، ')"/>)
+                            </t><t t-if="!item_last">، </t>
+                        </t>
+                        — بتأشير «أرشفة» تخرج من التبويبات إلى «أرشيف الكشوف»
+                        بموظفيها وحساباتها، ويُوقَف من بقي منهم. واتركها بلا
+                        تأشيرٍ إن كان الملف جزئياً.
+                    </div>
+                    <div t-if="state.excel.revive.length" class="o_pr_note small mb-2">
+                        كشوفٌ ستعود من الأرشيف لأنها في الملف:
+                        <b t-esc="state.excel.revive.map((item) => item.name).join('، ')"/>
+                    </div>
                     <div t-if="state.excel.skipped.length" class="o_pr_note small mb-2">
                         أوراقٌ لم أجد فيها جدول موظفين فتركتُها:
                         <b t-esc="state.excel.skipped.join('، ')"/>
@@ -112,6 +127,15 @@
                                    t-on-change="(ev) => this.toggleExcel('stop', ev)"/>
                             <label class="form-check-label">
                                 إيقاف <t t-esc="state.excel.stop.length"/> من غاب
+                            </label>
+                        </div>
+                        <div class="form-check" t-if="state.excel.archive.length">
+                            <input type="checkbox" class="form-check-input"
+                                   t-att-checked="state.excelOptions.archive"
+                                   t-on-change="(ev) => this.toggleExcel('archive', ev)"/>
+                            <label class="form-check-label">
+                                أرشفة <t t-esc="state.excel.archive.length"/>
+                                كشوفٍ غابت عن الملف
                             </label>
                         </div>
                     </div>
@@ -623,10 +647,12 @@
                             <span class="badge rounded-pill" t-esc="state.employees.length"/>
                         </a>
                     </li>
-                    <li class="nav-item" t-foreach="state.groups" t-as="group" t-key="group.id">
+                    <li class="nav-item" t-foreach="liveGroups" t-as="group" t-key="group.id">
                         <a href="#" t-attf-class="nav-link {{ state.sheet === group.id ? 'active' : '' }}"
                            t-on-click.prevent="() => this.setSheet(group.id)">
                             <t t-esc="group.name"/>
+                            <i t-if="!group.active" class="fa fa-archive ms-1"
+                               title="كشفٌ مؤرشف"/>
                             <span class="badge rounded-pill" t-esc="countOf(group.id)"/>
                         </a>
                     </li>
@@ -988,7 +1014,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr t-foreach="state.groups" t-as="group" t-key="group._k">
+                            <tr t-foreach="activeGroups" t-as="group" t-key="group._k">
                                 <td>
                                     <input type="number" class="form-control form-control-sm"
                                            t-att-value="group.sequence"
@@ -1021,6 +1047,11 @@
                                 </td>
                                 <td class="text-center" t-esc="countOf(group.id)"/>
                                 <td class="text-center">
+                                    <button t-if="group.id" class="btn btn-sm btn-link p-0 me-1"
+                                            title="أرشِف الكشف"
+                                            t-on-click="() => this.toggleGroupArchive(group)">
+                                        <i class="fa fa-archive"/>
+                                    </button>
                                     <button class="btn btn-sm btn-link text-danger p-0"
                                             title="حذف الكشف"
                                             t-on-click="() => this.removeGroup(group)">
@@ -1028,7 +1059,7 @@
                                     </button>
                                 </td>
                             </tr>
-                            <tr t-if="!state.groups.length">
+                            <tr t-if="!activeGroups.length">
                                 <td colspan="7" class="text-muted text-center py-2">لا كشوف بعد</td>
                             </tr>
                         </tbody>
@@ -1037,6 +1068,47 @@
                             t-on-click="() => this.addGroup()">
                         <i class="fa fa-plus me-1"/> كشف
                     </button>
+
+                    <!-- أرشيف الكشوف: مشاريع انتهت، بموظفيها وحساباتها -->
+                    <t t-if="archivedGroups.length">
+                        <h4 class="o_pr_section_title mt-4">
+                            <i class="fa fa-archive me-1"/> أرشيف الكشوف
+                            <span class="o_pr_count" t-esc="archivedGroups.length"/>
+                        </h4>
+                        <div class="o_pr_note small text-muted mb-2">
+                            مشاريع انتهت فخرجت من التبويبات، وبقيت هنا بموظفيها
+                            (موقوفين) وحساباتها. وتعود إن عادت في كشفٍ مرفوع، أو
+                            بزرّ «أعِده».
+                        </div>
+                        <table class="table table-bordered table-sm o_pr_table"
+                               style="max-width:1020px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:190px;">الكشف</th>
+                                    <th style="width:220px;">حساب المصروف</th>
+                                    <th style="width:220px;">يُدفع من</th>
+                                    <th style="width:160px;">اليومية</th>
+                                    <th style="width:70px;">موظفون</th>
+                                    <th style="width:80px;"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="archivedGroups" t-as="group" t-key="group._k">
+                                    <td t-esc="group.name"/>
+                                    <td t-esc="group.account or 'حساب الرواتب العام'"/>
+                                    <td t-esc="group.payment_account or 'حساب الدفع العام'"/>
+                                    <td t-esc="group.journal or '—'"/>
+                                    <td class="text-center" t-esc="countOf(group.id)"/>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-link p-0"
+                                                t-on-click="() => this.toggleGroupArchive(group)">
+                                            أعِده
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </t>
                 </div>
             </t>
         </div>

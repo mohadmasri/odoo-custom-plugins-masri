@@ -271,3 +271,10 @@
 .o_pr_change s {
     color: var(--gray-600, #6c757d);
 }
+
+/* عنوان قسمٍ داخل تبويب الإعدادات (أرشيف الكشوف مثلاً) */
+.o_pr_section_title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
