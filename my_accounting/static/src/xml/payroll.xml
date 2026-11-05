@@ -233,216 +233,12 @@
                 </div>
             </t>
 
-            <!-- ======================================= كشف الشهر -->
-            <t t-elif="state.tab === 'sheet'">
-                <div t-if="!data" class="o_pr_empty">
-                    <div class="mb-2">لا كشف لشهر <b t-esc="periodLabel"/> بعد.</div>
-                    <button class="btn btn-sm btn-primary me-2"
-                            t-att-disabled="state.busy"
-                            t-on-click="() => this.pickExcel()">
-                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary"
-                            t-att-disabled="state.busy"
-                            t-on-click="() => this.buildMonth()">
-                        <i class="fa fa-users me-1"/> ابْنِ من البطاقات
-                    </button>
-                    <div class="small text-muted mt-2">
-                        رفع الملف يعرض لك التعديل على البطاقات، فإن وافقتَ
-                        طُبِّق وبُني الكشف بعده.
-                    </div>
-                </div>
-
-                <t t-else="">
-                    <div class="o_pr_head">
-                        <div class="o_pr_print_title">
-                            كشف رواتب <t t-esc="data.month_label"/> <t t-esc="data.year"/>
-                            <t t-if="monthLabel"> — <t t-esc="monthLabel"/></t>
-                        </div>
-                        <div class="small text-muted">
-                            <t t-esc="visibleCount"/> موظفاً
-                        </div>
-                    </div>
-
-                    <div class="o_pr_bar no-print">
-                        <button class="btn btn-sm btn-primary"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.pickExcel()">
-                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.fillFromEmployees()">
-                            أعد البناء من البطاقات
-                        </button>
-                        <button class="btn btn-sm btn-primary"
-                                t-att-disabled="state.busy or !linesDirty"
-                                t-on-click="() => this.saveLines()">حفظ</button>
-                        <button class="btn btn-sm btn-outline-secondary"
-                                t-att-disabled="state.busy or !linesDirty"
-                                t-on-click="() => this.cancelLines()">إلغاء</button>
-                        <span t-if="linesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
-                        <span class="o_pr_sep"/>
-                        <!-- القيد للكشف المعروض وحده، ويخرج حرّاً بلا صلةٍ به -->
-                        <button t-if="data.lines.length" class="btn btn-sm btn-success"
-                                t-att-disabled="state.busy or linesDirty"
-                                t-on-click="() => this.postPayroll()">
-                            <i class="fa fa-check me-1"/> <t t-esc="postLabel"/>
-                        </button>
-                        <button class="btn btn-sm btn-link text-danger"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.deletePayroll()">احذف الكشف</button>
-                    </div>
-
-                    <div t-if="!data.lines.length" class="o_pr_empty">
-                        <div class="mb-2">الكشف فارغ.</div>
-                        <button class="btn btn-sm btn-primary me-2"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.fillFromEmployees()">
-                            <i class="fa fa-users me-1"/> ابْنِ من بطاقات الموظفين
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.pickExcel()">
-                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
-                        </button>
-                        <div class="small text-muted mt-2">
-                            ورفع الإكسل يعدّل البطاقات ولا يبني الكشف، فابْنِه منها بعده.
-                        </div>
-                    </div>
-
-                    <!-- كشوف الشهر تبويباتٍ: واحدٌ منها أو عرض الكل -->
-                    <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
-                        t-if="data.lines.length and sheetSections.length > 1">
-                        <li class="nav-item">
-                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'all' ? 'active' : '' }}"
-                               t-on-click.prevent="() => this.setMonthSheet('all')">
-                                عرض الكل
-                                <span class="badge rounded-pill" t-esc="data.lines.length"/>
-                            </a>
-                        </li>
-                        <t t-foreach="state.groups" t-as="group" t-key="group.id">
-                            <li class="nav-item" t-if="monthCountOf(group.id)">
-                                <a href="#" t-attf-class="nav-link {{ state.monthSheet === group.id ? 'active' : '' }}"
-                                   t-on-click.prevent="() => this.setMonthSheet(group.id)">
-                                    <t t-esc="group.name"/>
-                                    <span class="badge rounded-pill" t-esc="monthCountOf(group.id)"/>
-                                </a>
-                            </li>
-                        </t>
-                        <li class="nav-item" t-if="monthCountOf(false)">
-                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'none' ? 'active' : '' }}"
-                               t-on-click.prevent="() => this.setMonthSheet('none')">
-                                بلا كشف
-                                <span class="badge rounded-pill" t-esc="monthCountOf(false)"/>
-                            </a>
-                        </li>
-                    </ul>
-
-                    <table t-if="data.lines.length"
-                           class="table table-bordered table-sm o_pr_table o_pr_month">
-                        <thead>
-                            <tr>
-                                <th class="text-center" style="width:44px;">م</th>
-                                <th style="width:170px;">الموظف</th>
-                                <th class="text-end" style="width:96px;">الأساسي</th>
-                                <th class="text-end" style="width:96px;">العلاوات</th>
-                                <th class="text-end" style="width:96px;">الإجمالي</th>
-                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
-                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
-                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
-                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
-                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
-                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
-                                <th class="text-end" style="width:96px;">الصافي</th>
-                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
-                            </tr>
-                        </thead>
-                        <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
-                        <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
-                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
-                                <td class="text-center text-muted"
-                                    t-esc="section.start + line_index + 1"/>
-                                <td t-esc="line.employee"/>
-                                <t>
-                                    <td t-foreach="['basic_salary', 'allowance']" t-as="field"
-                                        t-key="field">
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line[field]"
-                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
-                                    </td>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.gross)"/>
-                                    <td t-foreach="['social_base', 'employee_social', 'income_tax', 'pension', 'other_deduction']"
-                                        t-as="field" t-key="field">
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line[field]"
-                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
-                                    </td>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.total_deduction)"/>
-                                    <td class="text-end o_pr_calc" t-esc="fmt(line.net)"/>
-                                    <td>
-                                        <input type="number" step="0.001"
-                                               class="form-control form-control-sm text-end"
-                                               t-att-value="line.employer_social"
-                                               t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
-                                    </td>
-                                </t>
-                            </tr>
-                        </tbody>
-                        <tbody t-if="!data.lines.length">
-                            <tr>
-                                <td colspan="13" class="text-muted text-center py-2">
-                                    لا بنود. أضف موظفين ثم «أعد البناء».
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tbody t-elif="!visibleSections.length">
-                            <tr>
-                                <td colspan="13" class="text-muted text-center py-2">
-                                    لا بنود في هذا الكشف.
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="o_pr_total">
-                                <td colspan="2">
-                                    <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
-                                    <t t-else="">مجموع الكشف</t>
-                                </td>
-                                <td class="text-end" t-esc="fmt(visibleTotals.basic_salary)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.allowance)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.gross)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.social_base)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.employee_social)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.income_tax)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.pension)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.other_deduction)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.total_deduction)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.net)"/>
-                                <td class="text-end" t-esc="fmt(visibleTotals.employer_social)"/>
-                            </tr>
-                        </tfoot>
-                    </table>
-
-                    <div class="o_pr_note small text-muted">
-                        القيد: مصروف الرواتب <t t-esc="fmt(totals.gross)"/> مديناً،
-                        وحصة الشركة <t t-esc="fmt(totals.employer_social)"/> مديناً،
-                        مقابل الضمان <t t-esc="fmt(totals.employee_social + totals.employer_social)"/>
-                        وضريبة الدخل <t t-esc="fmt(totals.income_tax)"/>
-                        والمدفوع <t t-esc="fmt(totals.net)"/> دائناً.
-                    </div>
-                </t>
-            </t>
-
-            <!-- ======================================= الموظفون -->
-            <t t-elif="state.tab === 'employees' and state.card">
+            <t t-elif="state.card">
                 <!-- ================================= بطاقة الموظف -->
                 <div class="o_pr_bar">
                     <button class="btn btn-sm btn-outline-secondary"
                             t-on-click="() => this.closeCard()">
-                        <i class="fa fa-arrow-right me-1"/> رجوع إلى الموظفين
+                        <i class="fa fa-arrow-right me-1"/> رجوع
                     </button>
                     <span class="o_pr_sep"/>
                     <button class="btn btn-sm btn-primary"
@@ -651,6 +447,211 @@
                 </div>
             </t>
 
+
+            <!-- ======================================= كشف الشهر -->
+            <t t-elif="state.tab === 'sheet'">
+                <div t-if="!data" class="o_pr_empty">
+                    <div class="mb-2">لا كشف لشهر <b t-esc="periodLabel"/> بعد.</div>
+                    <button class="btn btn-sm btn-primary me-2"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.pickExcel()">
+                        <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-att-disabled="state.busy"
+                            t-on-click="() => this.buildMonth()">
+                        <i class="fa fa-users me-1"/> ابْنِ من البطاقات
+                    </button>
+                    <div class="small text-muted mt-2">
+                        رفع الملف يعرض لك التعديل على البطاقات، فإن وافقتَ
+                        طُبِّق وبُني الكشف بعده.
+                    </div>
+                </div>
+
+                <t t-else="">
+                    <div class="o_pr_head">
+                        <div class="o_pr_print_title">
+                            كشف رواتب <t t-esc="data.month_label"/> <t t-esc="data.year"/>
+                            <t t-if="monthLabel"> — <t t-esc="monthLabel"/></t>
+                        </div>
+                        <div class="small text-muted">
+                            <t t-esc="visibleCount"/> موظفاً
+                        </div>
+                    </div>
+
+                    <div class="o_pr_bar no-print">
+                        <button class="btn btn-sm btn-primary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.pickExcel()">
+                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف الشهر
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.fillFromEmployees()">
+                            أعد البناء من البطاقات
+                        </button>
+                        <button class="btn btn-sm btn-primary"
+                                t-att-disabled="state.busy or !linesDirty"
+                                t-on-click="() => this.saveLines()">حفظ</button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy or !linesDirty"
+                                t-on-click="() => this.cancelLines()">إلغاء</button>
+                        <span t-if="linesDirty" class="o_pr_dirty">تغييرات لم تُحفظ</span>
+                        <span class="o_pr_sep"/>
+                        <!-- القيد للكشف المعروض وحده، ويخرج حرّاً بلا صلةٍ به -->
+                        <button t-if="data.lines.length" class="btn btn-sm btn-success"
+                                t-att-disabled="state.busy or linesDirty"
+                                t-on-click="() => this.postPayroll()">
+                            <i class="fa fa-check me-1"/> <t t-esc="postLabel"/>
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.deletePayroll()">احذف الكشف</button>
+                    </div>
+
+                    <div t-if="!data.lines.length" class="o_pr_empty">
+                        <div class="mb-2">الكشف فارغ.</div>
+                        <button class="btn btn-sm btn-primary me-2"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.fillFromEmployees()">
+                            <i class="fa fa-users me-1"/> ابْنِ من بطاقات الموظفين
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.pickExcel()">
+                            <i class="fa fa-file-excel-o me-1"/> ارفع كشف إكسل
+                        </button>
+                        <div class="small text-muted mt-2">
+                            ورفع الإكسل يعدّل البطاقات ولا يبني الكشف، فابْنِه منها بعده.
+                        </div>
+                    </div>
+
+                    <!-- كشوف الشهر تبويباتٍ: واحدٌ منها أو عرض الكل -->
+                    <ul class="nav nav-pills o_pr_sheets mb-2 no-print"
+                        t-if="data.lines.length and sheetSections.length > 1">
+                        <li class="nav-item">
+                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'all' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setMonthSheet('all')">
+                                عرض الكل
+                                <span class="badge rounded-pill" t-esc="data.lines.length"/>
+                            </a>
+                        </li>
+                        <t t-foreach="state.groups" t-as="group" t-key="group.id">
+                            <li class="nav-item" t-if="monthCountOf(group.id)">
+                                <a href="#" t-attf-class="nav-link {{ state.monthSheet === group.id ? 'active' : '' }}"
+                                   t-on-click.prevent="() => this.setMonthSheet(group.id)">
+                                    <t t-esc="group.name"/>
+                                    <span class="badge rounded-pill" t-esc="monthCountOf(group.id)"/>
+                                </a>
+                            </li>
+                        </t>
+                        <li class="nav-item" t-if="monthCountOf(false)">
+                            <a href="#" t-attf-class="nav-link {{ state.monthSheet === 'none' ? 'active' : '' }}"
+                               t-on-click.prevent="() => this.setMonthSheet('none')">
+                                بلا كشف
+                                <span class="badge rounded-pill" t-esc="monthCountOf(false)"/>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <table t-if="data.lines.length"
+                           class="table table-bordered table-sm o_pr_table o_pr_month">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width:44px;">م</th>
+                                <th style="width:170px;">الموظف</th>
+                                <th class="text-end" style="width:96px;">الأساسي</th>
+                                <th class="text-end" style="width:96px;">العلاوات</th>
+                                <th class="text-end" style="width:96px;">الإجمالي</th>
+                                <th class="text-end" style="width:96px;">الخاضع للضمان</th>
+                                <th class="text-end" style="width:96px;">ضمان الموظف</th>
+                                <th class="text-end" style="width:96px;">ضريبة الدخل</th>
+                                <th class="text-end" style="width:96px;">صندوق التقاعد</th>
+                                <th class="text-end" style="width:96px;">استقطاعات أخرى</th>
+                                <th class="text-end" style="width:96px;">مجموع الاستقطاع</th>
+                                <th class="text-end" style="width:96px;">الصافي</th>
+                                <th class="text-end" style="width:96px;">ضمان الشركة</th>
+                            </tr>
+                        </thead>
+                        <!-- الكشف يسرد بنوده متّصلةً، مرتّبةً بترتيب الكشوف -->
+                        <tbody t-foreach="visibleSections" t-as="section" t-key="section.key">
+                            <tr t-foreach="section.lines" t-as="line" t-key="line.id">
+                                <td class="text-center text-muted"
+                                    t-esc="section.start + line_index + 1"/>
+                                <td t-esc="line.employee"/>
+                                <t>
+                                    <td t-foreach="['basic_salary', 'allowance']" t-as="field"
+                                        t-key="field">
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line[field]"
+                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                    </td>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.gross)"/>
+                                    <td t-foreach="['social_base', 'employee_social', 'income_tax', 'pension', 'other_deduction']"
+                                        t-as="field" t-key="field">
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line[field]"
+                                               t-on-change="(ev) => this.editLine(line, field, ev)"/>
+                                    </td>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.total_deduction)"/>
+                                    <td class="text-end o_pr_calc" t-esc="fmt(line.net)"/>
+                                    <td>
+                                        <input type="number" step="0.001"
+                                               class="form-control form-control-sm text-end"
+                                               t-att-value="line.employer_social"
+                                               t-on-change="(ev) => this.editLine(line, 'employer_social', ev)"/>
+                                    </td>
+                                </t>
+                            </tr>
+                        </tbody>
+                        <tbody t-if="!data.lines.length">
+                            <tr>
+                                <td colspan="13" class="text-muted text-center py-2">
+                                    لا بنود. أضف موظفين ثم «أعد البناء».
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody t-elif="!visibleSections.length">
+                            <tr>
+                                <td colspan="13" class="text-muted text-center py-2">
+                                    لا بنود في هذا الكشف.
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="o_pr_total">
+                                <td colspan="2">
+                                    <t t-if="monthLabel">مجموع <t t-esc="monthLabel"/></t>
+                                    <t t-else="">مجموع الكشف</t>
+                                </td>
+                                <td class="text-end" t-esc="fmt(visibleTotals.basic_salary)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.allowance)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.gross)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.social_base)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.employee_social)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.income_tax)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.pension)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.other_deduction)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.total_deduction)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.net)"/>
+                                <td class="text-end" t-esc="fmt(visibleTotals.employer_social)"/>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="o_pr_note small text-muted">
+                        القيد: مصروف الرواتب <t t-esc="fmt(totals.gross)"/> مديناً،
+                        وحصة الشركة <t t-esc="fmt(totals.employer_social)"/> مديناً،
+                        مقابل الضمان <t t-esc="fmt(totals.employee_social + totals.employer_social)"/>
+                        وضريبة الدخل <t t-esc="fmt(totals.income_tax)"/>
+                        والمدفوع <t t-esc="fmt(totals.net)"/> دائناً.
+                    </div>
+                </t>
+            </t>
+
+            <!-- ======================================= الموظفون -->
             <t t-elif="state.tab === 'employees'">
                 <div class="o_pr_bar">
                     <input type="text" class="form-control form-control-sm"
