@@ -31,6 +31,14 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" t-attf-class="nav-link {{ state.tab === 'projects' ? 'active' : '' }}"
+                       t-on-click.prevent="() => this.setTab('projects')">
+                        المشاريع
+                        <span t-if="state.live.length" class="o_pr_count"
+                              t-esc="state.live.length"/>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" t-attf-class="nav-link {{ state.tab === 'finished' ? 'active' : '' }}"
                        t-on-click.prevent="() => this.setTab('finished')">
                         مشاريع منتهية
@@ -840,32 +848,44 @@
             </t>
 
             <!-- ======================================= مشاريع منتهية -->
-            <t t-elif="state.tab === 'finished'">
-                <div t-if="!state.finished.length" class="o_pr_empty">
-                    <div class="mb-2">لا مشروع منتهٍ بعد.</div>
-                    <div class="small text-muted">
-                        المشروع الذي يغيب عن كشفٍ مرفوع ينتهي، فينتقل إلى هنا
-                        بكشوف رواتبه وبطاقات موظفيه.
-                    </div>
+            <t t-elif="onProjects">
+                <div t-if="!projectList.length" class="o_pr_empty">
+                    <t t-if="state.tab === 'projects'">
+                        <div class="mb-2">لا مشروع قائمٌ بعد.</div>
+                        <div class="small text-muted">
+                            كشوف المشاريع تُستجدّ من أوراق ملف الرواتب المرفوع.
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div class="mb-2">لا مشروع منتهٍ بعد.</div>
+                        <div class="small text-muted">
+                            المشروع الذي يغيب عن كشفٍ مرفوع ينتهي، فينتقل إلى هنا
+                            بكشوف رواتبه وبطاقات موظفيه.
+                        </div>
+                    </t>
                 </div>
 
                 <t t-else="">
                     <div class="o_pr_layout">
                         <aside class="o_pr_side no-print">
-                            <div class="o_pr_side_title">المشاريع المنتهية</div>
+                            <div class="o_pr_side_title">
+                                <t t-if="state.tab === 'projects'">المشاريع القائمة</t>
+                                <t t-else="">المشاريع المنتهية</t>
+                            </div>
                             <button type="button"
-                                    t-attf-class="o_pr_side_item {{ finishedProject ? '' : 'active' }}"
-                                    t-on-click="() => this.closeFinished()">
+                                    t-attf-class="o_pr_side_item {{ openProject ? '' : 'active' }}"
+                                    t-on-click="() => this.closeProject()">
                                 <span>كل المشاريع</span>
                                 <span class="badge rounded-pill"
-                                      t-esc="state.finished.length"/>
+                                      t-esc="projectList.length"/>
                             </button>
-                            <button type="button" t-foreach="state.finished" t-as="project"
+                            <button type="button" t-foreach="projectList" t-as="project"
                                     t-key="project.id"
-                                    t-attf-class="o_pr_side_item {{ state.finishedId === project.id ? 'active' : '' }}"
-                                    t-on-click="() => this.openFinished(project)">
+                                    t-attf-class="o_pr_side_item {{ projectId === project.id ? 'active' : '' }}"
+                                    t-on-click="() => this.openProjectCard(project)">
                                 <span>
-                                    <i class="fa fa-archive me-1"/>
+                                    <i t-if="state.tab === 'finished'" class="fa fa-archive me-1"/>
+                                    <i t-else="" class="fa fa-folder-o me-1"/>
                                     <t t-esc="project.name"/>
                                 </span>
                                 <span class="badge rounded-pill"
@@ -875,18 +895,21 @@
 
                         <div class="o_pr_main">
                             <!-- لا مشروع مختار: المشاريع بطاقاتٍ -->
-                            <t t-if="!finishedProject">
+                            <t t-if="!openProject">
                                 <div class="o_pr_people_head small text-muted mb-2">
-                                    <b t-esc="state.finished.length"/> مشروعاً انتهى —
+                                    <b t-esc="projectList.length"/>
+                                    <t t-if="state.tab === 'projects'">مشروعاً قائماً</t>
+                                    <t t-else="">مشروعاً انتهى</t> —
                                     اضغط بطاقةً لتفتح كشفه على آخر شهرٍ دخله.
                                 </div>
                                 <div class="o_pr_people">
-                                    <div t-foreach="state.finished" t-as="project"
+                                    <div t-foreach="projectList" t-as="project"
                                          t-key="project.id" class="o_pr_person"
-                                         t-on-click="() => this.openFinished(project)">
+                                         t-on-click="() => this.openProjectCard(project)">
                                         <div class="o_pr_person_head">
                                             <div class="o_pr_person_name">
-                                                <i class="fa fa-archive me-1 text-muted"/>
+                                                <i t-if="state.tab === 'finished'" class="fa fa-archive me-1 text-muted"/>
+                                                <i t-else="" class="fa fa-folder-o me-1 text-muted"/>
                                                 <t t-esc="project.name"/>
                                             </div>
                                         </div>
@@ -913,7 +936,8 @@
                                             <span class="o_pr_tag o_pr_tag_group">
                                                 <t t-esc="project.months.length"/> كشفاً
                                             </span>
-                                            <span class="o_pr_tag o_pr_tag_off">منتهٍ</span>
+                                            <span t-if="state.tab === 'finished'"
+                                                  class="o_pr_tag o_pr_tag_off">منتهٍ</span>
                                         </div>
                                     </div>
                                 </div>
@@ -926,23 +950,24 @@
                                         <div class="o_pr_card_name">
                                             <button class="btn btn-sm btn-link p-0 me-2 no-print"
                                                     title="رجوع إلى المشاريع"
-                                                    t-on-click="() => this.closeFinished()">
+                                                    t-on-click="() => this.closeProject()">
                                                 <i class="fa fa-arrow-right"/>
                                             </button>
-                                            <t t-esc="finishedProject.name"/>
+                                            <t t-esc="openProject.name"/>
                                         </div>
                                         <div class="small text-muted">
-                                            أشهره <b t-esc="projectSpan(finishedProject)"/> ·
-                                            المصروف على <b t-esc="finishedProject.account"/> ·
-                                            يُدفع من <b t-esc="finishedProject.payment_account"/>
-                                            <t t-if="finishedProject.journal">
-                                                · يومية <b t-esc="finishedProject.journal"/>
+                                            أشهره <b t-esc="projectSpan(openProject)"/> ·
+                                            المصروف على <b t-esc="openProject.account"/> ·
+                                            يُدفع من <b t-esc="openProject.payment_account"/>
+                                            <t t-if="openProject.journal">
+                                                · يومية <b t-esc="openProject.journal"/>
                                             </t>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-secondary no-print"
+                                    <button t-if="state.tab === 'finished'"
+                                            class="btn btn-sm btn-outline-secondary no-print"
                                             t-att-disabled="state.busy"
-                                            t-on-click="() => this.reviveProject(finishedProject)">
+                                            t-on-click="() => this.reviveProject(openProject)">
                                         أعِد المشروع
                                     </button>
                                 </div>
@@ -950,9 +975,9 @@
                                 <div class="o_pr_card_sub">
                                     كشف رواتبه <t t-esc="periodLabel"/>
                                 </div>
-                                <div t-if="!finishedMonth" class="o_pr_empty">
+                                <div t-if="!projectMonth" class="o_pr_empty">
                                     لا كشف لهذا المشروع في <t t-esc="periodLabel"/>.
-                                    وأشهره <b t-esc="projectSpan(finishedProject)"/>.
+                                    وأشهره <b t-esc="projectSpan(openProject)"/>.
                                 </div>
                                 <table t-else=""
                                        class="table table-bordered table-sm o_pr_table o_pr_wide">
@@ -969,7 +994,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr t-foreach="finishedMonth.lines" t-as="line"
+                                        <tr t-foreach="projectMonth.lines" t-as="line"
                                             t-key="line.id">
                                             <td t-esc="line.employee"/>
                                             <td class="text-end" t-esc="fmt(line.basic_salary)"/>
@@ -985,26 +1010,26 @@
                                         <tr class="o_pr_total">
                                             <td>المجموع</td>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).basic_salary)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).basic_salary)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).allowance)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).allowance)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).gross)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).gross)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).employee_social)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).employee_social)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).income_tax)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).income_tax)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).pension)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).pension)"/>
                                             <td class="text-end"
-                                                t-esc="fmt(monthTotals(finishedMonth).net)"/>
+                                                t-esc="fmt(monthTotals(projectMonth).net)"/>
                                         </tr>
                                     </tfoot>
                                 </table>
 
                                 <div class="o_pr_card_sub mt-3">بطاقات موظفيه</div>
                                 <div class="o_pr_people">
-                                    <div t-foreach="finishedProject.employees" t-as="employee"
+                                    <div t-foreach="openProject.employees" t-as="employee"
                                          t-key="employee.id"
                                          t-attf-class="o_pr_person {{ employee.active ? '' : 'o_pr_person_off' }}"
                                          t-custom-click="(ev, mid) => this.openCard(employee, mid)">

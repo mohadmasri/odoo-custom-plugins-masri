@@ -299,10 +299,19 @@ class MyAccountingPayrollGroup(models.Model):
         الكشف المؤرشف يبقى كما كان: موظفوه (موقوفين) وبنوده في كل شهرٍ
         دخل فيه، فيُقرأ تاريخ المشروع كاملاً في مكانٍ واحد.
         """
+        return self._projects(False)
+
+    @api.model
+    def get_live(self):
+        """المشاريع القائمة: مثل المنتهية، كشوفها وموظفوها شهراً شهراً."""
+        return self._projects(True)
+
+    @api.model
+    def _projects(self, active):
         Line = self.env['myaccounting.payroll.line']
         items = []
         for group in self.with_context(active_test=False).search(
-                [('active', '=', False)]):
+                [('active', '=', active)]):
             months = {}
             for line in Line.search([('group_id', '=', group.id)]):
                 payroll = line.payroll_id

@@ -58,6 +58,8 @@ export class Payroll extends Component {
             groups: [],
             finished: [],
             finishedId: false,
+            live: [],
+            liveId: false,
             years: [],
             year: `${today.getFullYear()}`,
             month: `${today.getMonth() + 1}`,
@@ -122,11 +124,19 @@ export class Payroll extends Component {
         return `${monthLabel(this.state.month)} ${this.state.year}`;
     }
 
+    /** المشاريع: القائمة والمنتهية، كلٌّ بكشوفه وموظفيه */
     async loadFinished() {
-        this.state.finished = await this.orm.call("myaccounting.payroll.group",
-            "get_finished", []);
-        if (!this.state.finished.some((item) => item.id === this.state.finishedId)) {
+        const [finished, live] = await Promise.all([
+            this.orm.call("myaccounting.payroll.group", "get_finished", []),
+            this.orm.call("myaccounting.payroll.group", "get_live", []),
+        ]);
+        this.state.finished = finished;
+        this.state.live = live;
+        if (!finished.some((item) => item.id === this.state.finishedId)) {
             this.state.finishedId = false;
+        }
+        if (!live.some((item) => item.id === this.state.liveId)) {
+            this.state.liveId = false;
         }
     }
 
@@ -979,9 +989,38 @@ export class Payroll extends Component {
     // المشاريع المنتهية
     // ------------------------------------------------------------------
 
+    /** تبويب المشاريع: القائمة أو المنتهية، والشاشة واحدة */
+    get onProjects() {
+        return this.state.tab === "projects" || this.state.tab === "finished";
+    }
+
+    get projectList() {
+        return this.state.tab === "projects" ? this.state.live : this.state.finished;
+    }
+
+    get projectId() {
+        return this.state.tab === "projects"
+            ? this.state.liveId : this.state.finishedId;
+    }
+
+    /** المشروع المفتوح في التبويب الحالي */
+    get openProject() {
+        return this.onProjects
+            ? this.projectList.find((item) => item.id === this.projectId) || null
+            : null;
+    }
+
+    setProject(id) {
+        if (this.state.tab === "projects") {
+            this.state.liveId = id;
+        } else {
+            this.state.finishedId = id;
+        }
+    }
+
     /** أشهر المشروع المفتوح في السنة المعروضة: ما سواها لا يُضغط */
     get allowedMonths() {
-        const project = this.state.tab === "finished" ? this.finishedProject : null;
+        const project = this.openProject;
         if (!project) {
             return false;
         }
@@ -991,8 +1030,8 @@ export class Payroll extends Component {
     }
 
     /** كشف المشروع في الشهر المعروض */
-    get finishedMonth() {
-        const project = this.finishedProject;
+    get projectMonth() {
+        const project = this.openProject;
         if (!project) {
             return null;
         }
@@ -1017,9 +1056,9 @@ export class Payroll extends Component {
     }
 
     /** بطاقة المشروع تُفتح على آخر شهرٍ له، فالفلتر ينتقل إليه */
-    async openFinished(project) {
+    async openProjectCard(project) {
         const last = project.months[0];
-        this.state.finishedId = project.id;
+        this.setProject(project.id);
         if (last) {
             await this.withBusy(async () => {
                 this.state.year = `${last.year}`;
@@ -1029,17 +1068,8 @@ export class Payroll extends Component {
         }
     }
 
-    closeFinished() {
-        this.state.finishedId = false;
-    }
-
-    get finishedProject() {
-        return this.state.finished.find(
-            (item) => item.id === this.state.finishedId) || null;
-    }
-
-    setFinished(id) {
-        this.state.finishedId = id;
+    closeProject() {
+        this.setProject(false);
     }
 
     monthTotals(month) {
