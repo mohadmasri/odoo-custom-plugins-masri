@@ -63,7 +63,19 @@
     .o_general_ledger .o_gl_printable {
         overflow: visible !important;
     }
+    /* الجدول يفيض إلى صفحاتٍ تالية بدل أن يُحشر في واحدة، ولا يُقطع سطرٌ
+       بين صفحتين، وترويسته تتكرّر فوق كل صفحة */
     .o_general_ledger .o_gl_table {
+        page-break-inside: auto;
+        break-inside: auto;
+    }
+    .o_general_ledger .o_gl_table thead {
+        display: table-header-group;
+    }
+    .o_general_ledger .o_gl_table tfoot {
+        display: table-row-group;
+    }
+    .o_general_ledger .o_gl_table tr {
         page-break-inside: avoid;
         break-inside: avoid;
     }
@@ -137,4 +149,17 @@
     padding: 4px 10px;
     font-weight: 600;
     letter-spacing: 0.5px;
+}
+
+/* كل خمسة أسطر خطٌّ أغمق تحتها: العين تعدّ الأسطر الطويلة بلا ضياع */
+.o_general_ledger .o_gl_table tbody tr:nth-child(5n) > td {
+    border-bottom-width: 3px;
+    border-bottom-color: var(--gray-600, #6c757d);
+}
+
+@media print {
+    .o_general_ledger .o_gl_table tbody tr:nth-child(5n) > td {
+        border-bottom-width: 2px;
+        border-bottom-color: #555;
+    }
 }

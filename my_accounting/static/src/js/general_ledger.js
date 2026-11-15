@@ -14,6 +14,8 @@ const DIGIT_MODES = [
     { value: "arab", label: "٠١٢٣", title: "أرقام عربية" },
 ];
 const DIGITS_KEY = "my_accounting.gl_digits";
+// حدّ التكبير في الطباعة: ما فوقه يصير الخطّ أكبر من أن يُقرأ مرتاحاً
+const MAX_PRINT_SCALE = 2.6;
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
 function savedDigits() {
@@ -153,12 +155,13 @@ export class GeneralLedger extends Component {
     }
 
     /**
-     * الطباعة في صفحة A4 أفقية واحدة، مملوءة قدر الإمكان:
+     * الطباعة على A4 أفقية بأكبر خطٍّ تحتمله الصفحة:
      *  1) تُضيَّق أعمدة الأرقام إلى أقل عرض يكفي أطول رقم (وتبقى كلها متساوية)،
      *     ويُسمح بالتفاف الترويسات وعمود المرجع، فيقلّ عرض الجدول.
-     *  2) يُكبَّر الجدول (أو يُصغَّر) بالنسبة التي تملأ الصفحة دون تجاوزها،
-     *     فتصبح الأرقام أكبر وأوضح.
-     *  3) إن بقي فراغ رأسي، تُزاد المسافات داخل الصفوف لملء الصفحة.
+     *  2) يُكبَّر الجدول حتى يملأ **عرض** الصفحة — وهو ما يُكبّر الخطّ. ولا
+     *     يُصغَّر ليُحشر في ورقةٍ واحدة: الأسطر تفيض إلى الصفحة التالية
+     *     وترويسة الجدول تتكرّر فوقها.
+     *  3) إن بقي فراغٌ رأسي بعد التكبير، تُزاد المسافات داخل الصفوف لملئه.
      * كل ذلك يُطبَّق لحظة الطباعة فقط ثم يُلغى.
      */
     printLedger() {
@@ -189,23 +192,17 @@ export class GeneralLedger extends Component {
             }
             page.style.setProperty("--gl-ref-w", "130px");
 
-            // 2) نسبة ملء الصفحة (تكبير أو تصغير)، بحد أعلى معقول للتكبير
-            let scale = Math.min(
-                availableWidth / (printable.scrollWidth || 1),
-                availableHeight / (contentHeight() || 1),
-                3
-            ) * 0.985;
+            // 2) التكبير بعرض الصفحة وحده. وكان يُؤخذ أصغر النسبتين (العرض
+            //    والطول) ليدخل الكشف في ورقةٍ واحدة، فكان الخطّ يصغر إلى
+            //    النصف ويبقى نصف العرض أبيض. الطول يفيض إلى صفحةٍ تالية.
+            const scale = Math.min(availableWidth / (printable.scrollWidth || 1),
+                                   MAX_PRINT_SCALE) * 0.99;
 
-            // 3) ملء الفراغ الرأسي المتبقي بزيادة تباعد الصفوف
+            // 3) إن بقي فراغٌ رأسي بعد التكبير، تُوسَّع الأسطر لملئه
             const rows = table.querySelectorAll("tr").length;
             const spare = availableHeight / scale - contentHeight();
             if (rows && spare > 0) {
                 page.style.setProperty("--gl-row-pad", `${Math.min(spare / (2 * rows), 10).toFixed(2)}px`);
-                scale = Math.min(
-                    availableWidth / (printable.scrollWidth || 1),
-                    availableHeight / (contentHeight() || 1),
-                    3
-                ) * 0.985;
             }
             page.style.setProperty("--gl-print-scale", scale.toFixed(4));
             window.print();
