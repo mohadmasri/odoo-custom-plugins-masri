@@ -22,6 +22,15 @@
                                     t-esc="flt.label"/>
                         </t>
                     </div>
+                    <!-- شكل الأرقام: يسري على الشاشة والطباعة معاً -->
+                    <div class="btn-group btn-group-sm o_gl_digits" role="group"
+                         title="شكل الأرقام في الدفتر">
+                        <button t-foreach="digitModes" t-as="mode" t-key="mode.value"
+                                type="button" t-att-title="mode.title"
+                                t-attf-class="btn {{ isDigitMode(mode.value) ? 'btn-primary' : 'btn-outline-secondary' }}"
+                                t-on-click="() => this.setDigits(mode.value)"
+                                t-esc="mode.label"/>
+                    </div>
                     <button class="btn btn-secondary" t-on-click="() => this.printLedger()">
                         <i class="fa fa-print me-1"/> طباعة
                     </button>
@@ -38,7 +47,7 @@
             <div t-if="state.loading" class="text-center text-muted py-5">جارِ التحميل...</div>
 
             <t t-if="!state.loading and state.data">
-                <h4 class="mb-3 o_gl_title" t-esc="state.month"/>
+                <h4 class="mb-3 o_gl_title" t-esc="digits(state.month)"/>
 
                 <div t-if="!state.data.rows.length" class="text-center text-muted py-5">
                     لا توجد قيود بالحالات المختارة خلال هذا الشهر
@@ -84,15 +93,15 @@
                             <tbody>
                                 <tr t-foreach="state.data.rows" t-as="row" t-key="row.move_id"
                                     style="cursor:pointer;" t-custom-click="(ev, isMiddleClick) => this.openMove(row.move_id, isMiddleClick)">
-                                    <td class="o_gl_seq" t-esc="row.seq"/>
+                                    <td class="o_gl_seq" t-esc="digits(row.seq)"/>
                                     <td class="o_gl_move">
-                                        <strong t-esc="row.move_name"/>
+                                        <strong t-esc="digits(row.move_name)"/>
                                         <span t-if="row.state !== 'posted'"
                                               t-attf-class="badge ms-1 {{ row.state === 'draft' ? 'text-bg-secondary' : 'text-bg-warning' }}"
                                               style="font-size:9px;"
                                               t-esc="row.state === 'draft' ? 'مسودة' : 'غير مكتمل'"/>
                                     </td>
-                                    <td class="o_gl_date" t-esc="row.date"/>
+                                    <td class="o_gl_date" t-esc="digits(row.date)"/>
                                     <td class="o_gl_ref" t-esc="row.ref"/>
                                     <td class="text-end o_gl_num" t-esc="this.fmt(row.total_debit)"/>
                                     <td class="text-end o_gl_num" t-esc="this.fmt(row.total_credit)"/>

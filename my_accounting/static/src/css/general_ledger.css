@@ -131,3 +131,10 @@
 @media print {
     .o_print_no_code { display: none !important; }
 }
+
+/* مبدّل شكل الأرقام: عربيٌّ أو إنجليزيّ، وزرّاه ضيّقان فلا يزاحمان الشريط */
+.o_gl_digits .btn {
+    padding: 4px 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}

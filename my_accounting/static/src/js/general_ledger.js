@@ -7,6 +7,27 @@ import { PeriodFilter } from "./period_filter";
 import { usePrintPageSize } from "./print_page_size";
 import { openRecord } from "./open_record";
 
+// شكل الأرقام في الدفتر وحده: عربيّها (٠١٢) أو إنجليزيّها (012).
+// الاختيار يُحفظ في المتصفّح، والطباعة تأخذ ما على الشاشة فتطابقه.
+const DIGIT_MODES = [
+    { value: "latn", label: "0123", title: "أرقام إنجليزية" },
+    { value: "arab", label: "٠١٢٣", title: "أرقام عربية" },
+];
+const DIGITS_KEY = "my_accounting.gl_digits";
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+
+function savedDigits() {
+    try {
+        const saved = window.localStorage.getItem(DIGITS_KEY);
+        if (DIGIT_MODES.some((mode) => mode.value === saved)) {
+            return saved;
+        }
+    } catch {
+        // المتصفّح يمنع التخزين أحياناً (تصفّحٌ خاص): لا بأس، الافتراضي يكفي
+    }
+    return "latn";
+}
+
 const STATE_FILTERS = [
     { value: "posted", label: "مرحّل" },
     { value: "draft", label: "مسودة" },
@@ -40,8 +61,10 @@ export class GeneralLedger extends Component {
             loading: true,
             // فلتر الحالة (اختيار متعدد مثل صفحة القيود): مرحّل فقط افتراضياً
             states: states.length ? states : ["posted"],
+            digits: savedDigits(),
         });
         this.stateFilters = STATE_FILTERS;
+        this.digitModes = DIGIT_MODES;
         // دفتر الأستاذ يُطبع دائماً بالعرض (صفحة أفقية)
         this.printPage = usePrintPageSize("A4 landscape", "8mm");
         this.fixedMonth = !!context.ledger_month;
@@ -202,8 +225,47 @@ export class GeneralLedger extends Component {
         window.location.href = url;
     }
 
+    // ------------------------------------------------------------------
+    // شكل الأرقام: عربيٌّ أو إنجليزيّ، وفاصلة آلافٍ في الدفتر وحده
+    // ------------------------------------------------------------------
+
+    get arabicDigits() {
+        return this.state.digits === "arab";
+    }
+
+    isDigitMode(value) {
+        return this.state.digits === value;
+    }
+
+    setDigits(value) {
+        this.state.digits = value;
+        try {
+            window.localStorage.setItem(DIGITS_KEY, value);
+        } catch {
+            // لا يضرّ: الاختيار يعمل في هذه الجلسة على الأقلّ
+        }
+    }
+
+    /** مبلغٌ بثلاث خانات عشرية وفاصلة آلاف، بأرقام اللغة المختارة */
+    money(value) {
+        const number = Number(value) || 0;
+        return number.toLocaleString(this.arabicDigits ? "ar-EG" : "en-US", {
+            minimumFractionDigits: 3,
+            maximumFractionDigits: 3,
+        });
+    }
+
+    /** نصٌّ فيه أرقام (ترتيبٌ أو تاريخ): تُحوَّل أرقامه وحدها */
+    digits(text) {
+        const value = text === 0 ? "0" : (text || "");
+        if (!this.arabicDigits) {
+            return String(value);
+        }
+        return String(value).replace(/[0-9]/g, (one) => ARABIC_DIGITS[Number(one)]);
+    }
+
     fmt(v) {
-        return v ? v.toFixed(3) : "";
+        return v ? this.money(v) : "";
     }
 
     // خانة حساب: فارغة إن لم يُدخل شيء، و0 إن أُدخل صفر يدوياً
@@ -211,7 +273,10 @@ export class GeneralLedger extends Component {
         if (!amount) {
             return "";
         }
-        return amount[side] ? amount[side].toFixed(3) : (amount[`${side}_zero`] ? "0.000" : "");
+        if (amount[side]) {
+            return this.money(amount[side]);
+        }
+        return amount[`${side}_zero`] ? this.money(0) : "";
     }
 }
 
