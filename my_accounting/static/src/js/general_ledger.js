@@ -243,13 +243,17 @@ export class GeneralLedger extends Component {
         }
     }
 
-    /** مبلغٌ بثلاث خانات عشرية وفاصلة آلاف، بأرقام اللغة المختارة */
+    /** مبلغٌ بثلاث خانات عشرية وفاصلة آلاف، بأرقام اللغة المختارة.
+
+        وفواصل العربية في اليونيكود (٫ و٬) يشبه بعضها بعضاً حتى تختلط
+        على العين، فنكتب النقطة للعشرية والفاصلة العربية للآلاف.
+     */
     money(value) {
-        const number = Number(value) || 0;
-        return number.toLocaleString(this.arabicDigits ? "ar-EG" : "en-US", {
+        const text = (Number(value) || 0).toLocaleString("en-US", {
             minimumFractionDigits: 3,
             maximumFractionDigits: 3,
         });
+        return this.arabicDigits ? this.digits(text).replace(/,/g, "،") : text;
     }
 
     /** نصٌّ فيه أرقام (ترتيبٌ أو تاريخ): تُحوَّل أرقامه وحدها */
