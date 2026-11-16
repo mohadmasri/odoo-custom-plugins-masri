@@ -163,8 +163,10 @@ export class GeneralLedger extends Component {
      *     وترويسة الجدول تتكرّر فوقها.
      *  3) إن بقي فراغٌ رأسي بعد التكبير، تُزاد المسافات داخل الصفوف لملئه.
      * كل ذلك يُطبَّق لحظة الطباعة فقط ثم يُلغى.
+     *
+     * @param {boolean} [withGap] «طباعة عمود»: يُترك فراغٌ بين الحسابات
      */
-    printLedger() {
+    printLedger(withGap) {
         const page = document.querySelector(".o_general_ledger");
         const printable = page && page.querySelector(".o_gl_printable");
         const table = printable && printable.querySelector(".o_gl_table");
@@ -179,6 +181,9 @@ export class GeneralLedger extends Component {
         const contentHeight = () => printable.scrollHeight + (title ? title.offsetHeight : 0);
 
         page.classList.add("o_gl_print_fit");
+        // «طباعة عمود»: فراغٌ بين كل حسابٍ وما يليه. يُضاف قبل القياس،
+        // فيدخل عرضُ الفراغ في حساب نسبة التكبير
+        page.classList.toggle("o_gl_print_gap", !!withGap);
         this.printPage.enable();
         try {
             // 1) أقل عرض يكفي الأرقام = أطول رقم + الحشو الداخلي للخلية
@@ -209,6 +214,7 @@ export class GeneralLedger extends Component {
         } finally {
             this.printPage.disable();
             page.classList.remove("o_gl_print_fit");
+            page.classList.remove("o_gl_print_gap");
             page.style.removeProperty("--gl-num-w");
             page.style.removeProperty("--gl-ref-w");
             page.style.removeProperty("--gl-row-pad");

@@ -163,3 +163,18 @@
         border-bottom-color: #555;
     }
 }
+
+/* «طباعة عمود»: شريطٌ أبيض قبل أول عمودٍ من كل حساب، فتنفصل كتلة كل
+   حسابٍ عمّا جاورها. يُطبَّق لحظة الطباعة وحدها (الصنف يُضاف ثم يُزال)،
+   وهو خارج @media print ليدخل عرضُه في قياس التكبير قبل الطباعة. */
+.o_general_ledger.o_gl_print_gap .o_gl_table .o_gl_acc_start {
+    border-inline-start: 12px solid #fff;
+}
+
+/* الجدول بعرضٍ ثابت، فلو لم يتّسع العمود لابتلع الفراغُ مكانَ الأرقام */
+.o_general_ledger.o_gl_print_gap .o_gl_table col.o_gl_col_gap,
+.o_general_ledger.o_gl_print_gap .o_gl_table .o_gl_acc_start.o_gl_num {
+    width: calc(var(--gl-num-w, 90px) + 12px);
+    min-width: calc(var(--gl-num-w, 90px) + 12px);
+    max-width: calc(var(--gl-num-w, 90px) + 12px);
+}

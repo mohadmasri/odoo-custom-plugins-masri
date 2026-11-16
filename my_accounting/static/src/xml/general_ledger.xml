@@ -34,6 +34,11 @@
                     <button class="btn btn-secondary" t-on-click="() => this.printLedger()">
                         <i class="fa fa-print me-1"/> طباعة
                     </button>
+                    <button class="btn btn-outline-secondary"
+                            title="كالطباعة العادية، وبين كل حسابٍ وما يليه فراغ"
+                            t-on-click="() => this.printLedger(true)">
+                        <i class="fa fa-columns me-1"/> طباعة عمود
+                    </button>
                     <button class="btn btn-success" t-on-click="() => this.exportExcel()">
                         <i class="fa fa-file-excel-o me-1"/> تحميل Excel
                     </button>
@@ -65,7 +70,7 @@
                                 <col class="o_gl_col_num"/>
                                 <col class="o_gl_col_num"/>
                                 <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                    <col class="o_gl_col_num"/>
+                                    <col class="o_gl_col_num o_gl_col_gap"/>
                                     <col class="o_gl_col_num"/>
                                 </t>
                             </colgroup>
@@ -78,14 +83,14 @@
                                     <th rowspan="2" class="text-end o_gl_num">إجمالي مدين</th>
                                     <th rowspan="2" class="text-end o_gl_num">إجمالي دائن</th>
                                     <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                        <th colspan="2" class="text-center">
+                                        <th colspan="2" class="text-center o_gl_acc_start">
                                             <span class="o_print_no_code"><t t-esc="acc.code"/><t t-esc="' - '"/></span><t t-esc="acc.name"/>
                                         </th>
                                     </t>
                                 </tr>
                                 <tr>
                                     <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                        <th class="text-end small o_gl_num">من</th>
+                                        <th class="text-end small o_gl_num o_gl_acc_start">من</th>
                                         <th class="text-end small o_gl_num">إلى</th>
                                     </t>
                                 </tr>
@@ -106,7 +111,8 @@
                                     <td class="text-end o_gl_num" t-esc="this.fmt(row.total_debit)"/>
                                     <td class="text-end o_gl_num" t-esc="this.fmt(row.total_credit)"/>
                                     <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                        <td class="text-end o_gl_num" t-esc="this.cell(row.amounts[acc.id], 'debit')"/>
+                                        <td class="text-end o_gl_num o_gl_acc_start"
+                                            t-esc="this.cell(row.amounts[acc.id], 'debit')"/>
                                         <td class="text-end o_gl_num" t-esc="this.cell(row.amounts[acc.id], 'credit')"/>
                                     </t>
                                 </tr>
@@ -117,7 +123,8 @@
                                     <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_debit)"/>
                                     <td class="text-end o_gl_num" t-esc="this.fmt(state.data.grand_credit)"/>
                                     <t t-foreach="state.data.accounts" t-as="acc" t-key="acc.id">
-                                        <td class="text-end o_gl_num" t-esc="this.cell(state.data.totals[acc.id], 'debit')"/>
+                                        <td class="text-end o_gl_num o_gl_acc_start"
+                                            t-esc="this.cell(state.data.totals[acc.id], 'debit')"/>
                                         <td class="text-end o_gl_num" t-esc="this.cell(state.data.totals[acc.id], 'credit')"/>
                                     </t>
                                 </tr>
