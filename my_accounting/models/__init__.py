@@ -16,6 +16,7 @@ from . import photo_entry
 from . import account_move
 from . import backup
 from . import user_admin
+from . import res_users
 from . import asset_warmup
 from . import ir_http
 from . import balance_sheet
